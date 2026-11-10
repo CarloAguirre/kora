@@ -89,6 +89,7 @@ function formatDateTime(isoDateTime: string): string {
 
 export function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
   const sigla = getTeamStyle(teamName ?? '').sigla.toUpperCase();
+  if (sigla === 'PMO') return 'pmo';
   if (sigla === 'QA') return 'qa';
   if (sigla === 'IA') return 'ia';
   if (sigla === 'UX') return 'ux';
@@ -100,6 +101,7 @@ export function roleFromTeamName(teamName: string | null): PhaseRoadmapRole {
  *  QA → QA Funcional y el resto → Desarrollo. Ningún tramo cae en "Rev. Cliente". Es lo que
  *  permite que los chips de "Resumen de avance" también filtren las barras del Gantt. */
 const SCOPE_BY_ROLE: Readonly<Record<PhaseRoadmapRole, PhaseRoadmapTaskScope>> = {
+  pmo: 'desarrollo',
   ux: 'diseno',
   qa: 'qa',
   dev: 'desarrollo',
@@ -275,6 +277,7 @@ function toPhaseRoadmapPhase(
         label: segment.name,
         startDate: segment.startDate,
         endDate: segment.endDate,
+        closedAt: segment.closedAt ?? null,
       };
     }),
     deliveries: module.deliveries.map(
@@ -312,7 +315,7 @@ function shiftIsoDate(iso: string, days: number): string {
  * "Roadmap por Fases" del proyecto — lo usan tanto el portal de cliente como el Roadmap interno
  * (`ProjectModulesCard`), así ambas vistas muestran exactamente lo mismo.
  */
-export function toPhaseRoadmap(project: ProjectDetail): ProjectPhaseRoadmap {
+export function toPhaseRoadmap(project: Pick<ProjectDetail, 'modules' | 'observations' | 'startDate' | 'endDate'>): ProjectPhaseRoadmap {
   const observationsByModule = new Map<string, ProjectObservation[]>();
   for (const observation of project.observations) {
     if (!observation.moduleId) continue;
@@ -353,8 +356,13 @@ function toRoadmapStep(stage: ProjectModule['currentStage']): RoadmapStep {
 
 export function toRoadmapPhase(module: ProjectModule, index: number): ClientRoadmapPhase {
   const status = phaseStatus(module);
-  const start = module.estimatedStartDate;
-  const end = module.estimatedEndDate;
+  // Los segmentos son el calendario definitivo y EDITABLE. Si el PM cambia
+  // sus fechas, la vista cliente debe reflejarlo sin utilizar el snapshot
+  // inicial de fechas estimadas de la fase.
+  const blockStarts = module.segments.map((segment) => segment.startDate).sort();
+  const blockEnds = module.segments.map((segment) => segment.endDate).sort();
+  const start = blockStarts[0] ?? module.estimatedStartDate;
+  const end = blockEnds[blockEnds.length - 1] ?? module.estimatedEndDate;
 
   const months: string[] = [];
   if (start && end) {

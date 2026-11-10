@@ -4,6 +4,7 @@ import { PROJECT_PAYMENT_DEFAULT_TERM_DAYS, type IssueProjectPaymentMilestoneInv
 import {
   ProjectIsInternalError,
   ProjectNotApprovedForInvoicingError,
+  ProjectQuotationTransferRequiredError,
   ProjectPaymentMilestoneAlreadyIssuedError,
   ProjectPaymentMilestoneNotFoundError,
 } from '../../domain/errors/project.errors';
@@ -104,6 +105,10 @@ export class IssueProjectPaymentMilestoneInvoiceUseCase
     const triggersNewHito0 = Boolean(
       isFirstMilestone && project && !project.isDeleted && project.salesStage === 'approved' && project.status === 'draft',
     );
+    if (triggersNewHito0 && project &&
+        await this.projects.hasPendingQuotationTransfer?.(project.id)) {
+      return err(new ProjectQuotationTransferRequiredError());
+    }
     const triggersReactivation = Boolean(
       isFirstMilestone && project && !project.isDeleted && project.salesStage === 'approved' && project.status === 'on_hold',
     );

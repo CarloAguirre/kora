@@ -18,6 +18,7 @@ export interface HourEntryProps {
   moduleId: string | null;
   /** Tiempo de ejecución (tramo) de `moduleId` — siempre `null` sin fase. */
   segmentId: string | null;
+  taskId?: string | null;
   assignment: string | null;
   category: string;
   description: string;
@@ -43,6 +44,7 @@ export interface CreateHourEntryProps {
   readonly projectId?: string | null;
   readonly moduleId?: string | null;
   readonly segmentId?: string | null;
+  readonly taskId?: string | null;
   readonly assignment: string;
   readonly category?: string;
   readonly description?: string;
@@ -109,6 +111,7 @@ export class HourEntry extends AggregateRoot<string> {
       projectId,
       moduleId: projectId ? (props.moduleId ?? null) : null,
       segmentId: projectId && props.moduleId ? (props.segmentId ?? null) : null,
+      taskId: projectId && props.moduleId ? (props.taskId ?? null) : null,
       assignment: props.assignment,
       category: (props.category ?? '').trim(),
       description: (props.description ?? '').trim(),
@@ -213,6 +216,7 @@ export class HourEntry extends AggregateRoot<string> {
         | 'projectId'
         | 'moduleId'
         | 'segmentId'
+        | 'taskId'
         | 'category'
         | 'description'
         | 'hours'
@@ -250,7 +254,10 @@ export class HourEntry extends AggregateRoot<string> {
     assignDefined(this.props, data);
     this.props.designatedApproverUserId = projectId ? null : designatedApproverUserId;
     if (!projectId) this.props.moduleId = null;
-    if (!this.props.moduleId) this.props.segmentId = null;
+    if (!this.props.moduleId) {
+      this.props.segmentId = null;
+      this.props.taskId = null;
+    }
     if (!this.props.hasBlocker) this.props.blockerDescription = null;
 
     const wasRejected = this.props.status === 'rejected';

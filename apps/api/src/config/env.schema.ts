@@ -40,6 +40,23 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
+  // PoC opt-in: nunca inicia OAuth Drive ni altera el login salvo habilitación explícita.
+  GOOGLE_DRIVE_OAUTH_POC_ENABLED: z.stringbool().default(false),
+
+  // Integración servidor-a-servidor con Google Drive para los antecedentes de
+  // proyectos. Ambas son opcionales: sin ellas, Calculadora informa que Drive
+  // no está configurado y no intenta acceder a carpetas privadas.
+  GOOGLE_DRIVE_CLIENT_EMAIL: z.email().optional(),
+  GOOGLE_DRIVE_PRIVATE_KEY: z.string().optional(),
+
+  // Proveedor IA de la PoC de Calculadora. La API key es opcional: sin ella
+  // AiModule cae al proveedor simulado y la aplicación sigue arrancando.
+  GEMINI_API_KEY: z.string().trim().min(1).optional(),
+  GEMINI_MODEL: z.string().trim().min(1).default('gemini-3.5-flash-lite'),
+  // Selección explícita: nunca cambiar proveedor ni generar costos por accidente.
+  AI_PROVIDER: z.enum(['auto', 'gemini', 'openai', 'poc']).default('auto'),
+  OPENAI_API_KEY: z.string().trim().min(1).optional(),
+  OPENAI_MODEL: z.string().trim().min(1).default('gpt-6.1-sol'),
 
   // Correo saliente (Resend). Sin RESEND_API_KEY los correos se escriben en el
   // log en vez de enviarse — solo admisible fuera de producción.

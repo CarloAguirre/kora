@@ -47,6 +47,8 @@ import type { ActorContext, UseCase } from '../../../../shared/application/use-c
 import { ProjectChangeLogRecorder, type ProjectChangeLogEntry } from '../services/project-change-log.recorder';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
+import { progressToday } from '../services/project-progress';
+import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 export interface UpdateProjectModuleDeliveryCommand {
   readonly projectId: string;
@@ -85,6 +87,7 @@ export class UpdateProjectModuleDeliveryUseCase
     private readonly progress: ProjectProgressRecalculator,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    private readonly forecastSync: ForecastSourceSyncService,
   ) {}
 
   async execute(command: UpdateProjectModuleDeliveryCommand): Promise<Result<void, ApplicationError>> {
@@ -123,6 +126,61 @@ export class UpdateProjectModuleDeliveryUseCase
       }
     }
 
+    // Cierre explícito del bloque, distinto de la entrega del colaborador que
+    // sigue requiriendo revisión. Esta acción no puede autoaprobar una entrega
+    // genérica de fase ni utilizarse sin permisos de líder.
+    const finalizeBlock = command.data.finalizeBlock === true;
+    const forceCancelIncompleteTasks = command.data.forceCancelIncompleteTasks === true;
+    if (forceCancelIncompleteTasks && !finalizeBlock) {
+      return err(new ForbiddenError('La cancelación excepcional requiere confirmar el cierre del bloque.',
+        'PROJECT_BLOCK_FORCE_CLOSE_INVALID'));
+    }
+    const reopenBlock = command.data.reopenBlock === true;
+    if ((finalizeBlock && reopenBlock) || (finalizeBlock || reopenBlock) && !canManage) {
+      return err(new ForbiddenError('No tienes permiso para gestionar el cierre del bloque.', 'PROJECT_BLOCK_CLOSE_FORBIDDEN'));
+    }
+    const linkedSegment = module.segments.find((segment) => segment.id === delivery.segmentId);
+    if ((finalizeBlock || reopenBlock) && !linkedSegment) {
+      return err(new ForbiddenError('La entrega no está vinculada a un bloque operativo.', 'PROJECT_BLOCK_NO_SEGMENT'));
+    }
+    const now = this.clock.now();
+    const today = progressToday(now);
+    const incompleteTasksToCancel: (typeof module.tasks)[number][] = [];
+    if (finalizeBlock) {
+      const selectedDate = command.data.completedOn;
+      if (delivery.status !== 'planned' || command.data.status != null && command.data.status !== 'approved') {
+        return err(new InvalidDeliveryStatusTransitionError('Solo se puede cerrar una entrega de bloque planificada.'));
+      }
+      if (!selectedDate || selectedDate > today ||
+        selectedDate < linkedSegment!.startDate.toISOString().slice(0, 10)) {
+        return err(new ForbiddenError('La fecha real debe estar entre el inicio del bloque y hoy.', 'PROJECT_BLOCK_CLOSE_DATE_INVALID'));
+      }
+      const teamBlocks = module.segments.filter((segment) => segment.teamId === linkedSegment!.teamId);
+      const linkedTasks = module.tasks.filter((task) => {
+        if (task.cancelledAt || task.teamId !== linkedSegment!.teamId) return false;
+        if (task.segmentId) return task.segmentId === linkedSegment!.id;
+        const marker = task.description?.match(/ · ID ([0-9a-fA-F-]{36})/);
+        if (marker) return marker[1]?.toLowerCase() === linkedSegment!.id.toLowerCase();
+        return teamBlocks.length === 1;
+      });
+      if (linkedTasks.length === 0 ||
+        (!forceCancelIncompleteTasks && linkedTasks.some((task) => task.status !== 'done'))) {
+        return err(new ForbiddenError(
+          linkedTasks.length === 0
+            ? 'No se puede cerrar un bloque sin tareas operativas.'
+            : 'Solo puedes marcar como entregado cuando todas las tareas del bloque están aprobadas.',
+          'PROJECT_BLOCK_TASKS_NOT_APPROVED',
+        ));
+      }
+      if (forceCancelIncompleteTasks) {
+        incompleteTasksToCancel.push(...linkedTasks.filter((task) => task.status !== 'done'));
+      }
+    }
+    if (reopenBlock && (delivery.status !== 'approved' ||
+      command.data.status != null && command.data.status !== 'planned')) {
+      return err(new InvalidDeliveryStatusTransitionError('Solo se puede reabrir una entrega de bloque cerrada.'));
+    }
+
     // --- Equipo y colaborador -------------------------------------------------------------
     const teamChanged = command.data.teamId !== undefined && (command.data.teamId ?? null) !== delivery.teamId;
     const nextTeamId = command.data.teamId !== undefined ? (command.data.teamId ?? null) : delivery.teamId;
@@ -159,18 +217,24 @@ export class UpdateProjectModuleDeliveryUseCase
     }
 
     // --- Estado ----------------------------------------------------------------------------
-    const nextStatus = command.data.status;
+    const nextStatus = finalizeBlock ? 'approved' : reopenBlock ? 'planned' : command.data.status;
     const statusChanged = nextStatus !== undefined && nextStatus !== delivery.status;
+    // Otra vista puede revertir una aprobación mediante el ciclo tradicional.
+    // Si había un cierre de bloque, esa reversión también debe limpiarlo.
+    const undoRecordedBlockClose = reopenBlock ||
+      (delivery.status === 'approved' && nextStatus === 'delivered' && Boolean(delivery.completedOn));
     if (statusChanged) {
-      if (!PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS[delivery.status].includes(nextStatus)) {
+      if (!finalizeBlock && !reopenBlock &&
+        !PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS[delivery.status].includes(nextStatus)) {
         return err(new InvalidDeliveryStatusTransitionError(invalidTransitionMessage(delivery.status, nextStatus)));
       }
-      if (nextStatus === 'delivered' && delivery.status === 'planned' && nextAssigneeUserId === null) {
-        return err(
-          new InvalidDeliveryStatusTransitionError('Asigna la entrega a un colaborador antes de marcarla como terminada.'),
-        );
+      if (nextStatus === 'delivered' && delivery.status === 'planned' &&
+        nextAssigneeUserId === null && !canManage) {
+        return err(new InvalidDeliveryStatusTransitionError(
+          'Solo un líder puede entregar sin colaborador asignado.',
+        ));
       }
-      if (nextStatus === 'planned' && !command.data.rejectionReason?.trim()) {
+      if (nextStatus === 'planned' && !reopenBlock && !command.data.rejectionReason?.trim()) {
         return err(new RejectionReasonRequiredError());
       }
       if (
@@ -183,7 +247,6 @@ export class UpdateProjectModuleDeliveryUseCase
       }
     }
 
-    const now = this.clock.now();
     // Cualquier cambio de estado limpia el motivo de un rechazo anterior, salvo que este mismo
     // llamado sea el que lo está fijando (rechazo explícito con su motivo).
     const rejectionReason =
@@ -249,16 +312,27 @@ export class UpdateProjectModuleDeliveryUseCase
       // Un líder puede marcarla terminada por el colaborador — que se sepa que no fue él.
       const assigneeName =
         members.find((member) => member.userId === nextAssigneeUserId)?.fullName ?? delivery.assigneeName ?? 'el colaborador asignado';
-      const onBehalfOf = nextAssigneeUserId !== command.actor.userId ? ` en nombre de ${assigneeName}` : '';
+      const onBehalfOf = nextAssigneeUserId === null
+        ? ' por el líder sin colaborador asignado'
+        : nextAssigneeUserId !== command.actor.userId ? ` en nombre de ${assigneeName}` : '';
       messages.push(
-        delivery.status === 'planned'
-          ? `Entrega${label} marcada como terminada${onBehalfOf} ${inPhase}, ${deadlineNote(committedDate, now)}; queda pendiente de aprobación.${onBehalfOf ? ` Motivo: ${command.data.comment?.trim()}` : ''}`
+        finalizeBlock
+          ? `Entrega${label} del bloque "${linkedSegment!.name}" cerrada el ${formatCommittedDate(new Date(command.data.completedOn!))} ${inPhase}.${command.data.comment?.trim() ? ' Evidencia: ' + command.data.comment.trim() : ''}`
+          : reopenBlock
+            ? `Cierre de la entrega${label} revertido ${inPhase}; el bloque vuelve a estar abierto.`
+            : delivery.status === 'planned'
+              ? `Entrega${label} marcada como terminada${onBehalfOf} ${inPhase}, ${deadlineNote(committedDate, now)}; queda pendiente de aprobación.${onBehalfOf ? ` Motivo: ${command.data.comment?.trim()}` : ''}`
           : nextStatus === 'approved'
             ? `Entrega${label} aprobada ${inPhase}, ${deadlineNote(committedDate, now)}.`
             : nextStatus === 'planned'
               ? `Entrega${label} rechazada ${inPhase}: ${rejectionReason}`
               : `Se revirtió la aprobación de la entrega${label} ${inPhase}; vuelve a quedar pendiente de aprobación.`,
       );
+    }
+
+    for (const task of incompleteTasksToCancel) {
+      messages.push('Tarea "' + task.name + '" cancelada al cerrar excepcionalmente el bloque "' +
+        linkedSegment!.name + '" ' + inPhase + '. Se conserva el historial de horas.');
     }
 
     const entries: ProjectChangeLogEntry[] = messages.map((message) => ({
@@ -270,6 +344,12 @@ export class UpdateProjectModuleDeliveryUseCase
     // Cambio y registro en la misma transacción: si no se puede escribir la bitácora, la entrega
     // tampoco cambia — nunca queda una aprobación/rechazo sin quién ni cuándo.
     await this.unitOfWork.run(async (tx) => {
+      // Cancelación lógica, forecast, bitácora y cierre son atómicos.
+      // No ejecutar dos endpoints secuenciales: un error intermedio dejaría el bloque inconsistente.
+      for (const task of incompleteTasksToCancel) {
+        await this.modules.cancelTask(task.id, now, tx);
+        await this.forecastSync.syncTask(project, module.id, task.id, now, tx);
+      }
       await this.modules.updateDelivery(
         command.deliveryId,
         {
@@ -279,12 +359,24 @@ export class UpdateProjectModuleDeliveryUseCase
           ...(assigneeChanged ? { assigneeUserId: nextAssigneeUserId } : {}),
           ...(segmentChanged ? { segmentId: nextSegmentId } : {}),
           ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+          ...(finalizeBlock ? {
+            completedOn: new Date(command.data.completedOn! + 'T00:00:00.000Z'),
+            completedByUserId: command.actor.userId,
+            completionComment: command.data.comment?.trim() || null,
+          } : {}),
+          ...(undoRecordedBlockClose ? {
+            completedOn: null, completedByUserId: null, completionComment: null,
+          } : {}),
           ...(command.data.estimatedDate !== undefined ? { estimatedDate: new Date(command.data.estimatedDate) } : {}),
           ...(rejectionReason !== undefined ? { rejectionReason } : {}),
         },
         now,
         tx,
       );
+      if ((finalizeBlock || undoRecordedBlockClose) && linkedSegment) {
+        await this.modules.updateSegment(linkedSegment.id,
+          { closedAt: finalizeBlock ? now : null }, now, tx);
+      }
       if (entries.length > 0) await this.changeLog.record(entries, command.actor.userId, now, tx);
       await this.progress.recalculate(project.id, tx);
     });

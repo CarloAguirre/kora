@@ -52,6 +52,8 @@ export interface HourEntryListItem {
   readonly moduleName: string | null;
   readonly segmentId: string | null;
   readonly segmentName: string | null;
+  /** Task ID exacto cuando hay atribución, null para HH históricas. */
+  readonly taskId?: string | null;
   /** Equipo activo del autor al momento de listar — no es histórico, refleja la membresía actual. */
   readonly teamId: string | null;
   readonly teamName: string | null;

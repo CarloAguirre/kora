@@ -132,4 +132,43 @@ describe('ListProjectsUseCase — resolución de slug en los filtros', () => {
     const filters: ProjectFilters = projects.search.mock.calls[0]![0];
     expect(filters.teamId).toBe('team-uuid-1');
   });
+  it('aplica filtros comerciales de etapa y cotización en el backend', async () => {
+    const projects = new FakeProjectRepository();
+    const useCase = new ListProjectsUseCase(
+      projects as unknown as ProjectRepository,
+      new FakeTeamRepository(new Map()) as unknown as TeamRepository,
+      new FakeClientReader(new Map()),
+      MODULES, new FixedClock(),
+    );
+    await useCase.execute({
+      query: {
+        ...baseQuery(), salesStage: ['prospect'], quotationStatus: ['none', 'draft'],
+      },
+      actor: ACTOR,
+      actorPermissions: ['projects:read', 'projects:manage'],
+    });
+    const filters: ProjectFilters = projects.search.mock.calls[0]![0];
+    expect(filters.salesStage).toEqual(['prospect']);
+    expect(filters.quotationStatus).toEqual(['none', 'draft']);
+    expect(filters.quotationViewerUserId).toBeUndefined();
+  });
+
+  it('limita el filtro de cotización al líder asignado cuando no es Gerencia', async () => {
+    const projects = new FakeProjectRepository();
+    const useCase = new ListProjectsUseCase(
+      projects as unknown as ProjectRepository,
+      new FakeTeamRepository(new Map()) as unknown as TeamRepository,
+      new FakeClientReader(new Map()),
+      MODULES, new FixedClock(),
+    );
+    await useCase.execute({
+      query: { ...baseQuery(), quotationStatus: ['draft'] },
+      actor: { userId: 'leader-01', email: 'leader@kabeli.cl' },
+      actorPermissions: ['projects:read_assigned'],
+    });
+    const filters: ProjectFilters = projects.search.mock.calls[0]![0];
+    expect(filters.quotationViewerUserId).toBe('leader-01');
+    expect(filters.assignedToUserId).toBe('leader-01');
+  });
+
 });

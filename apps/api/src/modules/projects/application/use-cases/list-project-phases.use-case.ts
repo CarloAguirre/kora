@@ -41,12 +41,10 @@ export class ListProjectPhasesUseCase
     const project = isUuid(command.projectId) ? await this.projects.findById(command.projectId) : null;
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
 
+    const projectTeams = await this.teams.findByProject(project.id);
     if (!command.actorPermissions.includes('projects:read')) {
       const snapshot = project.toSnapshot();
-      const [members, projectTeams] = await Promise.all([
-        this.members.listForProject(project.id),
-        this.teams.findByProject(project.id),
-      ]);
+      const members = await this.members.listForProject(project.id);
       const isParticipant =
         snapshot.leaderUserId === command.actorUserId ||
         snapshot.developerUserId === command.actorUserId ||
@@ -68,6 +66,16 @@ export class ListProjectPhasesUseCase
           name: segment.name,
           startDate: segment.startDate.toISOString().slice(0, 10),
           endDate: segment.endDate.toISOString().slice(0, 10),
+          leaderName: projectTeams.find((team) => team.teamId === segment.teamId)?.leaderName ?? null,
+        })),
+        tasks: module.tasks.filter((task) => !task.cancelledAt).map((task) => ({
+          id: task.id, name: task.name, teamId: task.teamId,
+          segmentId: task.segmentId, assigneeUserId: task.assigneeUserId,
+          estimatedHours: task.estimatedHours,
+          /** Solo HH aprobadas enlazadas por task_id; sin atribuir historiales. */
+          actualHours: task.actualHours ?? null,
+          pendingHours: task.pendingHours ?? null,
+          cancelledAt: null,
         })),
       })),
     );

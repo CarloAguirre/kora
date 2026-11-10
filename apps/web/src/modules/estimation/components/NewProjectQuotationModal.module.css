@@ -1,0 +1,1 @@
+.copy{display:grid;gap:12px;margin-top:16px}.copy small{font-size:12px;color:var(--kora-text-muted,#667085);line-height:1.4}.demo{font-size:12px;color:var(--kora-warning-text,#854d0e);background:var(--kora-warning-surface,#fff7e6);border-radius:var(--kora-radius,8px);padding:12px;margin:14px 0 0;line-height:1.5}.error{font-size:12px;color:var(--kora-danger,#b42318)}

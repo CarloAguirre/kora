@@ -55,6 +55,12 @@ const NAVIGATION: readonly NavigationItem[] = [
     icon: <FolderOpenIcon size={20} />,
     anyOf: ['projects:read', 'projects:read_assigned'],
   },
+  {
+    to: '/mis-proyectos',
+    label: 'Mis proyectos',
+    icon: <FolderOpenIcon size={20} />,
+    permission: 'hours:read_own',
+  },
   // Portal de cliente: mismas etiquetas "Proyectos"/"Soporte" que el resto del
   // menú, pero apuntando a las páginas de solo-lectura del propio cliente en
   // vez de a los listados internos — el permiso `own_client` es exclusivo del
@@ -127,6 +133,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
     // Mismo criterio para `finanzas`: perfil de un único propósito (ver
     // `kora-perfil-finanzas.html`), su menú es solo "Facturación".
     if (item.to === '/dashboard' && (user?.role === 'cliente' || user?.role === 'finanzas')) return false;
+    if (item.to === '/mis-proyectos' && user?.role !== 'collaborator') return false;
     if (item.permission) return can(item.permission);
     if (item.anyOf) return canAny(...item.anyOf);
     return true;

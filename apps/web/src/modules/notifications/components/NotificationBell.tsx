@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { TEAM_REPORT_MISSING_FIELD_LABELS, type LeaderReminders, type Notification } from '@kora/contracts';
 import styles from './NotificationBell.module.css';
 import { BellIcon, CircleCheckIcon, ClockIcon, FolderOpenIcon } from '@/shared/components/icons/Icons';
-import { projectPath } from '@/app/router/paths';
+import { projectPath, projectTeamPath } from '@/app/router/paths';
 import { useLeaderReminders, useMarkNotificationsRead, useNotifications } from '../api/notifications.queries';
 
 /** Cuántos proyectos se listan por notificación antes de "Ver los N restantes". */
@@ -60,7 +60,11 @@ export function NotificationBell() {
   const approvals = reminders?.pendingApprovals ?? { entries: 0, hours: 0 };
   const missingDays = reminders?.missingHourDays ?? [];
   const projectsMissingData = reminders?.projectsMissingData ?? [];
-  const pendingCount = [approvals.entries > 0, missingDays.length > 0, projectsMissingData.length > 0].filter(Boolean).length;
+  const teamsAwaitingStaffing = reminders?.teamsAwaitingStaffing ?? [];
+  const pendingCount = [
+    approvals.entries > 0, missingDays.length > 0,
+    projectsMissingData.length > 0, teamsAwaitingStaffing.length > 0,
+  ].filter(Boolean).length;
   // Cada pendiente cuenta como un aviso mientras siga sin resolverse.
   const badgeCount = unread + pendingCount;
   const close = () => setOpen(false);
@@ -137,6 +141,31 @@ export function NotificationBell() {
                     </p>
                   </ReminderItem>
                 )}
+                {teamsAwaitingStaffing.length > 0 && (
+                  <ReminderItem
+                    icon={<FolderOpenIcon size={16} />}
+                    title={`${plural(teamsAwaitingStaffing.length, 'equipo', 'equipos')} pendiente${teamsAwaitingStaffing.length === 1 ? '' : 's'} de asignar colaboradores`}
+                  >
+                    <ExpandableList
+                      items={teamsAwaitingStaffing.map((item) => ({
+                        key: item.projectId + ':' + item.teamId,
+                        content: (
+                          <Link
+                            to={projectTeamPath(
+                              { id: item.projectId, slug: item.projectSlug },
+                              { id: item.teamId, slug: item.teamSlug },
+                            )}
+                            className={styles.projectLink}
+                            onClick={close}
+                          >
+                            {item.clientName ? item.clientName + ' — ' : ''}
+                            {item.projectName} · {item.teamName}: asignar colaboradores
+                          </Link>
+                        ),
+                      }))}
+                    />
+                  </ReminderItem>
+                )}
                 {projectsMissingData.length > 0 && (
                   <ReminderItem
                     icon={<FolderOpenIcon size={16} />}
@@ -197,8 +226,29 @@ function NotificationItem({
   onOpen: () => void;
   onNavigate: () => void;
 }) {
-  const { data } = notification;
+  if (notification.type === 'task_review_requested' || notification.type === 'task_returned') {
+    const { data } = notification;
+    return (
+      <li className={[styles.item, notification.readAt ? '' : styles.itemUnread]
+        .filter(Boolean).join(' ')} onClick={onOpen}>
+        <div className={styles.itemHeader}>
+          {!notification.readAt && <span className={styles.unreadDot} aria-label="Sin leer" />}
+          <span className={styles.itemTitle}>{notification.title}</span>
+        </div>
+        <span className={styles.itemTime}>{timeAgo(notification.createdAt)}</span>
+        <Link to={projectPath({ id: data.projectId, slug: data.projectSlug })}
+          className={styles.projectLink} onClick={onNavigate}>
+          {data.projectName} · {data.taskName}
+        </Link>
+        {notification.type === 'task_review_requested' && data.assigneeName &&
+          <p className={styles.note}>Completada por {data.assigneeName}. Requiere aprobación.</p>}
+        {notification.type === 'task_returned' && data.reason &&
+          <p className={styles.note}>Motivo de devolución: {data.reason}</p>}
+      </li>
+    );
+  }
 
+  const { data } = notification;
   return (
     <li className={[styles.item, notification.readAt ? '' : styles.itemUnread].filter(Boolean).join(' ')} onClick={onOpen}>
       <div className={styles.itemHeader}>

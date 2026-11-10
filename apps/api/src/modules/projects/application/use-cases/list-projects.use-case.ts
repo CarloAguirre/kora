@@ -83,6 +83,10 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
         type: query.type,
         status: query.status,
         phase: query.phase,
+        salesStage: query.salesStage,
+        quotationStatus: query.quotationStatus,
+        quotationViewerUserId: query.quotationStatus?.length && !actorPermissions.includes('projects:manage')
+          ? actor.userId : undefined,
         kind: query.kind,
         clientId: client?.id,
         clientIds: query.clientIds,
@@ -99,12 +103,16 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
     const modulesByProject = await this.modules.listProgressInputsForProjects(page.items.map((item) => item.id));
     const today = progressToday(this.clock.now());
     return ok(
-      mapPage(page, (item) =>
-        toProjectSummary(
+      mapPage(page, (item) => {
+        const canReadCommercial = actorPermissions.includes('projects:manage') ||
+          (actorPermissions.includes('projects:read_assigned') &&
+           item.leaderUserId === actor.userId);
+        const summary = toProjectSummary(
           item,
           calculateProjectProgress({ ...item, modules: modulesByProject.get(item.id) ?? [] }, today),
-        ),
-      ),
+        );
+        return { ...summary, quotationStatus: canReadCommercial ? item.quotationStatus : null };
+      }),
     );
   }
 }

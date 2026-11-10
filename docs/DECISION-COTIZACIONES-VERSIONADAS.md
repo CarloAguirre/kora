@@ -1,0 +1,87 @@
+# ADR / decisiones pendientes — Cotizaciones versionadas en Kora
+**Estado:** propuesta técnica, no aprobación comercial. **Fecha:** 2026-10-30.
+
+## Reglas explícitas de la especificación
+- Una cotización ligada a cada proyecto; versiones numeradas, fuente manual/copia/IA; una sola versión aprobada.
+- Estados: `borrador → enviada al cliente → aprobada`; se permite aprobación directa de borrador con confirmación. Enviada/aprobada: no editable.
+- Aprobación permite traspasar ahora o después; aprobado-pendiente **no** modifica el plan de ejecución.
+- Horas por equipo: colaboradores/cupos × semanas × hh/semana × dedicación; modo por fases: suma de horas por equipo en fases. Las fases son semanas relativas a inicio real. La Fase 1 es propia de Kora.
+- Valor HH y moneda (UF, USD, CLP), impuesto (IVA19/IGV18/exento), únicos/recurrentes, pago en hitos (100%) y supuestos son comerciales. El agente IA nunca propone valor HH.
+- La vista cliente no cambia. El resumen comercial posterior al traspaso solo lo ven usuarios autorizados.
+- Fijas F01–F05, dinámicas por impacto hasta 5 iniciales y 2 de seguimiento, prefill de evidencia y opción «No lo sé / supuesto».
+
+## Máquina de estados propuesta
+`quotation` (1 por project_id) posee `versions[]`. `version` es `draft | sent | approved`; aceptación IA es estado **ortogonal** `pending | accepted`. Un borrador se edita, `sent`/ `approved` permanecen congelados. `approved` único por cotización; traspaso `pending|completed` vinculado a versión. Revisar cambio de `approved` antiguo a `sent` cuando se apruebe otra, sin perder auditoría de aprobaciones.
+**En R1 NO implementar envío, aprobación ni traspaso; incorporar solo snapshots editables de borrador y copia.**
+
+## D01 · Equipos: BLOQUEA EDITOR
+Especificación lista cinco equipos (`Desarrollo`, `UX-UI`, `QA`, `RPA`, `IA`), HTML agrega PMO, PoC sugiere Tech Lead y Arquitectura. Consultar catálogo real `teams`; no crear equipos implícitos por cadena, resolver si PMO/Líder/Arquitectura son perfil imputable o costo sin HH.
+
+## D02 · Permisos: BLOQUEA ENDPOINTS EXPUESTOS
+Documento permite Líder PM, Gerencia, PMO, pero HTML limita al Líder PM a proyectos a cargo. Kora tiene `projects:manage` para admin/PMO y `projects:read_assigned` para líderes. **Política conservadora preliminar para R1**: admin/PMO con `projects:manage`, líder únicamente si `projects.leader_user_id` coincide; nadie más. Validar con producto si un Líder PM puede editar cotizaciones ajenas; la restricción es explícita en backend, nunca solo UI.
+
+## D03 · Drive: BLOQUEA IA PRODUCTIVA
+Documento exige carpeta visible para cuenta Google conectada del usuario. Hoy se usa Service Account, y `openid email profile` no autoriza acceso delegado. Definir OAuth delegado/alcances, consentimiento, refresh seguro y política de usuarios sin Google. Mantener Service Account solamente para pruebas autorizadas. Match de carpetas por nombre: sugerencia, confirmación explícita ante duda.
+
+## D04 · EDT/tareas: BLOQUEA AUTOMATISMO DE TRASPASO
+La EDT original es granular (RF/HU/actividad/rol); la nueva propuesta solo prescribe equipos y fases/módulos en semanas. El documento deja abierta la pregunta de qué hacer con tareas al editar HH. **No borrar ni prorratear tareas existentes** por modificar cotización. Si se requiere tareas reales, se hará un paso de conciliación EDT → tareas tras aceptación humana. No confundir peso de módulo con horas de todas sus tareas.
+
+## D05 · Reaprobación después de transferir: BLOQUEA REEMPLAZO DE DATOS REALES
+Documento permite aprobar otra versión, pero prototipo cierra la edición después de traspasar. Recalcular un proyecto activo con horas consumidas/facturas puede corromper su historial. Requerir flujo controlado de cambio de alcance con diferencias y protección de hitos ya facturados/pagados. Antes de acordarlo, ninguna cotización reemplaza ejecución existente automáticamente.
+
+## D06 · Tarifas/impuestos y cálculo: BLOQUEA MONTOS COMERCIALES
+Documento: HH única por proyecto; HTML: valor HH por versión. **Propuesta técnica reversible**: cada versión conserva snapshot tarifario; si se acuerda un valor base de proyecto, solo se copia al crear la versión y no cambia versiones enviadas. `Neto = HH × valorHH + costos únicos`; impuesto sobre neto; mensual/anual separados. Decidir redondeos, decimales UF y base imponible de costos externos; no imponer supuestos financieros mediante Gemini.
+
+## Casos de conciliación con Kora
+- `projects.type` identifica desarrollo/soporte, no prospecto/aprobado. La fase comercial es `sales_stage` y el estado operacional es `status`.
+- `project_teams.member_count` es cupo máximo, no personas asignadas. `project_modules` y sus tareas ya afectan avance y Forecast.
+- `project_payment_milestones` tiene estados `pending/to_invoice/invoiced/paid`. No reemplazar tramos facturados.
+- `ChangeProjectStatusUseCase` y la activación automática por Hito 0 requieren revisión conjunta en R3 antes de bloquear `active`.
+- Ninguna acción sobre borradores debe actualizar Proyectos o disparar correos, triggers de facturación ni Forecast.
+
+## Aceptación pendiente
+Acordar con Diseño/Levantamiento los seis puntos, documentar decisión definitiva y actualizar contrato/prototipo cuando diverjan. Hasta entonces, las recomendaciones son **propuestas**, no reglas aprobadas.
+
+## Evidencia de PostgreSQL y regla operativa provisional (30-oct-2026)
+
+El resultado de la consulta de estados (ver `VALIDACION-ESTADOS-COTIZACIONES-2026-10-30.md`) revela 37 proyectos `development` en `prospect|quoted` que también están `active`. La Calculadora **puede preparar un borrador comercial aislado** en esos proyectos, igual que si estuvieran `draft`; esto NO valida ni reemplaza un contrato o alcance operativo, y NO habilita transferencia sobre un proyecto activo. La etapa `approved` se mantiene de solo lectura para borradores nuevos en esta fase. La decisión D05 sigue abierta para el reemplazo de la versión transferida y la protección de HH/facturas históricas.
+
+## R3-a · Preflight read-only (30-oct-2026)
+
+Se incorpora GET de previsualización operativa con HH vendidas/usadas, equipos, módulos/tareas/segmentos e hitos por estado; transferEnabled permanece false. La lectura no modifica BD. No se compara contract_amount con el neto propuesto (D06 no define la base). Consultar docs/IMPLEMENTACION-CALCULADORA-R3A-PREFLIGHT.md. D04, D05 y D06 continúan abiertas; ninguna mutación de aprobación/traspaso se habilita.
+
+## R3-b — Evidencia D04 antes de traspasar (30-oct-2026)
+
+Para preparar D04 se agregó una conciliación de solo lectura EDT → candidatos de módulos/tareas existentes. La coincidencia de nombres NO es una relación de identidad y no habilita editar ni reemplazar tareas reales. Si la EDT se modificó comercialmente, se identifica como evidencia desfasada; fases comerciales sin EDT no se convierten en tareas. Ver docs/IMPLEMENTACION-CALCULADORA-R3B-EDT-CONCILIACION.md. D04, D05 y D06 permanecen pendientes.
+
+## R3-c — Revisión humana D04 (30-oct-2026)
+
+Una pantalla local permite preparar una propuesta explícita de asociación de módulos/actividades EDT a módulos/tareas operativos por UUID y exportar un acta JSON, sin guardarla en Kora ni ejecutar cambios. Una asociación por nombre no es identidad comprobada. Las decisiones marcadas en el acta no constituyen aprobación comercial ni ratifican D04–D06. Ver `docs/IMPLEMENTACION-CALCULADORA-R3C-ACTA-CONCILIACION.md`.
+
+## R3-d — Registro de actas en Kora (30-oct-2026)
+
+Las actas propuestas por el responsable pueden guardarse como registros append-only de `quotation_events` sin modificar la cotización ni ejecutar traspasos. Cada guardado conserva JSON canónico, autor, fecha y revisión; un preflight stale se rechaza. El registro **no equivale** a ratificación de D04/D05/D06 ni es aprobación contractual. Ver docs/IMPLEMENTACION-CALCULADORA-R3D-ACTAS-AUDITABLES.md.
+
+## R3-e — Segundo revisor técnico (30-oct-2026)
+
+La política conservadora provisional exige un segundo usuario con `projects:manage` distinto al autor para evaluar técnicamente la última acta. Resultados: `changes_requested` o `reviewed_for_discussion`, siempre con `status=technical_review_only` y `transferEnabled=false`; se escriben únicamente eventos append-only. D02/D04/D05/D06 siguen abiertos. La revisión técnica jamás equivale a aprobación contractual; consultar docs/IMPLEMENTACION-CALCULADORA-R3E-EVALUACION-TECNICA.md.
+
+## R3-f — Validación sin permiso comercial (01-nov-2026)
+
+La comprobación automática antes del envío diagnostica inconsistencias de versión/equipos/HH/tarifas/fases/pagos e IA, pero NO envía ni aprueba. El resultado `contentChecksPassed` no es un permiso y `sendEnabled` sigue fijo en `false`. Se advierte explícitamente que costos recurrentes no están incluidos en el cálculo actual y que D02/D05/D06 continúan pendientes. Ver `docs/IMPLEMENTACION-CALCULADORA-R3F-VALIDACION-COMERCIAL.md`.
+
+## R3-g — Evidencia interna previa al envío (01-nov-2026)
+
+El GET `commercial-dossier` genera un expediente estructurado para revisión humana a partir de la versión persistida y un preflight reciente. Tiene `internal_review_only`, `deliveryEnabled:false`, `commercialApprovalEnabled:false`, `transferEnabled:false` y deja D02/D05/D06 en estado pendiente. Es un documento interno descargable, no un documento de cliente ni una aprobación; no se almacena ni altera proyectos. Ver `docs/IMPLEMENTACION-CALCULADORA-R3G-EXPEDIENTE-INTERNO.md`.
+
+## R4-a — Cuestionario antes de generar propuesta (01-nov-2026)
+
+F01–F05 son obligatorias/opcionales según definición ya aprobada por contrato; el nuevo endpoint `/poc/proposal-answered` exige respuestas válidas. No se generan aclaraciones dinámicas sin lectura documental, el análisis preliminar previo sigue siendo PoC y la lectura Drive depende de D03. Se restringió el fallback de KDM a su URL demo explícita, evitando considerar documentación ajena como evidencia. La cotización real y estados comerciales permanecen separados. Ver `docs/IMPLEMENTACION-CALCULADORA-R4A-CUESTIONARIO-FIJO.md`.
+
+## R4-c — Aceptación técnica inicial no es aprobación comercial (02-nov-2026)
+
+Se habilitó la materialización de un baseline técnico generado desde Gemini+KDM únicamente para prospectos/cotizados sin ejecución ni registros previos. Un evento planning_baseline_applied marca la versión usada y los moduleIds. La aplicación llena project_teams, project_modules y sold_hours; NO altera sales_stage, contrato, pagos, tareas fechadas, usados ni status contractual approved. D02/D05/D06 continúan abiertos. El frontend no debe presentar este evento como aceptación del cliente. Ver docs/IMPLEMENTACION-CALCULADORA-R4C-EDT-ROADMAP-ACEPTACION.md.
+
+## R4-e — Implementación inicial de transiciones comerciales y traspaso seguro (02-nov-2026)
+
+Con la Especificación de Calculadora (26-oct-2026) se implementaron estados `draft→sent→approved`, aceptación IA separada, permiso equivalente para Líder PM asignado y Gerencia/PMO, y traspaso **solo de proyecto No iniciado sin ejecución ni cobros**. La aprobación de cliente cambia `sales_stage` a `approved`, nunca cambia HH de proyecto hasta traspaso. Estado de envío es registro manual, no email automático. Se bloquea Hito 0 inicial (manual y primera factura automática) si hay cotización nueva sin traspaso. D02 queda parcialmente cubierta por esta regla; D05 continúa abierta para recotizaciones con operaciones/hitos históricos; D06 conserva los valores existentes y validación del plan 100%, sin nuevas reglas fiscales. Evitar activar el antiguo endpoint R4-c de aplicación temprana. Ver `docs/IMPLEMENTACION-CALCULADORA-R4E-ALINEACION-COMERCIAL-LISTADO.md`.

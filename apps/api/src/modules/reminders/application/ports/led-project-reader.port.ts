@@ -17,6 +17,16 @@ export interface LedProjectTeamRow {
   readonly teamHasHours: boolean;
 }
 
+export interface TeamAwaitingStaffingRow {
+  readonly projectId: string;
+  readonly projectSlug: string;
+  readonly projectName: string;
+  readonly clientName: string | null;
+  readonly teamId: string;
+  readonly teamSlug: string;
+  readonly teamName: string;
+}
+
 /** Lectura para "datos por completar" de la campanita: cruza proyectos, equipos y horas. */
 export interface LedProjectReader {
   /**
@@ -26,6 +36,9 @@ export interface LedProjectReader {
    * pero un recordatorio diario por proyectos cerrados sería ruido.
    */
   listTeamsOfLedProjects(userId: string): Promise<LedProjectTeamRow[]>;
+  /** Solo equipos con cotización efectivamente traspasada y sin gente
+   * activa asignada a trabajar en ese proyecto, dirigidos a su líder efectivo. */
+  listTeamsAwaitingStaffing(userId: string): Promise<TeamAwaitingStaffingRow[]>;
 }
 
 export const LED_PROJECT_READER = Symbol('LedProjectReader');

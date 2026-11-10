@@ -56,7 +56,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         teamId: projectTeams.teamId,
         teamSlug: teams.slug,
         teamName: teams.name,
-        leaderUserId: projectTeams.leaderUserId,
+        leaderUserId: sql<string | null>`coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`,
         leaderFirstName: users.firstName,
         leaderLastName: users.lastName,
         assignedHours: projectTeams.assignedHours,
@@ -74,16 +74,17 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
       })
       .from(projectTeams)
       .innerJoin(teams, eq(teams.id, projectTeams.teamId))
-      .leftJoin(users, eq(users.id, projectTeams.leaderUserId))
+      .leftJoin(users, sql`${users.id} = coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId})`)
       .leftJoin(
         projectTeamMembers,
         and(
           eq(projectTeamMembers.projectId, projectTeams.projectId),
           eq(projectTeamMembers.teamId, projectTeams.teamId),
+          sql`${projectTeamMembers.blockedAt} is null`,
         ),
       )
       .where(eq(projectTeams.projectId, projectId))
-      .groupBy(projectTeams.id, teams.slug, teams.name, teams.leaderUserId, users.firstName, users.lastName)
+      .groupBy(projectTeams.id, teams.id, teams.slug, teams.name, teams.leaderUserId, users.firstName, users.lastName)
       .orderBy(projectTeams.createdAt, projectTeams.id);
 
     const assignedUserIds = new Set(
@@ -127,7 +128,7 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
     const rows = await db
       .select({ id: teams.id })
       .from(teams)
-      .leftJoin(projectTeams, and(eq(projectTeams.teamId, teams.id), eq(projectTeams.projectId, projectId)))
+      .innerJoin(projectTeams, and(eq(projectTeams.teamId, teams.id), eq(projectTeams.projectId, projectId)))
       .where(
         and(
           eq(teams.id, teamId),

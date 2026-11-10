@@ -16,6 +16,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { TextField } from '@/shared/components/ui/TextField';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { PillSwitcher } from '@/shared/components/ui/PillSwitcher';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Pagination, usePaginatedItems } from '@/shared/components/ui/Pagination';
 import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
@@ -63,6 +64,12 @@ interface BitacoraCardProps {
   /** Gerencia/PMO (`projects:manage`): puede corregir la fecha del Hito 0 desde su registro de activación. */
   canCorrectHito0?: boolean;
 }
+
+const BITACORA_FILTER_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'incidents', label: 'Incidentes' },
+  { value: 'work', label: 'Entregas y tareas' },
+] as const;
 
 const RESOLVE_ACTION_LABEL: Record<BitacoraRowAction, string> = {
   aprobar: 'Aprobar',
@@ -251,32 +258,12 @@ export function BitacoraCard({
         <div className={styles.eventsToolbar}>
           <div className={styles.filterField}>
             <span className={styles.filterFieldLabel}>Tipo</span>
-            <div className={styles.filterTabs} role="group" aria-label="Filtrar por tipo">
-              <button
-                type="button"
-                aria-pressed={filter === 'all'}
-                className={[styles.filterTab, filter === 'all' ? styles.filterTabActive : ''].join(' ')}
-                onClick={() => setFilter('all')}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                aria-pressed={filter === 'incidents'}
-                className={[styles.filterTab, filter === 'incidents' ? styles.filterTabActive : ''].join(' ')}
-                onClick={() => setFilter('incidents')}
-              >
-                Incidentes
-              </button>
-              <button
-                type="button"
-                aria-pressed={filter === 'work'}
-                className={[styles.filterTab, filter === 'work' ? styles.filterTabActive : ''].join(' ')}
-                onClick={() => setFilter('work')}
-              >
-                Entregas y tareas
-              </button>
-            </div>
+            <PillSwitcher
+              aria-label="Filtrar por tipo"
+              value={filter}
+              options={BITACORA_FILTER_OPTIONS}
+              onChange={setFilter}
+            />
           </div>
           <TextField
             className={styles.eventsSearch}

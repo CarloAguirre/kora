@@ -264,6 +264,12 @@ export const dashboardMyTaskSchema = z.object({
   moduleId: z.string(),
   moduleName: z.string(),
   title: z.string(),
+  /** Datos trazables desde la tarea y entradas de HH: nunca se infieren por aprobación de trabajo. */
+  segmentName: z.string().nullable().optional(),
+  estimatedHours: z.number().nullable().optional(),
+  approvedHours: z.number().optional(),
+  pendingHours: z.number().optional(),
+  reviewerName: z.string().nullable().optional(),
   date: z.string(),
   status: projectModuleTaskStatusSchema,
   completedAt: isoDateTimeSchema.nullable(),

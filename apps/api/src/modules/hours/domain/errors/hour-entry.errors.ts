@@ -98,6 +98,18 @@ export class ModuleNotInProjectError extends DomainError {
   }
 }
 
+export class InvalidHourEntrySegmentError extends ValidationError {
+  constructor(message = 'El bloque de trabajo no corresponde a esta fase, proyecto o colaborador.') {
+    super(message, 'HOUR_ENTRY_INVALID_SEGMENT');
+  }
+}
+
+export class HourEntrySegmentRequiredError extends ValidationError {
+  constructor() {
+    super('Selecciona un bloque de trabajo para imputar las HH de esta fase.', 'HOUR_ENTRY_SEGMENT_REQUIRED');
+  }
+}
+
 export class SegmentNotInModuleError extends DomainError {
   constructor() {
     super('HOUR_ENTRY_SEGMENT_NOT_IN_MODULE', 'El tiempo de ejecución elegido no pertenece a esta fase.');

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Permission, ProjectDetail, ProjectTeamMember } from '@kora/contracts';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
@@ -23,7 +23,9 @@ vi.mock('../api/projects.queries', () => ({
   useUpdateProjectObservation: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectObservation: () => ({ mutateAsync: vi.fn() }),
   useUpdateProject: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useCreateProjectModule: () => ({ mutateAsync: vi.fn() }),
+  useCreateProjectModule: () => ({
+    mutateAsync: vi.fn().mockResolvedValue({ id: 'new-phase-id' }), isPending: false,
+  }),
   useUpdateProjectModule: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectModule: () => ({ mutateAsync: vi.fn() }),
   useAddProjectModuleDelivery: () => ({ mutateAsync: vi.fn() }),
@@ -35,6 +37,8 @@ vi.mock('../api/projects.queries', () => ({
   useCreateProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
   useUpdateProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
   useDeleteProjectModuleTask: () => ({ mutateAsync: vi.fn() }),
+  useRoadmapReferenceExclusions: () => ({ data: [] }),
+  useExcludeRoadmapReference: () => ({ mutateAsync: vi.fn(), isPending: false }),
   // Requeridos por `DailyEntryForm`/`WeeklyEntryForm`, montados siempre (aunque
   // cerrado el diálogo) por el botón "+" de `BitacoraMiniCard`.
   useProjectsList: () => ({ data: { items: [] } }),
@@ -44,6 +48,23 @@ vi.mock('../api/projects.queries', () => ({
 vi.mock('@/modules/users/api/users.queries', () => ({
   // Requerido por `DailyEntryForm`/`WeeklyEntryForm` (ver nota sobre `useProjectsList` más abajo).
   useUsersList: () => ({ data: { items: [] } }),
+}));
+
+// Estas pruebas verifican la ficha y los equipos, no el endpoint comercial.
+ // Aislar el nuevo widget evita requerir QueryClientProvider y peticiones de red
+ // en un test que ya sustituye los demás hooks de datos por mocks.
+vi.mock('@/modules/estimation/api/quotation.queries', () => ({
+  useDeleteQuotationVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useQuotationLifecycle: () => ({
+    approveClient: { mutateAsync: vi.fn(), isPending: false },
+    transferApproved: { mutateAsync: vi.fn(), isPending: false },
+  }),
+  useAppliedQuotationPlanning: () => ({ data: null, isLoading: false, isError: false }),
+  useProjectQuotation: () => ({
+    data: null,
+    isLoading: false,
+    error: null,
+  }),
 }));
 
 vi.mock('@/modules/forecast/api/forecast.queries', () => ({
@@ -194,7 +215,11 @@ function buildProject(): ProjectDetail {
   };
 }
 
-function renderView(permissions: Permission[] = ['projects:manage'], pendingApprovals: { groups: unknown[] } = { groups: [] }) {
+function renderView(
+  permissions: Permission[] = ['projects:manage'],
+  pendingApprovals: { groups: unknown[] } = { groups: [] },
+  projectOverride: ProjectDetail = buildProject(),
+) {
   useProjectPendingApprovalsMock.mockReturnValue({ data: pendingApprovals });
   const auth: AuthContextValue = {
     user: {
@@ -220,7 +245,7 @@ function renderView(permissions: Permission[] = ['projects:manage'], pendingAppr
     <MemoryRouter>
       <AuthContext.Provider value={auth}>
         <ToastProvider>
-          <DevelopmentProjectDetailView project={buildProject()} projectId="project-1" />
+          <DevelopmentProjectDetailView project={projectOverride} projectId="project-1" />
         </ToastProvider>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -232,43 +257,159 @@ function getTeamCard(teamName: string) {
   return screen.getByText(`Equipo ${teamName}`).closest('a') as HTMLAnchorElement;
 }
 
-describe('DevelopmentProjectDetailView — equipos asignados', () => {
-  it('muestra el líder de cada equipo, incluso si no está fijado a nivel de proyecto', () => {
+describe('Cotizaciones integradas en ficha Kora', () => {
+  it('muestra el nuevo tab dentro de las pestañas y no la tarjeta exterior anterior', () => {
     renderView();
+    const button = screen.getByRole('button', { name: 'Cotizaciones' });
+    expect(button).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Cotizaciones del proyecto' })).not.toBeInTheDocument();
+    fireEvent.click(button);
+    expect(screen.getByRole('region', { name: 'Cotizaciones del proyecto' })).toBeInTheDocument();
+    expect(screen.getByText('Este proyecto aún no tiene cotización')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Nueva cotización' })).toBeDisabled();
+  });
+});
 
-    expect(within(getTeamCard('Desarrollo')).getByText('José Aponte')).toBeInTheDocument();
-    expect(within(getTeamCard('UX-UI')).getByText('Eduardo Aranda')).toBeInTheDocument();
-    // RPA no tiene líder fijado para ESTE proyecto (project_teams.leader_user_id
-    // nulo), pero el equipo sí tiene líder en general — debe mostrarse igual.
-    expect(within(getTeamCard('RPA')).getByText('José Aponte')).toBeInTheDocument();
-    // QA no tiene líder ni a nivel de proyecto ni en el catálogo de equipos.
-    expect(within(getTeamCard('QA')).getByText('Sin líder asignado')).toBeInTheDocument();
+describe('Navegación guiada desde el Roadmap a Resumen', () => {
+  it('habilita el Roadmap con estado Prospecto / No iniciado aun sin una fase', () => {
+    const initial = buildProject();
+    renderView(['projects:manage'], { groups: [] }, {
+      ...initial, salesStage: 'prospect', status: 'draft', modules: [], teams: [], members: [],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    expect(screen.getByRole('heading', { name: 'Arma el plan del proyecto' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear la primera fase' })).toBeEnabled();
+    expect(screen.queryByText(/El Roadmap está disponible para proyectos aprobados/))
+      .not.toBeInTheDocument();
   });
 
-  it('resume HH asignadas/utilizadas y la salud de cada equipo', () => {
-    renderView();
+  it('conserva el Roadmap visible en Prospecto / No iniciado después de que existe una fase', () => {
+    const initial = buildProject();
+    const projectWithPhase = { ...initial, salesStage: 'prospect', status: 'draft',
+      modules: [{
+        id: 'fase-1', name: 'Planificación inicial', initialStage: 'discovery',
+        currentStage: 'discovery', progress: {
+          actual: null, expected: null, scopes: {}, estimatedByCount: false,
+        }, blockerCount: 0, segments: [], deliveries: [], tasks: [],
+        estimatedHours: null, estimatedStartDate: null, estimatedEndDate: null,
+      }],
+    } as unknown as ProjectDetail;
+    renderView(['projects:manage'], { groups: [] }, projectWithPhase);
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    expect(screen.queryByText(/El Roadmap está disponible para proyectos aprobados/))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Arma el plan del proyecto' }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText('Planificación inicial')).toBeInTheDocument();
+  });
 
+  it('permite iniciar planificación de un proyecto operativo aunque su etapa comercial no sea approved', () => {
+    const initial = buildProject();
+    renderView(['projects:manage'], { groups: [] }, {
+      ...initial, salesStage: 'quoted', status: 'active', modules: [],
+    } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    expect(screen.getByRole('heading', { name: 'Arma el plan del proyecto' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear la primera fase' })).toBeEnabled();
+  });
+
+  it('tras crear una fase sin equipos abre la sección real de Equipos asignados en modo gestión', async () => {
+    const initial = buildProject();
+    renderView(['projects:manage'], { groups: [] }, {
+      ...initial, modules: [], teams: [], members: [],
+    } as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Roadmap' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Crear la primera fase' }));
+    const createModal = screen.getByRole('dialog', { name: 'Nueva fase' });
+    fireEvent.change(within(createModal).getByRole('textbox', { name: 'Nombre de la fase' }), {
+      target: { value: 'Fase de integración' },
+    });
+    fireEvent.click(within(createModal).getByRole('button', { name: 'Crear fase' }));
+    const missingTeams = await screen.findByRole('dialog', { name: 'Primero agrega equipos' });
+    fireEvent.click(within(missingTeams).getByRole('button', { name: 'Ir a Equipos asignados' }));
+    expect(screen.getByRole('button', { name: 'Resumen' }).className)
+      .toContain('tabsShellButtonActive');
+    const teams = document.getElementById('project-assigned-teams');
+    expect(teams).not.toBeNull();
+    expect(within(teams!).getByText('Agregar equipo')).toBeInTheDocument();
+    expect(within(teams!).getByRole('combobox', { name: 'Agregar equipo' })).toBeInTheDocument();
+    expect(within(teams!).getByRole('button', { name: 'Listo' })).toBeInTheDocument();
+  });
+});
+
+describe('Avance del proyecto — misma fuente operativa que el Roadmap', () => {
+  it('no toma el 100% antiguo del backend si las tareas del bloque aún no están aprobadas', () => {
+    const old = buildProject();
+    const viewProject = {
+      ...old,
+      // project.progress usa otra fórmula (por fases/ítems), por eso no puede
+      // determinar el porcentaje que aquí muestra el Roadmap por segmentos.
+      progress: { ...old.progress, actual: 100, expected: 100 },
+      modules: [{
+        id: 'phase-operativa', name: 'Diseño UX',
+        estimatedHours: 100,
+        segments: [{
+          id: 'block-operativo', teamId: 'team-dev', teamName: 'Desarrollo',
+          name: 'Diseño UX', startDate: '2026-01-01', endDate: '2026-02-01',
+          estimatedHours: 100, consumedHours: 12, members: [],
+        }],
+        deliveries: [],
+        tasks: [{
+          id: 'task-pending', teamId: 'team-dev', segmentId: 'block-operativo',
+          assigneeUserId: null, cancelledAt: null, estimatedHours: 100,
+          status: 'todo', date: '2026-01-30', description: null,
+        }],
+      }],
+    } as unknown as ProjectDetail;
+    renderView(['projects:manage'], { groups: [] }, viewProject);
+    expect(screen.getByRole('heading', { name: 'Avance del proyecto' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Avance real 0%; plan a la fecha 100%' }))
+      .toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /Cómo se calcula este avance/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Fase 1: Diseño UX')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.getByText('Fase 1: Diseño UX')).toBeInTheDocument();
+    // El plan operativo puede diferir del contrato sin que sea un error
+    // automático. Se informa la diferencia, sin alertar por falsa incoherencia.
+    expect(screen.getByText(/La diferencia no cambia el contrato/)).toBeInTheDocument();
+    expect(screen.queryByText(/Las HH de bloques no coinciden con la estimación comercial/))
+      .not.toBeInTheDocument();
+  });
+});
+
+describe('DevelopmentProjectDetailView — equipos PM/PMO', () => {
+  it('muestra el líder de los equipos, incluyendo el fallback del catálogo', () => {
+    renderView();
+    expect(within(getTeamCard('Desarrollo')).getByText('José Aponte')).toBeInTheDocument();
+    expect(within(getTeamCard('UX-UI')).getByText('Eduardo Aranda')).toBeInTheDocument();
+    expect(within(getTeamCard('RPA')).getByText('José Aponte')).toBeInTheDocument();
+  });
+
+  it('muestra las HH reales y la planificación en el resumen de equipos', () => {
+    renderView();
+    expect(screen.getAllByText('HH vendidas').length).toBeGreaterThan(1);
+    expect(screen.getByText('Asignadas a equipos')).toBeInTheDocument();
+    expect(screen.getByText('Por asignar')).toBeInTheDocument();
+    expect(screen.getByText('Planificadas en bloques')).toBeInTheDocument();
     const desarrollo = within(getTeamCard('Desarrollo'));
     expect(desarrollo.getByText('400 hrs')).toBeInTheDocument();
     expect(desarrollo.getByText('474 hrs')).toBeInTheDocument();
-    expect(desarrollo.getByText(/Crítico — 74 hrs sobre presupuesto/)).toBeInTheDocument();
-
-    expect(within(getTeamCard('UX-UI')).getByText(/Excelente/)).toBeInTheDocument();
-    expect(within(getTeamCard('RPA')).getByText(/En rango/)).toBeInTheDocument();
-    expect(within(getTeamCard('QA')).getByText(/Crítico — sin iniciar/)).toBeInTheDocument();
+    expect(desarrollo.getByText(/Sobre presupuesto/)).toBeInTheDocument();
   });
 
-  it('cada tarjeta lleva a la ficha del equipo dentro del proyecto', () => {
+  it('cada card conserva el enlace profundo al equipo dentro del proyecto', () => {
     renderView();
-
     expect(getTeamCard('Desarrollo')).toHaveAttribute('href', '/proyectos/proyecto-de-prueba/equipos/desarrollo');
   });
 
-  it('no lista personas ni permite asignar o quitar gente desde la ficha', () => {
+  it('el PM gestiona líder, cupos y HH en la misma sección, no la asignación de personas', () => {
     renderView(['projects:manage']);
-
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar equipos' }));
+    expect(screen.getByRole('button', { name: 'Listo' })).toBeInTheDocument();
+    expect(screen.getByText('Agregar equipo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Quitar equipo Desarrollo' })).toBeInTheDocument();
     expect(screen.queryByText('Claudio Andres Flores Vilches')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Quitar a/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Asignar' })).not.toBeInTheDocument();
   });
 });

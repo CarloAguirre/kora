@@ -12,6 +12,45 @@ const base = {
 };
 
 describe('HourEntry', () => {
+  it('conserva taskId en registros atribuidos y nunca lo asigna a horas generales', () => {
+    const attributed = HourEntry.create({
+      ...base, assignment: 'Proyecto', projectId: 'project-1',
+      moduleId: 'module-1', segmentId: 'segment-1', taskId: 'task-1',
+      ownerRequiresApproval: true,
+    }).unwrap();
+    expect(attributed.toSnapshot()).toMatchObject({
+      moduleId: 'module-1', segmentId: 'segment-1', taskId: 'task-1', status: 'pending',
+    });
+    const changed = attributed.updateDetails({
+      moduleId: null, segmentId: null, taskId: null,
+    }, true, new Date('2026-08-26'));
+    expect(changed.isOk()).toBe(true);
+    expect(attributed.toSnapshot()).toMatchObject({
+      moduleId: null, segmentId: null, taskId: null,
+    });
+
+    const general = HourEntry.create({
+      ...base, assignment: 'Vacaciones', designatedApproverUserId: 'leader-1',
+      moduleId: 'module-1', segmentId: 'segment-1', taskId: 'task-1',
+      ownerRequiresApproval: true,
+    }).unwrap();
+    expect(general.toSnapshot().taskId).toBeNull();
+  });
+
+
+  it('conserva segmentId al crear y no lo extrapola a registros generales', () => {
+    const result = HourEntry.create({ ...base, assignment: 'Proyecto',
+      projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
+      ownerRequiresApproval: false });
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value.toSnapshot().segmentId).toBe('segment-1');
+
+    const general = HourEntry.create({ ...base, assignment: 'Vacaciones',
+      designatedApproverUserId: 'leader-1', moduleId: 'module-1',
+      segmentId: 'segment-1', ownerRequiresApproval: true });
+    expect(general.isOk()).toBe(true);
+    if (general.isOk()) expect(general.value.toSnapshot().segmentId).toBeNull();
+  });
   describe('creación', () => {
     it('un colaborador nace pendiente', () => {
       const result = HourEntry.create({

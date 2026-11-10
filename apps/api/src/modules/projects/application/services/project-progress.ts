@@ -10,25 +10,25 @@ import {
 } from '@kora/contracts';
 
 /**
- * Avance real del proyecto — ver `projectProgressSchema` en los contratos. Función pura: la usan la
- * ficha, el listado, el dashboard y `ProjectProgressRecalculator`, para que todas las pantallas
- * muestren el mismo número.
+ * Avance del proyecto (projectProgressSchema): ficha, listados, Dashboard y
+ * ProjectProgressRecalculator comparten esta función pura.
  *
- * Por fase, tareas y entregas son ítems del plan:
- * - Peso de una tarea = sus HH estimadas. Las entregas (no tienen HH) y las tareas antiguas sin HH
- *   pesan el promedio de las tareas que sí tienen en la misma fase; si ninguna tiene, se reparten por
- *   igual las HH de la fase entre tareas y entregas (o pesan 1 si la fase tampoco tiene) — avance
- *   "por cantidad". Una fase con HH pero sin tareas (solo entregas) no reparte: cada entrega pesa 1.
- * - Base = el mayor entre la suma de pesos de sus ítems y las HH estimadas de la fase: las HH de la
- *   fase todavía sin ítems cuentan en la base, pero no en el real ni en el esperado.
- * - Real = peso de las tareas Aprobadas (`done`) y entregas Aprobadas (`approved`) / base. Esperado =
- *   peso de los ítems con fecha límite ≤ hoy / base. Una fase cerrada a mano (`closed`) cuenta 100%
- *   en ambos.
+ * En Kora V5.02 la fuente operacional es project_module_segments:
+ * - Denominador = HH propias de los bloques (NO HH vendidas/de fase).
+ * - Real = HH estimadas de tareas aprobadas por bloque, capadas al presupuesto,
+ *   o 100% al aprobar la entrega/cerrar explícitamente el segmento.
+ * - Esperado = distribución lineal por días calendario entre inicio y fin.
+ * - Consumo de HH = costo independiente del avance, no lo determina.
  *
- * El proyecto suma las fases (no promedia porcentajes), así cada fase pesa según su tamaño.
+ * El cálculo anterior ponderado por ítems de fase subsiste ÚNICAMENTE para
+ * invocaciones legacy que no suministren la propiedad segments. Los lectores
+ * del proyecto real entregan siempre segments, incluso [] cuando no hay plan.
  */
 
 export interface ProgressTaskInput {
+  readonly segmentId?: string | null;
+  readonly teamId?: string | null;
+  readonly description?: string | null;
   readonly estimatedHours: number | null;
   readonly status: ProjectModuleTaskStatus;
   /** Fecha límite, día calendario (medianoche UTC). */
@@ -37,12 +37,24 @@ export interface ProgressTaskInput {
 }
 
 export interface ProgressDeliveryInput {
+  readonly segmentId?: string | null;
   readonly status: ProjectModuleDeliveryStatus;
   /** Fecha estimada, día calendario (medianoche UTC). */
   readonly estimatedDate: Date;
 }
 
+export interface ProgressSegmentInput {
+  readonly id: string;
+  readonly teamId: string;
+  readonly estimatedHours: number | null;
+  readonly startDate: Date;
+  readonly endDate: Date;
+  readonly closedAt?: Date | null;
+}
+
 export interface ProgressModuleInput {
+  /** Undefined: caller legacy; []: phase without operational blocks (not a plan). */
+  readonly segments?: readonly ProgressSegmentInput[];
   readonly estimatedHours: number | null;
   readonly currentStage: ProjectModuleStage;
   readonly tasks: readonly ProgressTaskInput[];
@@ -77,7 +89,68 @@ export function progressToday(now: Date): string {
 const percent = (part: number, whole: number) => Math.max(0, Math.min(100, Math.round((part / whole) * 100)));
 const positive = (value: number | null) => (value != null && value > 0 ? value : null);
 
-function moduleTotals(module: ProgressModuleInput, today: string): ModuleTotals {
+/**
+ * Mismo cálculo del Roadmap y Avance del equipo, sobre entidades persistidas.
+ * Sin plan operativo no usamos HH de fase ni ítems de cotización como un
+ * porcentaje artificial. Conservamos el modelo legacy exclusivamente para
+ * consumidores que aún no entregan el campo segments.
+ */
+function operationalModuleTotals(module: ProgressModuleInput, today: string): ModuleTotals {
+  const segments = module.segments ?? [];
+  const hours = (value: number | null) => value != null && Number.isFinite(value) && value > 0 ? value : 0;
+  const toDay = (date: Date) => Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const current = Date.parse(today + 'T00:00:00Z');
+  const DAY_MS = 86_400_000;
+  const moduleHours = hours(module.estimatedHours);
+  let planned = 0;
+  let completed = 0;
+  let expected = 0;
+  let covered = 0;
+
+  for (const segment of segments) {
+    const blockHours = hours(segment.estimatedHours);
+    if (!blockHours) continue;
+    planned += blockHours;
+    const teamSegments = segments.filter((item) => item.teamId === segment.teamId);
+    const linked = module.tasks.filter((task) => {
+      if (task.teamId !== segment.teamId) return false;
+      if (task.segmentId) return task.segmentId === segment.id;
+      const marker = task.description?.match(/ · ID ([0-9a-fA-F-]{36})/);
+      if (marker) return marker[1]?.toLowerCase() === segment.id.toLowerCase();
+      return teamSegments.length === 1;
+    });
+    covered += Math.min(blockHours, linked.reduce((sum, task) => sum + hours(task.estimatedHours), 0));
+    const approved = module.deliveries.some((delivery) =>
+      delivery.segmentId === segment.id && delivery.status === 'approved');
+    completed += segment.closedAt || approved ? blockHours :
+      Math.min(blockHours, linked.filter((task) => task.status === 'done')
+        .reduce((sum, task) => sum + hours(task.estimatedHours), 0));
+    const start = toDay(segment.startDate);
+    const end = toDay(segment.endDate);
+    if (end < start || current < start) continue;
+    expected += current >= end ? blockHours : blockHours *
+      ((current - start) / DAY_MS + 1) / ((end - start) / DAY_MS + 1);
+  }
+
+  const legacyScopes = legacyModuleTotals(module, today).progress.scopes;
+  const progress: ProjectModuleProgress = {
+    actual: planned > 0 ? percent(completed, planned) : null,
+    expected: planned > 0 ? percent(expected, planned) : null,
+    estimatedByCount: false,
+    scopes: legacyScopes,
+  };
+  return {
+    progress,
+    hasPlan: planned > 0,
+    base: planned,
+    approved: completed,
+    due: expected,
+    taskTotal: covered,
+    moduleHours,
+  };
+}
+
+function legacyModuleTotals(module: ProgressModuleInput, today: string): ModuleTotals {
   const known = module.tasks.flatMap((task) => {
     const hours = positive(task.estimatedHours);
     return hours == null ? [] : [hours];
@@ -136,6 +209,11 @@ function moduleTotals(module: ProgressModuleInput, today: string): ModuleTotals 
     taskTotal,
     moduleHours,
   };
+}
+
+function moduleTotals(module: ProgressModuleInput, today: string): ModuleTotals {
+  return module.segments === undefined
+    ? legacyModuleTotals(module, today) : operationalModuleTotals(module, today);
 }
 
 export function calculateModuleProgress(module: ProgressModuleInput, today: string): ProjectModuleProgress {

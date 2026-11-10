@@ -32,6 +32,12 @@ export const PROJECT_SALES_STAGE_LABELS: Readonly<Record<ProjectSalesStage, stri
   approved: 'Aprobado',
 };
 
+/** Estado observable de la cotización; no equivale al estado comercial del proyecto. */
+export const PROJECT_QUOTATION_LIST_STATUSES = [
+  'none', 'draft', 'sent', 'approved_pending', 'transferred', 'planning_applied',
+] as const;
+export const projectQuotationListStatusSchema = z.enum(PROJECT_QUOTATION_LIST_STATUSES);
+export type ProjectQuotationListStatus = z.infer<typeof projectQuotationListStatusSchema>;
 /**
  * "Tipo de proyecto" de desarrollo — capa sobre `salesStage` + `status` (mismo criterio que el
  * selector del diálogo de edición): `finished` es el estado Finalizado; el resto sale de
@@ -106,6 +112,7 @@ export const projectTeamMemberSchema = z.object({
   activity: z.string().nullable(),
   assignedHours: z.number(),
   consumedHours: z.number(),
+  blockedAt: isoDateTimeSchema.nullable().optional(),
 });
 export type ProjectTeamMember = z.infer<typeof projectTeamMemberSchema>;
 
@@ -165,6 +172,10 @@ export const PROJECT_MODULE_DELIVERY_STATUS_LABELS: Readonly<Record<ProjectModul
  * - `planned → delivered`: el colaborador asignado la marca como terminada (o un líder en su nombre).
  * - `delivered → approved | planned`: un líder (de proyecto o del equipo) la aprueba o la rechaza con motivo.
  * - `approved → delivered`: un líder revierte la aprobación y la devuelve a revisión.
+ * - La entrega planificada que CIERRA UN BLOQUE tiene una acción especial
+ *   `finalizeBlock`: un líder confirma fecha y evidencia tras aprobar todas
+ *   las tareas; registra `approved` y `closedAt` atómicamente. No altera
+ *   los permisos ni las transiciones normales de entregas independientes.
  */
 export const PROJECT_MODULE_DELIVERY_ALLOWED_TRANSITIONS: Readonly<
   Record<ProjectModuleDeliveryStatus, readonly ProjectModuleDeliveryStatus[]>
@@ -193,6 +204,10 @@ export const projectModuleDeliverySchema = z.object({
   rejectionReason: z.string().nullable(),
   /** Cuándo se agregó la entrega al proyecto (ISO) — fecha de su fila en la bitácora; la agendada es `estimatedDate`. */
   createdAt: z.string(),
+  /** Metadatos del cierre de bloque, nulos para entregas no finalizadas o históricas. */
+  completedOn: z.iso.date().nullable().optional(),
+  completedByName: z.string().nullable().optional(),
+  completionComment: z.string().nullable().optional(),
   /**
    * ¿Quien consulta puede gestionarla (asignar, aprobar, rechazar, revertir, editar)? Líder del proyecto,
    * PMO/admin o líder del equipo responsable — mismo criterio que `UpdateProjectModuleDeliveryUseCase`.
@@ -247,11 +262,17 @@ export type ProjectModuleSegmentMember = z.infer<typeof projectModuleSegmentMemb
 /** Tramo de trabajo de un equipo dentro de una fase/módulo — con su propio rango de fechas (Roadmap). */
 export const projectModuleSegmentSchema = z.object({
   id: uuidSchema,
+  /** Se fija al aprobarse la última tarea vinculada o al cerrar manualmente. */
+  closedAt: isoDateTimeSchema.nullable().optional(),
   teamId: uuidSchema,
   teamName: z.string(),
   name: z.string(),
   startDate: z.string(),
   endDate: z.string(),
+  /** HH de este bloque; nullable para bloques anteriores. */
+  estimatedHours: z.number().nullable(),
+  /** Solo horas aprobadas con segmentId explícito, no extrapola historial. */
+  consumedHours: z.number().nonnegative().optional(),
   members: z.array(projectModuleSegmentMemberSchema),
 });
 export type ProjectModuleSegment = z.infer<typeof projectModuleSegmentSchema>;
@@ -274,12 +295,23 @@ export const createProjectModuleSegmentSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del tramo'),
   startDate: z.iso.date(),
   endDate: z.iso.date(),
+  /** Opcional para consumidores anteriores de esta API; obligatorio en la UI nueva. */
+  estimatedHours: z.coerce.number().gt(0).max(1000000).optional(),
+  /** Entrega opcional de cierre, al finalizar el bloque, en la misma transacción. */
+  closingDelivery: z.object({
+    name: nonEmptyTrimmed(300, 'El nombre de la entrega'),
+    description: z.string().trim().max(2000).nullish(),
+  }).optional(),
   /** Opcional — omitirlo en una edición deja los colaboradores como estaban (salvo que cambie el equipo). */
   members: segmentMembersInputSchema.optional(),
 });
 export type CreateProjectModuleSegmentInput = z.infer<typeof createProjectModuleSegmentSchema>;
 
-export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.partial();
+export const updateProjectModuleSegmentSchema = createProjectModuleSegmentSchema.partial().extend({
+  /** Null elimina una entrega planificada (no aprobada); omitirla no la modifica. */
+  closingDelivery: createProjectModuleSegmentSchema.shape.closingDelivery.unwrap().nullable().optional(),
+  closureAction: z.enum(['close', 'reopen']).optional(),
+});
 export type UpdateProjectModuleSegmentInput = z.infer<typeof updateProjectModuleSegmentSchema>;
 
 /** HH estimadas de una tarea o fase — obligatorias y mayores a 0 en altas y ediciones (las antiguas pueden venir nulas). */
@@ -288,6 +320,18 @@ const estimatedHoursSchema = z.coerce
   .gt(0, 'Las horas estimadas deben ser mayores a 0.');
 
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
+/** Quitar una referencia EDT solo de la planificación operacional; la cotización permanece intacta. */
+export const excludeRoadmapReferenceSchema = z.object({
+  versionId: uuidSchema,
+  wbs: z.string().trim().min(1).max(160),
+  role: z.string().trim().min(1).max(160),
+});
+export type ExcludeRoadmapReferenceInput = z.infer<typeof excludeRoadmapReferenceSchema>;
+export const roadmapReferenceExclusionSchema = excludeRoadmapReferenceSchema.extend({
+  moduleId: uuidSchema,
+});
+export type RoadmapReferenceExclusion = z.infer<typeof roadmapReferenceExclusionSchema>;
+
 export const projectModuleTaskSchema = z.object({
   id: uuidSchema,
   teamId: uuidSchema.nullable(),
@@ -302,9 +346,14 @@ export const projectModuleTaskSchema = z.object({
   startDate: z.string(),
   date: z.string(),
   estimatedHours: z.number().nullable(),
+  /** HH aprobadas imputadas a esta tarea por FK; NULL sin asociación explícita. */
+  actualHours: z.number().nonnegative().nullable().optional(),
+  /** HH vinculadas a esta tarea esperando aprobación, no suman a las reales. */
+  pendingHours: z.number().nonnegative().nullable().optional(),
   status: projectModuleTaskStatusSchema,
   scope: projectModuleTaskScopeSchema,
   completedAt: isoDateTimeSchema.nullable(),
+  cancelledAt: isoDateTimeSchema.nullable().optional(),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla en revisión. */
   rejectionReason: z.string().nullable(),
 });
@@ -371,15 +420,26 @@ export type ProjectModule = z.infer<typeof projectModuleSchema>;
  * horas aunque no pueda ver el detalle del proyecto (`GET /projects/:id/phases`).
  */
 export const projectPhaseOptionSchema = projectModuleSchema.pick({ id: true, name: true, currentStage: true }).extend({
-  segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true })),
+  segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true }).extend({
+    leaderName: z.string().nullable().optional(),
+  })),
+  /** Sólo metadatos necesarios para imputar HH, sin datos sensibles de la ficha. */
+  tasks: z.array(projectModuleTaskSchema.pick({
+    id: true, name: true, segmentId: true, assigneeUserId: true, cancelledAt: true, teamId: true,
+  }).extend({
+    /** Opcionales para compatibilidad con clientes de /phases previos. La API actual los informa. */
+    estimatedHours: z.number().nullable().optional(),
+    actualHours: z.number().nonnegative().nullable().optional(),
+    pendingHours: z.number().nonnegative().nullable().optional(),
+  })),
 });
 export type ProjectPhaseOption = z.infer<typeof projectPhaseOptionSchema>;
 
 export const createProjectModuleSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre del módulo'),
   initialStage: projectModuleStageSchema,
-  /** Obligatorio: forma parte de la base del avance real del proyecto (ver `projectProgressSchema`). */
-  estimatedHours: estimatedHoursSchema,
+  /** La fase puede crearse solo con nombre: las HH se planifican al añadir bloques. */
+  estimatedHours: estimatedHoursSchema.optional(),
   estimatedStartDate: z.iso.date().nullish(),
   estimatedEndDate: z.iso.date().nullish(),
 });
@@ -418,10 +478,19 @@ export const updateProjectModuleDeliverySchema = z.object({
   rejectionReason: z.string().trim().max(1000).nullish(),
   /**
    * No se guarda en la entrega: va al registro de la bitácora. Obligatorio cuando un líder la marca
-   * como terminada en nombre del colaborador asignado — por qué lo hizo sin que el colaborador la enviara.
+   * como terminada en nombre del colaborador asignado o sin asignación nominal: registra el motivo.
    */
   comment: z.string().trim().max(1000).optional(),
+  /** Finalizar en una sola operación la entrega vinculada a un bloque: requiere tareas aprobadas y permiso de líder. */
+  finalizeBlock: z.boolean().optional(),
+  /** Cierre excepcional confirmado: cancela lógicamente las tareas no aprobadas del bloque. */
+  forceCancelIncompleteTasks: z.boolean().optional(),
+  /** Reabrir explícitamente el bloque ya finalizado, sin confundirlo con rechazo de entrega del colaborador. */
+  reopenBlock: z.boolean().optional(),
+  /** Fecha real seleccionada en el formulario de cierre; NO modifica estimatedDate. */
+  completedOn: z.iso.date().optional(),
 });
+
 export type UpdateProjectModuleDeliveryInput = z.infer<typeof updateProjectModuleDeliverySchema>;
 
 /**
@@ -566,6 +635,8 @@ export const projectPaymentMilestoneSchema = z.object({
   sortOrder: z.number().int(),
   triggerType: projectPaymentTriggerSchema,
   triggerPhase: projectPhaseSchema.nullable(),
+  /** Módulo comercial cotizado; fase operativa global no equivalente. */
+  triggerModuleId: uuidSchema.nullish(),
   triggerDate: z.iso.date().nullable(),
 });
 export type ProjectPaymentMilestone = z.infer<typeof projectPaymentMilestoneSchema>;
@@ -578,6 +649,7 @@ const paymentMilestoneScheduleShape = {
   sortOrder: z.coerce.number().int().min(0).optional(),
   triggerType: projectPaymentTriggerSchema.default('manual'),
   triggerPhase: projectPhaseSchema.nullish(),
+  triggerModuleId: uuidSchema.nullish(),
   triggerDate: z.iso.date().nullish(),
 };
 
@@ -586,11 +658,12 @@ function refineTrigger(
   data: {
     triggerType?: ProjectPaymentTrigger | undefined;
     triggerPhase?: ProjectPhase | null | undefined;
+    triggerModuleId?: string | null | undefined;
     triggerDate?: string | null | undefined;
   },
   ctx: z.RefinementCtx,
 ): void {
-  if (data.triggerType === 'phase' && !data.triggerPhase) {
+  if (data.triggerType === 'phase' && !data.triggerPhase && !data.triggerModuleId) {
     ctx.addIssue({ code: 'custom', message: 'Selecciona la fase que activa el tramo.', path: ['triggerPhase'] });
   }
   if (data.triggerType === 'date' && !data.triggerDate) {
@@ -723,6 +796,8 @@ export const projectSummarySchema = z.object({
   client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
   type: projectTypeSchema,
   salesStage: projectSalesStageSchema.nullable(),
+  /** Solo se informa a roles comerciales autorizados, puede venir null para otros usuarios. */
+  quotationStatus: projectQuotationListStatusSchema.nullish(),
   status: projectStatusSchema,
   phase: projectPhaseSchema.nullable(),
   priority: projectPrioritySchema.nullable(),
@@ -834,6 +909,35 @@ export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: 
   updatedAt: isoDateTimeSchema,
 });
 export type ProjectDetail = z.infer<typeof projectDetailSchema>;
+
+// Solo datos operativos. Quedan fuera cotizaciones, facturación y contactos.
+export const collaboratorProjectSummarySchema = projectSummarySchema.pick({
+  id: true, name: true, slug: true, type: true, status: true, phase: true,
+  client: true, leader: true, startDate: true, endDate: true, progress: true,
+}).extend({ weekHours: z.number().nonnegative() });
+export type CollaboratorProjectSummary = z.infer<typeof collaboratorProjectSummarySchema>;
+export const collaboratorProjectsResponseSchema = pageSchema(collaboratorProjectSummarySchema);
+export type CollaboratorProjectsResponse = z.infer<typeof collaboratorProjectsResponseSchema>;
+
+export const collaboratorProjectEventSchema = z.object({
+  id: uuidSchema, date: z.iso.date(), createdAt: isoDateTimeSchema,
+  userName: z.string(), moduleName: z.string().nullable(),
+  activity: z.string(), description: z.string(), hours: z.number().nonnegative(),
+  hasBlocker: z.boolean(), blockerDescription: z.string().nullable(),
+});
+export type CollaboratorProjectEvent = z.infer<typeof collaboratorProjectEventSchema>;
+
+export const collaboratorProjectDetailSchema = collaboratorProjectSummarySchema.omit({ weekHours: true }).extend({
+  estimatedDeliveryDate: z.string().nullable(),
+  /** Líder del equipo necesario para el drawer, sin datos comerciales ni de gestión. */
+  teams: z.array(projectTeamSchema.pick({ teamId: true, leader: true })),
+  modules: z.array(projectModuleSchema),
+  observations: z.array(projectObservationSchema),
+  events: z.array(collaboratorProjectEventSchema),
+  activityTruncated: z.boolean(),
+});
+export type CollaboratorProjectDetail = z.infer<typeof collaboratorProjectDetailSchema>;
+
 
 /** Equipo asignado desde la creación del proyecto — ver `project_teams` (v1: `equipo_proyecto`). */
 export const createProjectTeamAssignmentSchema = z.object({
@@ -1075,6 +1179,8 @@ export type ResolveProjectObservationInput = z.infer<typeof resolveProjectObserv
 export const projectSortFieldSchema = z.enum([
   'name',
   'status',
+  'salesStage',
+  'quotationStatus',
   'stage',
   'kind',
   'priority',
@@ -1108,6 +1214,8 @@ export const listProjectsQuerySchema = paginationQuerySchema.extend({
   type: projectTypeSchema.optional(),
   status: arrayQueryParam(projectStatusSchema),
   phase: arrayQueryParam(projectPhaseSchema),
+  salesStage: arrayQueryParam(projectSalesStageSchema),
+  quotationStatus: arrayQueryParam(projectQuotationListStatusSchema),
   /** "Tipo de proyecto" (filtro Tipo de proyecto de la tab Desarrollo) — ver `PROJECT_KINDS`. */
   kind: arrayQueryParam(projectKindSchema),
   /** Acepta id o slug: la ficha de cliente filtra por el `clientId` de la URL, que ahora es el slug del cliente — se resuelve a UUID en `ListProjectsUseCase`. */

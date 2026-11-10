@@ -33,6 +33,7 @@ export function toProjectSummary(item: ProjectListItem, progress: ProjectProgres
     client: item.clientId ? { id: item.clientId, companyName: item.clientName ?? '' } : null,
     type: item.type,
     salesStage: item.salesStage as ProjectSummary['salesStage'],
+    quotationStatus: item.quotationStatus,
     status: item.status,
     phase: item.phase as ProjectSummary['phase'],
     priority: item.priority as ProjectSummary['priority'],
@@ -96,6 +97,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     activity: member.activity,
     assignedHours: member.assignedHours,
     consumedHours: member.consumedHours,
+    blockedAt: member.blockedAt?.toISOString() ?? null,
   }));
 
   const teams: ProjectTeamDto[] = source.teams.map((team) => ({
@@ -142,7 +144,16 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       usedHours: Number(snapshot.usedHours),
       status: snapshot.status,
       stopsClock: snapshot.stopsClock,
-      modules: source.modules,
+      modules: source.modules.map((module) => ({
+        ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+        // Global y fases: mismo denominador operacional de los bloques que
+        // utiliza la ficha interna del proyecto y Avance del equipo.
+        segments: module.segments.map((block) => ({
+          id: block.id, teamId: block.teamId,
+          estimatedHours: block.estimatedHours,
+          startDate: block.startDate, endDate: block.endDate, closedAt: block.closedAt,
+        })),
+      })),
     },
     today,
   );
@@ -169,15 +180,21 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       status: delivery.status,
       rejectionReason: delivery.rejectionReason,
       createdAt: delivery.createdAt.toISOString(),
+      completedOn: delivery.completedOn?.toISOString().slice(0, 10) ?? null,
+      completedByName: delivery.completedByName ?? null,
+      completionComment: delivery.completionComment ?? null,
       canManage: source.canManagePendings || (delivery.teamId !== null && source.ledTeamIds.has(delivery.teamId)),
     })),
     segments: module.segments.map((segment) => ({
       id: segment.id,
+      closedAt: segment.closedAt?.toISOString() ?? null,
       teamId: segment.teamId,
       teamName: segment.teamName,
       name: segment.name,
       startDate: segment.startDate.toISOString().slice(0, 10),
       endDate: segment.endDate.toISOString().slice(0, 10),
+      estimatedHours: segment.estimatedHours,
+      consumedHours: segment.consumedHours ?? 0,
       members: segment.members.map((member) => ({
         teamMemberId: member.teamMemberId,
         fullName: member.fullName,
@@ -197,13 +214,23 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       startDate: task.startDate.toISOString().slice(0, 10),
       date: task.date.toISOString().slice(0, 10),
       estimatedHours: task.estimatedHours,
+      actualHours: task.actualHours ?? null,
+      pendingHours: task.pendingHours ?? null,
       status: task.status,
       scope: task.scope,
       completedAt: task.completedAt?.toISOString() ?? null,
+      cancelledAt: task.cancelledAt?.toISOString() ?? null,
       rejectionReason: task.rejectionReason,
     })),
     blockerCount: module.blockerCount,
-    progress: calculateModuleProgress(module, today),
+    progress: calculateModuleProgress({
+      ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+      segments: module.segments.map((block) => ({
+        id: block.id, teamId: block.teamId,
+        estimatedHours: block.estimatedHours,
+        startDate: block.startDate, endDate: block.endDate, closedAt: block.closedAt,
+      })),
+    }, today),
   }));
 
   const paymentMilestones: ProjectPaymentMilestoneDto[] = source.paymentMilestones.map((milestone) => ({
@@ -222,6 +249,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     sortOrder: milestone.sortOrder,
     triggerType: milestone.triggerType,
     triggerPhase: milestone.triggerPhase,
+    triggerModuleId: milestone.triggerModuleId,
     triggerDate: milestone.triggerDate?.toISOString().slice(0, 10) ?? null,
   }));
 
@@ -245,8 +273,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       : null,
     soldHours: Number(snapshot.soldHours),
     usedHours: Number(snapshot.usedHours),
-    assignedMemberCount: members.length,
-    plannedHours: members.reduce((sum, member) => sum + member.assignedHours, 0),
+    assignedMemberCount: members.filter((member) => !member.blockedAt).length,
+    plannedHours: members.filter((member) => !member.blockedAt).reduce((sum, member) => sum + member.assignedHours, 0),
     startDate: snapshot.startDate?.toISOString().slice(0, 10) ?? null,
     endDate: snapshot.endDate?.toISOString().slice(0, 10) ?? null,
     estimatedDeliveryDate: snapshot.estimatedDeliveryDate?.toISOString().slice(0, 10) ?? null,

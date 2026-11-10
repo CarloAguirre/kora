@@ -1,0 +1,176 @@
+import type { ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { AppliedQuotationPlanning, ProjectDetail } from '@kora/contracts';
+import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
+
+const mocks = vi.hoisted(() => ({ create: vi.fn(), onClose: vi.fn() }));
+const projectId = '0777e456-fd76-445e-83f1-afc25061c101';
+const teamId = '0777e456-fd76-445e-83f1-afc25061c102';
+const moduleId = '0777e456-fd76-445e-83f1-afc25061c103';
+const userId = '0777e456-fd76-445e-83f1-afc25061c104';
+const blockId = '0777e456-fd76-445e-83f1-afc25061c105';
+const versionId = '0777e456-fd76-445e-83f1-afc25061c106';
+
+vi.mock('@/shared/components/ui/Modal', () => ({
+  Modal: ({ title, children, footer }: { title: string; children: ReactNode; footer?: ReactNode }) =>
+    <div role="dialog" aria-label={title}>{children}{footer}</div>,
+}));
+vi.mock('../api/projects.queries', () => ({
+  useCreateProjectModuleTask: () => ({ isPending: false, mutateAsync: mocks.create }),
+}));
+
+const project = {
+  id: projectId, name: 'Pruebas Kora', slug: 'pruebas-kora',
+  teams: [{teamId,teamName:'Desarrollo',teamSlug:'desarrollo'}],
+  members: [{teamId,userId,fullName:'Persona asignada',userStatus:'active'}],
+  modules: [{id:moduleId,name:'S1 · Desarrollo',segments:[{
+    id:blockId,name:'Implementación',teamId,teamName:'Desarrollo',
+    startDate:'2026-11-10',endDate:'2026-11-20',members:[],
+  }], tasks:[]}],
+} as unknown as ProjectDetail;
+const reference = { wbs:'S1.01',name:'Conexión con sistema de taller',
+  description:'Conectar API', role:'Backend',teamId,hours:35,
+} as AppliedQuotationPlanning['modules'][number]['tasks'][number];
+
+beforeEach(() => { mocks.create.mockReset().mockResolvedValue({}); mocks.onClose.mockClear(); });
+const show = () => render(<MemoryRouter><QuotationReferenceTaskModal
+  project={project} moduleId={moduleId} versionId={versionId} versionNumber={1}
+  reference={reference} onClose={mocks.onClose}
+  /></MemoryRouter>);
+
+describe('Nueva tarea operativa a partir de referencia Gemini', () => {
+  it('precarga tarea y HH sin generar ejecución al abrir el modal', () => {
+    show();
+    expect(screen.getByRole('dialog',{name:'Nueva tarea'})).toBeInTheDocument();
+    expect(screen.getByLabelText(/Título de la tarea/)).toHaveValue('Conexión con sistema de taller');
+    expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toBeDisabled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it('no permite convertir una referencia sin bloque aunque ya tenga responsable, ámbito y fechas', () => {
+    show();
+    fireEvent.change(screen.getByLabelText(/Asignado a/), {
+      target: { value: teamId + ':' + userId },
+    });
+    fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
+      target: { value: 'desarrollo' },
+    });
+    fireEvent.change(screen.getByLabelText(/Fecha de inicio/), {
+      target: { value: '2026-11-10' },
+    });
+    fireEvent.change(screen.getByLabelText(/Fecha límite/), {
+      target: { value: '2026-11-20' },
+    });
+    expect(screen.getByRole('button', { name: 'Crear tarea' })).toBeDisabled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it('solo lista colaboradores activos del equipo responsable de la referencia EDT', async () => {
+    const otherTeamId = '0777e456-fd76-445e-83f1-afc25061c111';
+    const otherUserId = '0777e456-fd76-445e-83f1-afc25061c112';
+    const mixedProject = {
+      ...project,
+      members: [
+        ...project.members,
+        { teamId, userId: '0777e456-fd76-445e-83f1-afc25061c113',
+          fullName: 'Persona deshabilitada', userStatus: 'disabled' },
+        { teamId: otherTeamId, userId: otherUserId,
+          fullName: 'Persona de QA', userStatus: 'active' },
+      ],
+      teams: [...project.teams, { teamId: otherTeamId, teamName: 'QA', teamSlug: 'qa' }],
+    } as ProjectDetail;
+    render(<MemoryRouter><QuotationReferenceTaskModal
+      project={mixedProject} moduleId={moduleId} versionId={versionId}
+      versionNumber={1} reference={reference} onClose={mocks.onClose}
+    /></MemoryRouter>);
+    const options = (screen.getByLabelText(/Asignado a/) as HTMLSelectElement).options;
+    expect([...options].some((option) => option.textContent?.includes('Persona asignada'))).toBe(true);
+    expect([...options].some((option) => option.textContent?.includes('Persona de QA'))).toBe(false);
+    expect([...options].some((option) => option.textContent?.includes('Persona deshabilitada'))).toBe(false);
+    fireEvent.change(screen.getByLabelText(/Asignado a/), {
+      target: { value: teamId + ':' + userId },
+    });
+    fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
+      target: { value: blockId },
+    });
+    fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
+      target: { value: 'desarrollo' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Crear tarea' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({ input: expect.objectContaining({
+        teamId, assigneeUserId: userId,
+      }) }),
+    ));
+  });
+
+  it('crea una tarea con bloque, colaborador, ámbito y fechas; preserva trazabilidad EDT', async () => {
+    show();
+    fireEvent.change(screen.getByLabelText(/Asignado a/),{
+      target: { value: teamId + ':' + userId },
+    });
+    fireEvent.change(screen.getByLabelText(/Bloque de trabajo/), {
+      target: { value: blockId },
+    });
+    fireEvent.change(screen.getByLabelText(/Ámbito Kora/), {
+      target: { value: 'desarrollo' },
+    });
+    fireEvent.click(screen.getByRole('button',{name:'Crear tarea'}));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledOnce());
+    expect(mocks.create).toHaveBeenCalledWith({
+      projectId, moduleId,
+      input: expect.objectContaining({
+        teamId, segmentId: blockId, assigneeUserId:userId, name:'Conexión con sistema de taller',
+        estimatedHours:35, startDate:'2026-11-10', date:'2026-11-20',
+        scope:'desarrollo', status:'todo',
+        description:expect.stringContaining('Referencia cotización ' + versionId),
+      }),
+    });
+    expect(mocks.onClose).toHaveBeenCalledOnce();
+  });
+  it('lápiz abre Editar tarea, precarga bloque y permite guardarla por asignar', async () => {
+    render(<MemoryRouter><QuotationReferenceTaskModal
+      mode="edit" project={project} moduleId={moduleId} versionId={versionId}
+      versionNumber={1} reference={reference} onClose={mocks.onClose}
+    /></MemoryRouter>);
+    expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toHaveValue(blockId);
+    expect(screen.getByLabelText(/Fecha de inicio/)).toHaveValue('2026-11-10');
+    expect(screen.getByLabelText(/Fecha límite/)).toHaveValue('2026-11-20');
+    expect(screen.getByLabelText(/HH estimadas/)).toHaveValue(35);
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId, moduleId, input: expect.objectContaining({
+        name: 'Conexión con sistema de taller', estimatedHours: 35,
+        assigneeUserId: null, segmentId: blockId, status: 'todo',
+        startDate: '2026-11-10', date: '2026-11-20',
+      }),
+    }));
+  });
+
+  it('duplicar referencia conserva la EDT original y crea una copia operativa independiente', async () => {
+    render(<MemoryRouter><QuotationReferenceTaskModal
+      mode="duplicate" project={project} moduleId={moduleId} versionId={versionId}
+      versionNumber={1} reference={reference} onClose={mocks.onClose}
+    /></MemoryRouter>);
+    expect(screen.getByRole('dialog', { name: 'Duplicar tarea' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Título de la tarea/))
+      .toHaveValue('Conexión con sistema de taller (copia)');
+    expect(screen.getByLabelText(/Bloque de trabajo/)).toHaveValue(blockId);
+    expect(screen.getByRole('button', { name: 'Crear copia' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Crear copia' }));
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledWith({
+      projectId, moduleId, input: expect.objectContaining({
+        name: 'Conexión con sistema de taller (copia)', assigneeUserId: null,
+        segmentId: blockId, estimatedHours: 35,
+        description: expect.stringContaining('Copia de referencia de cotización ' + versionId),
+      }),
+    }));
+    const description = mocks.create.mock.calls[0]![0].input.description as string;
+    expect(description).not.toContain('Referencia cotización ' + versionId);
+  });
+
+});

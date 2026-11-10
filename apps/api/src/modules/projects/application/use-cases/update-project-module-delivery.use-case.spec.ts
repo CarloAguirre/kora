@@ -13,6 +13,7 @@ import type { AuditRecorder } from '../../../../shared/application/ports/audit-r
 import type { ProjectChangeLogRecorder } from '../services/project-change-log.recorder';
 import { FixedClock, PassthroughUnitOfWork } from '../../../../test/fakes';
 import type { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import type { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 
 const FAKE_PROJECT = {
   id: 'project-1',
@@ -73,6 +74,8 @@ function buildUseCase(
   const modules = {
     findById: vi.fn().mockResolvedValue(module),
     updateDelivery: vi.fn().mockResolvedValue(undefined),
+    updateSegment: vi.fn().mockResolvedValue(undefined),
+    cancelTask: vi.fn().mockResolvedValue(undefined),
   } as unknown as ProjectModuleRepository;
   const projectTeams = {
     isTeamLeaderForProject: vi.fn().mockResolvedValue(isTeamLeader),
@@ -92,6 +95,7 @@ function buildUseCase(
     { recalculate: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectProgressRecalculator,
     new FixedClock(),
     new PassthroughUnitOfWork(),
+    { syncTask: vi.fn().mockResolvedValue(undefined) } as unknown as ForecastSourceSyncService,
   );
   return { useCase, modules, changeLogRecord };
 }
@@ -210,12 +214,38 @@ describe('UpdateProjectModuleDeliveryUseCase — ciclo de vida', () => {
     expect(modules.updateDelivery).not.toHaveBeenCalled();
   });
 
-  it('no deja marcar como terminada una entrega sin colaborador asignado', async () => {
-    const { useCase } = buildUseCase(buildModule({ status: 'planned', assigneeUserId: null }));
-
+  it('sin asignado exige que el líder registre el motivo, sin inventar colaborador', async () => {
+    const { useCase, modules } = buildUseCase(buildModule({ status: 'planned', assigneeUserId: null }));
     const result = await useCase.execute({ ...TARGET, ...LEADER, data: { status: 'delivered' } });
+    expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_ON_BEHALF_COMMENT_REQUIRED');
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
+  });
 
-    expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_INVALID_TRANSITION');
+  it('el líder puede entregar sin asignado, dejando su identidad y motivo en bitácora', async () => {
+    const { useCase, modules, changeLogRecord } = buildUseCase(
+      buildModule({ status: 'planned', assigneeUserId: null }),
+    );
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER,
+      data: { status: 'delivered', comment: 'Entrega revisada y validada por el líder' },
+    });
+    expect(result.isOk()).toBe(true);
+    expect(modules.updateDelivery).toHaveBeenCalledWith('delivery-1',
+      expect.objectContaining({ status: 'delivered' }), expect.any(Date), expect.anything());
+    expect(loggedMessages(changeLogRecord)).toEqual([
+      expect.stringMatching(/por el líder sin colaborador asignado.*Motivo: Entrega revisada/),
+    ]);
+    expect(changeLogRecord.mock.calls[0]![1]).toBe('leader-1');
+  });
+
+  it('un colaborador sin asignación no puede enviar entregas ajenas', async () => {
+    const { useCase, modules } = buildUseCase(buildModule({ status: 'planned', assigneeUserId: null }));
+    const result = await useCase.execute({
+      ...TARGET, ...COLLABORATOR,
+      data: { status: 'delivered' },
+    });
+    expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_NOT_ASSIGNEE');
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
   });
 
   it('el colaborador asignado marca su entrega como terminada y queda pendiente de aprobación en la bitácora', async () => {
@@ -333,5 +363,169 @@ describe('UpdateProjectModuleDeliveryUseCase — asignación', () => {
     const result = await useCase.execute({ ...TARGET, ...LEADER, data: { teamId: 'team-ajeno' } });
 
     expect(errorCode(result)).toBe('PROJECT_MODULE_DELIVERY_TEAM_NOT_IN_PROJECT');
+  });
+});
+
+
+describe('Cierre de bloque por entrega configurada en el Roadmap', () => {
+  const ready = (status: 'planned' | 'approved' = 'planned',
+    taskStatus: 'done' | 'todo' = 'done'): ProjectModuleRecord => ({
+    ...buildModule({
+      status, segmentId: 'segment-1', assigneeUserId: null,
+      completedOn: null, completedByUserId: null, completionComment: null,
+    }),
+    segments: [{
+      id: 'segment-1', moduleId: 'module-1', teamId: 'team-1',
+      teamName: 'UX-UI', name: 'Entrega UX', startDate: new Date('2026-08-01'),
+      endDate: new Date('2026-08-10'), estimatedHours: 120,
+      members: [], closedAt: null,
+    }],
+    tasks: [{
+      id: 'task-1', moduleId: 'module-1', segmentId: 'segment-1',
+      teamId: 'team-1', status: taskStatus, cancelledAt: null,
+    }] as unknown as ProjectModuleRecord['tasks'],
+  });
+
+  it('finaliza y registra fecha real, usuario, evidencia y cierre en una sola transacción', async () => {
+    const { useCase, modules, changeLogRecord } = buildUseCase(ready());
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER, data: {
+        finalizeBlock: true, completedOn: '2026-08-18', comment: 'Acta de conformidad',
+      },
+    });
+    expect(result.isOk()).toBe(true);
+    expect(modules.updateDelivery).toHaveBeenCalledWith('delivery-1',
+      expect.objectContaining({
+        status: 'approved', completedOn: new Date('2026-08-18T00:00:00.000Z'),
+        completedByUserId: 'leader-1', completionComment: 'Acta de conformidad',
+      }), expect.any(Date), expect.anything());
+    expect(modules.updateSegment).toHaveBeenCalledWith('segment-1',
+      expect.objectContaining({ closedAt: expect.any(Date) }),
+      expect.any(Date), expect.anything());
+    expect(vi.mocked(modules.updateDelivery).mock.calls[0]![3])
+      .toBe(vi.mocked(modules.updateSegment).mock.calls[0]![3]);
+    expect(loggedMessages(changeLogRecord)).toEqual([
+      expect.stringContaining('cerrada el 18-08-2026'),
+    ]);
+  });
+
+  it('no permite finalizar antes de que estén todas las tareas aprobadas', async () => {
+    const { useCase, modules } = buildUseCase(ready('planned', 'todo'));
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER, data: { finalizeBlock: true, completedOn: '2026-08-18' },
+    });
+    expect(result.isErr()).toBe(true);
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
+    expect(modules.updateSegment).not.toHaveBeenCalled();
+  });
+
+  it('rechaza cerrar sin fecha válida o con una fecha futura', async () => {
+    for (const completedOn of [undefined, '2026-08-26', '2026-07-31']) {
+      const { useCase, modules } = buildUseCase(ready());
+      const result = await useCase.execute({
+        ...TARGET, ...LEADER, data: { finalizeBlock: true, ...(completedOn ? { completedOn } : {}) },
+      });
+      expect(result.isErr()).toBe(true);
+      expect(modules.updateDelivery).not.toHaveBeenCalled();
+    }
+  });
+
+  it('no permite a un colaborador ejecutar el cierre directo, aunque tenga la entrega asignada', async () => {
+    const module = ready();
+    const { useCase, modules } = buildUseCase({
+      ...module,
+      deliveries: module.deliveries.map((d) => ({ ...d, assigneeUserId: 'collab-1' })),
+    });
+    const result = await useCase.execute({
+      ...TARGET, ...COLLABORATOR, data: { finalizeBlock: true, completedOn: '2026-08-18' },
+    });
+    expect(result.isErr()).toBe(true);
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
+  });
+
+  it('cierre forzado confirma explícitamente y cancela solo tareas sin aprobar en la misma transacción', async () => {
+    const base = ready();
+    const incomplete = [
+      { ...base.tasks[0], id: 'task-pending', status: 'in_progress', name: 'Tarea en curso' },
+      { ...base.tasks[0], id: 'task-review', status: 'in_review', name: 'Tarea completada' },
+      { ...base.tasks[0], id: 'task-approved', status: 'done', name: 'Tarea aprobada' },
+    ] as unknown as ProjectModuleRecord['tasks'];
+    const { useCase, modules, changeLogRecord } = buildUseCase({
+      ...base, tasks: incomplete,
+    });
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER, data: {
+        finalizeBlock: true, forceCancelIncompleteTasks: true,
+        completedOn: '2026-08-18', comment: 'Cierre autorizado por líder',
+      },
+    });
+    expect(result.isOk()).toBe(true);
+    expect(modules.cancelTask).toHaveBeenCalledTimes(2);
+    expect(modules.cancelTask).toHaveBeenCalledWith('task-pending', expect.any(Date), expect.anything());
+    expect(modules.cancelTask).toHaveBeenCalledWith('task-review', expect.any(Date), expect.anything());
+    expect(modules.cancelTask).not.toHaveBeenCalledWith('task-approved', expect.anything(), expect.anything());
+    expect(modules.updateDelivery).toHaveBeenCalledWith('delivery-1',
+      expect.objectContaining({ status: 'approved' }), expect.any(Date), expect.anything());
+    const tx = vi.mocked(modules.updateDelivery).mock.calls[0]![3];
+    for (const call of vi.mocked(modules.cancelTask).mock.calls) expect(call[2]).toBe(tx);
+    expect(vi.mocked(modules.updateSegment).mock.calls[0]![3]).toBe(tx);
+    expect(loggedMessages(changeLogRecord)).toEqual(expect.arrayContaining([
+      expect.stringContaining('Tarea "Tarea en curso" cancelada'),
+      expect.stringContaining('Tarea "Tarea completada" cancelada'),
+    ]));
+  });
+
+  it('sin confirmación excepcional nunca cancela tareas automáticamente', async () => {
+    const { useCase, modules } = buildUseCase(ready('planned', 'todo'));
+    const result = await useCase.execute({
+      ...TARGET, ...LEADER, data: { finalizeBlock: true, completedOn: '2026-08-18' },
+    });
+    expect(errorCode(result)).toBe('PROJECT_BLOCK_TASKS_NOT_APPROVED');
+    expect(modules.cancelTask).not.toHaveBeenCalled();
+    expect(modules.updateDelivery).not.toHaveBeenCalled();
+  });
+
+  it('prohíbe cancelar tareas fuera de un cierre explícito y cerrar un bloque vacío', async () => {
+    const { useCase, modules } = buildUseCase(ready());
+    const withoutClose = await useCase.execute({
+      ...TARGET, ...LEADER, data: { forceCancelIncompleteTasks: true },
+    });
+    expect(errorCode(withoutClose)).toBe('PROJECT_BLOCK_FORCE_CLOSE_INVALID');
+    const empty = ready();
+    const { useCase: useEmpty, modules: emptyModules } = buildUseCase({ ...empty, tasks: [] });
+    const withoutTasks = await useEmpty.execute({
+      ...TARGET, ...LEADER, data: { finalizeBlock: true, forceCancelIncompleteTasks: true,
+        completedOn: '2026-08-18' },
+    });
+    expect(errorCode(withoutTasks)).toBe('PROJECT_BLOCK_TASKS_NOT_APPROVED');
+    expect(modules.cancelTask).not.toHaveBeenCalled();
+    expect(emptyModules.updateDelivery).not.toHaveBeenCalled();
+  });
+
+  it('un colaborador no puede forzar el cierre ni cancelar tareas del bloque', async () => {
+    const base = ready('planned', 'todo');
+    const { useCase, modules } = buildUseCase({
+      ...base,
+      deliveries: base.deliveries.map((d) => ({ ...d, assigneeUserId: 'collab-1' })),
+    });
+    const result = await useCase.execute({
+      ...TARGET, ...COLLABORATOR, data: {
+        finalizeBlock: true, forceCancelIncompleteTasks: true, completedOn: '2026-08-18',
+      },
+    });
+    expect(result.isErr()).toBe(true);
+    expect(modules.cancelTask).not.toHaveBeenCalled();
+  });
+
+  it('reabrir un bloque finalizado revierte su estado y metadatos en la misma transacción', async () => {
+    const { useCase, modules } = buildUseCase(ready('approved'));
+    const result = await useCase.execute({ ...TARGET, ...LEADER, data: { reopenBlock: true } });
+    expect(result.isOk()).toBe(true);
+    expect(modules.updateDelivery).toHaveBeenCalledWith('delivery-1',
+      expect.objectContaining({
+        status: 'planned', completedOn: null, completedByUserId: null, completionComment: null,
+      }), expect.any(Date), expect.anything());
+    expect(modules.updateSegment).toHaveBeenCalledWith('segment-1',
+      expect.objectContaining({ closedAt: null }), expect.any(Date), expect.anything());
   });
 });

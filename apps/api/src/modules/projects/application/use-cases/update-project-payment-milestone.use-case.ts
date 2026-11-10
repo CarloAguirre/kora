@@ -74,10 +74,13 @@ export class UpdateProjectPaymentMilestoneUseCase
       triggerType,
       triggerPhase:
         triggerType !== 'phase' ? null : data.triggerPhase !== undefined ? (data.triggerPhase ?? null) : milestone.triggerPhase,
+      triggerModuleId: triggerType !== 'phase' ? null :
+        data.triggerModuleId !== undefined ? data.triggerModuleId :
+        data.triggerPhase ? null : (milestone.triggerModuleId ?? null),
       triggerDate:
         triggerType !== 'date' ? null : data.triggerDate !== undefined ? toDate(data.triggerDate) : milestone.triggerDate,
     };
-    if (triggerType === 'phase' && !schedule.triggerPhase) {
+    if (triggerType === 'phase' && !schedule.triggerPhase && !schedule.triggerModuleId) {
       return err(new InvalidProjectPaymentMilestoneStateError('Selecciona la fase que activa el tramo.'));
     }
     if (triggerType === 'date' && !schedule.triggerDate) {

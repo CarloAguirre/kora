@@ -30,6 +30,7 @@ const SELECTION = {
   sortOrder: projectPaymentMilestones.sortOrder,
   triggerType: projectPaymentMilestones.triggerType,
   triggerPhase: projectPaymentMilestones.triggerPhase,
+  triggerModuleId: projectPaymentMilestones.triggerModuleId,
   triggerDate: projectPaymentMilestones.triggerDate,
 };
 
@@ -49,6 +50,7 @@ type Row = {
   sortOrder: number;
   triggerType: ProjectPaymentMilestoneRecord['triggerType'];
   triggerPhase: ProjectPaymentMilestoneRecord['triggerPhase'];
+  triggerModuleId: string | null;
   triggerDate: Date | null;
 };
 
@@ -69,6 +71,7 @@ function toRecord(row: Row): ProjectPaymentMilestoneRecord {
     sortOrder: row.sortOrder,
     triggerType: row.triggerType,
     triggerPhase: row.triggerPhase,
+    triggerModuleId: row.triggerModuleId,
     triggerDate: row.triggerDate,
   };
 }
@@ -193,6 +196,7 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
         sortOrder: input.sortOrder,
         triggerType: input.triggerType,
         triggerPhase: input.triggerType === 'phase' ? input.triggerPhase : null,
+        triggerModuleId: input.triggerType === 'phase' ? input.triggerModuleId : null,
         triggerDate: input.triggerType === 'date' ? input.triggerDate : null,
       })
       .returning({ id: projectPaymentMilestones.id });
@@ -215,6 +219,7 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
           ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
           ...(input.triggerType !== undefined ? { triggerType: input.triggerType } : {}),
           ...(input.triggerPhase !== undefined ? { triggerPhase: input.triggerPhase } : {}),
+          ...(input.triggerModuleId !== undefined ? { triggerModuleId: input.triggerModuleId } : {}),
           ...(input.triggerDate !== undefined ? { triggerDate: input.triggerDate } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
           ...(input.invoiceNumber !== undefined ? { invoiceNumber: input.invoiceNumber } : {}),

@@ -9,6 +9,7 @@ import type {
   UpdateHourEntryInput,
 } from '@kora/contracts';
 import { hourKeys, hoursApi } from './hours.api';
+import { projectKeys } from '@/modules/projects/api/projects.api';
 
 export function useHourEntriesList(query: Partial<ListHourEntriesQuery>, options: { enabled?: boolean } = {}) {
   return useQuery({
@@ -104,6 +105,8 @@ function useInvalidateHourEntries() {
     // El Dashboard resume horas/aprobaciones: sin esto quedaba desactualizado
     // hasta que el usuario recargaba la página a mano.
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    // El detalle de Roadmap muestra HH consumidas agrupadas por bloque.
+    queryClient.invalidateQueries({ queryKey: projectKeys.all });
     // La campanita del líder cuenta horas por aprobar y por registrar.
     queryClient.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
   };

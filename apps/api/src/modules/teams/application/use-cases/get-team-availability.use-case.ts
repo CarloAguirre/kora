@@ -45,10 +45,14 @@ export class GetTeamAvailabilityUseCase
     if (!team || team.isDeleted) return err(new TeamNotFoundError(teamId));
 
     const dates = enumerateDates(dateFrom, dateTo);
-    const [activeMembers, hoursByMemberAndDate] = await Promise.all([
+    const [currentTeamMembers, hoursByMemberAndDate] = await Promise.all([
       this.members.listActiveForTeam(team.id),
       this.teams.getHoursByMemberAndDate(team.id, new Date(`${dateFrom}T00:00:00.000Z`), new Date(`${dateTo}T00:00:00.000Z`)),
     ]);
+
+    // Una membresía sin fecha de salida no significa que la cuenta esté habilitada.
+    // Mantener la membresía y sus HH históricas en BD; excluirla solo del tablero operativo.
+    const visibleMembers = currentTeamMembers.filter((member) => member.userStatus !== 'disabled');
 
     const hoursByMemberId = new Map<string, Map<string, { approved: number; pending: number }>>();
     for (const row of hoursByMemberAndDate) {
@@ -59,10 +63,7 @@ export class GetTeamAvailabilityUseCase
 
     return ok({
       teamId: team.id,
-      // La membresía puede seguir vigente aunque la cuenta de la persona haya
-      // sido deshabilitada. El heatmap muestra disponibilidad actual, no historia:
-      // misma regla que GetTeamUseCase y ListTeamMemberOptionsUseCase.
-      members: activeMembers.filter((member) => member.userStatus !== 'disabled').map((member) => {
+      members: visibleMembers.map((member) => {
         const byDate = hoursByMemberId.get(member.id);
         return {
           teamMemberId: member.id,

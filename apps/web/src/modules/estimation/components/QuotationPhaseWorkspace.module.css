@@ -1,0 +1,82 @@
+/* HTML v5 — tarjetas de módulos, tareas, semanas y roadmap. */
+.surface{display:grid;gap:13px;min-width:0}
+.head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.head h2,.head h3{margin:0;font-size:15px;font-weight:750;color:var(--kora-text)}
+.head h3{font-size:14px}.head p{font-size:11.5px;color:var(--kora-text-muted);margin:0}
+.phases{display:grid;gap:14px}
+.phase{background:var(--kora-surface-alt);border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius);padding:15px;min-width:0;display:grid;gap:13px}
+.phaseHeader{display:flex;align-items:center;gap:10px;min-width:0}
+.phaseBadge{flex:0 0 auto;background:var(--kora-navy);color:var(--kora-surface);font-size:11px;font-weight:750;border-radius:var(--kora-radius-pill);padding:4px 10px}
+.phaseDescription{color:var(--kora-text-muted);font-size:12px;font-weight:500}
+.remove{color:var(--kora-danger);text-decoration:underline;margin-left:auto;min-width:0}
+.phaseFields{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(110px,.85fr) minmax(110px,.85fr);gap:10px}
+.phaseFields label,.phaseTeams label{display:grid;gap:6px;font-size:12px;color:var(--kora-text);font-weight:550;min-width:0}
+.phaseFields input,.phaseTeams input{font:inherit;min-width:0;width:100%;height:38px;border:1px solid var(--kora-border-soft);border-radius:8px;background:white;color:var(--kora-text);padding:8px 10px;font-size:12.5px}
+.phaseFields input:focus-visible,.phaseTeams input:focus-visible{border-color:var(--kora-blue-link);outline:2px solid var(--kora-blue-surface)}
+.phaseFields input:disabled,.phaseTeams input:disabled{background:var(--kora-surface-muted);color:var(--kora-text-muted)}
+.phaseTeams{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+.phaseTeams label>span{display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+.phaseTeams i{height:9px;width:9px;display:inline-block;flex:none;border-radius:3px}
+.phaseTeams input{text-align:right;font-variant-numeric:tabular-nums;border-color:var(--kora-blue-200)}
+.tasks{padding-top:12px;border-top:1px dashed var(--kora-border-soft)}
+.tasks>summary{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;list-style:none;user-select:none}
+.tasks>summary::-webkit-details-marker{display:none}
+.tasks>summary:before{content:'▸';color:var(--kora-navy);font-size:12px;transform:translateY(-1px)}
+.tasks[open]>summary:before{content:'▾'}
+.tasks>summary strong{color:var(--kora-text);font-size:12px}
+.tasks>summary span{color:var(--kora-text-muted);font-size:11.5px}
+.tableScroll{width:100%;overflow-x:auto;margin-top:12px}
+.tasksHeader,.taskRow{display:grid;grid-template-columns:minmax(270px,2fr) minmax(150px,1fr) 88px 42px 26px;column-gap:6px;align-items:center;min-width:680px}
+.tasksHeader{padding:8px 5px;font-size:11px;color:var(--kora-text-muted);border-bottom:1px solid var(--kora-border-subtle)}
+.tasksHeader span:nth-last-child(2),.tasksHeader span:last-child{text-align:center}
+.taskRow{padding:7px 5px;row-gap:4px;border-bottom:1px solid var(--kora-border-subtle)}
+.taskRow:last-child{border-bottom:0}
+.taskName{display:grid;gap:4px;min-width:0}
+.taskName small{color:var(--kora-blue-link);font-size:10.5px;line-height:1.4}
+.readonlyInput{display:flex;align-items:center;min-width:0;min-height:37px;padding:7px 9px;background:var(--kora-surface);border:1px solid var(--kora-border-soft);border-radius:8px;color:var(--kora-text);font-size:12px;overflow-wrap:anywhere}
+.readonlyHours{text-align:right;justify-content:flex-end;font-variant-numeric:tabular-nums}
+.teamSelect{width:100%;min-width:0;min-height:37px;border:1px solid var(--kora-border-soft);border-radius:8px;padding:7px 9px;background:white;font-family:inherit;color:var(--kora-text);font-size:12px}
+.teamSelect:focus-visible{outline:2px solid var(--kora-blue-surface);border-color:var(--kora-blue-link)}
+.teamSelect:disabled{color:var(--kora-text-disabled);background:var(--kora-surface-muted)}
+.editableHours{width:100%;min-width:0;height:37px;padding:6px 7px;text-align:right;font:inherit;font-size:12px;color:var(--kora-text);background:var(--kora-surface);border:1px solid var(--kora-blue-200);border-radius:8px;font-variant-numeric:tabular-nums}
+.editableHours:focus-visible{outline:2px solid var(--kora-blue-surface);border-color:var(--kora-blue-link)}
+.fixedField{justify-self:center;cursor:pointer}
+.fixedField input{width:14px;height:14px;accent-color:var(--kora-blue-link)}
+.add{all:unset;cursor:pointer;justify-self:start;color:var(--kora-text);font-size:12px;font-weight:650;border:1px solid var(--kora-border-soft);border-radius:8px;padding:8px 12px;background:white}
+.add:hover{background:var(--kora-surface-muted)}
+.roadmap{padding-top:6px;display:grid;gap:12px}
+.timeline{display:grid;gap:7px;border:1px solid var(--kora-border-soft);border-radius:11px;background:white;padding:14px 12px}
+.timelineRow{display:grid;grid-template-columns:190px minmax(0,1fr);gap:9px;align-items:center;font-size:11px;font-weight:650}
+.timelineRow>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.timelineTrack{position:relative;height:21px;background:var(--kora-surface-muted);border-radius:6px;overflow:hidden}
+.timelineBar{position:absolute;top:0;height:100%;display:flex;overflow:hidden;border-radius:5px;min-width:1px}
+.timelineBar>span{display:block;height:100%;min-width:0}
+.axis{display:flex;justify-content:space-between;padding-left:199px;color:var(--kora-text-muted);font-size:11px}
+.empty{color:var(--kora-text-muted);font-size:12px;margin:8px 0}
+@media(max-width:750px){.phaseTeams{grid-template-columns:repeat(2,minmax(0,1fr))}.timelineRow{grid-template-columns:120px minmax(0,1fr)}.axis{padding-left:129px}}
+@media(max-width:510px){.phaseFields{grid-template-columns:1fr 1fr}.phaseFields label:first-child{grid-column:1/-1}.phaseTeams{grid-template-columns:1fr}.timelineRow{grid-template-columns:95px minmax(0,1fr)}.axis{padding-left:104px}}
+
+.mappingNotice{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+ padding:12px 14px;border:1px solid var(--kora-border-subtle);background:var(--kora-blue-surface-alt);border-radius:var(--kora-radius)}
+.mappingNotice strong{font-size:12.5px;color:var(--kora-navy)}
+.mappingNotice p{margin:4px 0 0;font-size:11.5px;line-height:1.5;color:var(--kora-text-muted)}
+.mappingNotice button{flex:none}
+
+/* Fidelidad v5: filas compactas sin metadatos Gemini a la vista.
+ * Los WBS, perfiles, fuente y referencias persisten en el borrador/aiPoc. */
+.taskText{width:100%;min-width:0;height:34px;background:var(--kora-surface);color:var(--kora-text);
+ border:1px solid var(--kora-border-soft);border-radius:7px;padding:6px 9px;font:inherit;
+ font-size:11.5px;text-overflow:ellipsis}
+.taskText:focus-visible{outline:2px solid var(--kora-blue-surface);border-color:var(--kora-blue-link)}
+.taskRow{min-height:42px;padding:4px 2px}
+.tasksHeader{padding:7px 2px}
+.taskRow .teamSelect,.taskRow .editableHours{min-height:34px;height:34px;
+ font-size:11.5px;border-color:var(--kora-border-soft)}
+.taskRow .editableHours{border-color:var(--kora-blue-200)}
+.deleteTask{width:26px;min-width:26px;height:26px;font-size:18px;color:var(--kora-text-muted);line-height:1}
+.deleteTask:hover:not(:disabled){color:var(--kora-danger)}
+.deleteTask:focus-visible{outline:2px solid var(--kora-blue-600);outline-offset:1px}
+.noDelete{display:block;min-width:15px;height:15px}
+.addRow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:11px}
+.addRow .add{font-size:11.5px;padding:7px 10px;border-radius:7px}
+.importAction{display:inline-flex;align-items:center;cursor:pointer}

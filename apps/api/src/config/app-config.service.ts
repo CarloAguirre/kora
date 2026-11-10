@@ -50,6 +50,21 @@ export interface GoogleOAuthSettings {
   readonly callbackUrl: string;
 }
 
+export interface GoogleDriveSettings {
+  readonly enabled: boolean;
+  readonly clientEmail: string;
+  readonly privateKey: string;
+}
+
+export interface AiSettings {
+  readonly enabled: boolean;
+  readonly geminiApiKey: string;
+  readonly geminiModel: string;
+  readonly provider: 'auto' | 'gemini' | 'openai' | 'poc';
+  readonly openaiApiKey: string;
+  readonly openaiModel: string;
+}
+
 export interface MailSettings {
   /** `false` sin `RESEND_API_KEY`: los correos van al log (solo fuera de producción, ver env.schema). */
   readonly enabled: boolean;
@@ -103,6 +118,39 @@ export class AppConfigService {
       clientId,
       clientSecret,
       callbackUrl,
+    };
+  }
+
+  /** Prueba de autorización temporal sobre OAuth web existente, apagada por defecto. */
+  get googleDriveOauthPocEnabled(): boolean {
+    return this.config.get('GOOGLE_DRIVE_OAUTH_POC_ENABLED', { infer: true });
+  }
+
+  get googleDrive(): GoogleDriveSettings {
+    const clientEmail = this.config.get('GOOGLE_DRIVE_CLIENT_EMAIL', { infer: true }) ?? '';
+    const privateKeyRaw = this.config.get('GOOGLE_DRIVE_PRIVATE_KEY', { infer: true }) ?? '';
+
+    return {
+      enabled: clientEmail !== '' && privateKeyRaw !== '',
+      clientEmail,
+      privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
+    };
+  }
+
+  get ai(): AiSettings {
+    const geminiApiKey = this.config.get('GEMINI_API_KEY', { infer: true }) ?? '';
+    const openaiApiKey = this.config.get('OPENAI_API_KEY', { infer: true }) ?? '';
+    const provider = this.config.get('AI_PROVIDER', { infer: true });
+
+    return {
+      enabled: provider === 'openai' ? openaiApiKey !== '' :
+        provider === 'gemini' ? geminiApiKey !== '' :
+          provider === 'poc' ? false : geminiApiKey !== '',
+      provider,
+      openaiApiKey,
+      openaiModel: this.config.get('OPENAI_MODEL', { infer: true }),
+      geminiApiKey,
+      geminiModel: this.config.get('GEMINI_MODEL', { infer: true }),
     };
   }
 

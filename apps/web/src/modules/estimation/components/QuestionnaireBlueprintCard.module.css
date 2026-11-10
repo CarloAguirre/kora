@@ -1,0 +1,88 @@
+.card {
+  display: grid;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.header h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.header p,
+.question p,
+.footer {
+  margin: 0;
+  color: var(--kora-text-muted, #667085);
+  line-height: 1.5;
+}
+
+.metric {
+  min-width: 150px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--kora-surface-soft, #f6f8fb);
+  display: grid;
+  gap: 2px;
+}
+
+.metric strong {
+  font-size: 18px;
+}
+
+.metric span {
+  color: var(--kora-text-muted, #667085);
+  font-size: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.question {
+  border: 1px solid var(--kora-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.questionTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.id {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--kora-navy, #122235);
+}
+
+.category {
+  font-size: 12px;
+  color: var(--kora-text-muted, #667085);
+}
+
+.footer {
+  padding-top: 4px;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .header {
+    display: grid;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

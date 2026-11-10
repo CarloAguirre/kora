@@ -22,6 +22,11 @@ export interface ProjectModuleDeliveryRecord {
   readonly status: ProjectModuleDeliveryStatus;
   readonly rejectionReason: string | null;
   readonly createdAt: Date;
+  /** Metadatos de cierre del bloque, nulos hasta confirmarlo. */
+  readonly completedOn?: Date | null;
+  readonly completedByUserId?: string | null;
+  readonly completedByName?: string | null;
+  readonly completionComment?: string | null;
 }
 
 export interface ProjectModuleSegmentMemberRecord {
@@ -34,12 +39,16 @@ export interface ProjectModuleSegmentMemberRecord {
 
 export interface ProjectModuleSegmentRecord {
   readonly id: string;
+  readonly closedAt?: Date | null;
   readonly moduleId: string;
   readonly teamId: string;
   readonly teamName: string;
   readonly name: string;
   readonly startDate: Date;
   readonly endDate: Date;
+  readonly estimatedHours: number | null;
+  /** HH aprobadas imputadas explícitamente al bloque, no estimadas ni distribuidas. */
+  readonly consumedHours?: number;
   readonly members: readonly ProjectModuleSegmentMemberRecord[];
 }
 
@@ -58,9 +67,13 @@ export interface ProjectModuleTaskRecord {
   readonly startDate: Date;
   readonly date: Date;
   readonly estimatedHours: number | null;
+  /** HH aprobadas con FK a esta tarea; históricas no atribuidas permanecen null. */
+  readonly actualHours?: number | null;
+  readonly pendingHours?: number | null;
   readonly status: ProjectModuleTaskStatus;
   readonly scope: ProjectModuleTaskScope;
   readonly completedAt: Date | null;
+  readonly cancelledAt?: Date | null;
   readonly rejectionReason: string | null;
 }
 
@@ -103,13 +116,16 @@ export interface CreateProjectModuleSegmentInput {
   readonly name: string;
   readonly startDate: Date;
   readonly endDate: Date;
+  readonly estimatedHours: number | null;
 }
 
 export interface UpdateProjectModuleSegmentInput {
+  readonly closedAt?: Date | null;
   readonly teamId?: string;
   readonly name?: string;
   readonly startDate?: Date;
   readonly endDate?: Date;
+  readonly estimatedHours?: number | null;
 }
 
 export interface ProjectModuleSegmentMemberInput {
@@ -143,6 +159,7 @@ export interface UpdateProjectModuleTaskInput {
   readonly status?: ProjectModuleTaskStatus;
   readonly scope?: ProjectModuleTaskScope;
   readonly completedAt?: Date | null;
+  readonly cancelledAt?: Date | null;
   readonly rejectionReason?: string | null;
 }
 
@@ -165,6 +182,10 @@ export interface UpdateProjectModuleDeliveryInput {
   readonly status?: ProjectModuleDeliveryStatus;
   readonly estimatedDate?: Date;
   readonly rejectionReason?: string | null;
+  /** Actualizados solo por el caso de uso de cierre del bloque. */
+  readonly completedOn?: Date | null;
+  readonly completedByUserId?: string | null;
+  readonly completionComment?: string | null;
 }
 
 /** Fila de "Mis tareas" — tarea asignada a una persona, con el nombre de su proyecto/módulo. */
@@ -175,6 +196,14 @@ export interface TaskAssignedToUserRecord {
   readonly moduleId: string;
   readonly moduleName: string;
   readonly name: string;
+  /** Bloque vinculado, sin inferirlo por el nombre del módulo. */
+  readonly segmentName?: string | null;
+  readonly estimatedHours?: number | null;
+  /** HH de bitácora explícitamente ligadas a esta tarea. */
+  readonly approvedHours?: number;
+  readonly pendingHours?: number;
+  /** Responsable que puede revisar esta tarea según proyecto/equipo actual. */
+  readonly reviewerName?: string | null;
   readonly date: Date;
   readonly status: ProjectModuleTaskStatus;
   readonly completedAt: Date | null;
@@ -198,14 +227,26 @@ export interface DeliveryAssignedToUserRecord {
 /** Lo mínimo de una fase para calcular el avance del proyecto — ver `calculateProjectProgress`. */
 export interface ProjectModuleProgressInputRecord {
   readonly estimatedHours: number | null;
+  readonly segments: readonly {
+    readonly id: string;
+    readonly teamId: string;
+    readonly estimatedHours: number | null;
+    readonly startDate: Date;
+    readonly endDate: Date;
+    readonly closedAt: Date | null;
+  }[];
   readonly currentStage: ProjectModuleStage;
   readonly tasks: readonly {
+    readonly segmentId: string | null;
+    readonly teamId: string | null;
+    readonly description: string | null;
     readonly estimatedHours: number | null;
     readonly status: ProjectModuleTaskStatus;
     readonly date: Date;
     readonly scope: ProjectModuleTaskScope;
   }[];
   readonly deliveries: readonly {
+    readonly segmentId: string | null;
     readonly status: ProjectModuleDeliveryStatus;
     readonly estimatedDate: Date;
   }[];
@@ -238,6 +279,8 @@ export interface ProjectModuleRepository {
     context?: TransactionContext,
   ): Promise<void>;
   removeSegment(id: string, context?: TransactionContext): Promise<void>;
+  /** Reconciliar cierre real después de un cambio de aprobación de tarea, sin inferir fechas. */
+  refreshSegmentClosure(segmentId: string, now: Date, context?: TransactionContext): Promise<void>;
   /** Reemplaza todos los colaboradores del tramo por `members`. */
   replaceSegmentMembers(
     segmentId: string,
@@ -248,6 +291,13 @@ export interface ProjectModuleRepository {
   addTask(input: CreateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<string>;
   updateTask(id: string, input: UpdateProjectModuleTaskInput, now: Date, context?: TransactionContext): Promise<void>;
   removeTask(id: string, context?: TransactionContext): Promise<void>;
+  cancelTask(id: string, now: Date, context?: TransactionContext): Promise<void>;
+  hasTaskUserHours(projectId: string, moduleId: string, userId: string, context?: TransactionContext): Promise<boolean>;
+  /** Persistir en el mismo commit que el borrado de tarea una referencia de cotización oculta. */
+  excludeQuotationReference(input: {
+    projectId: string; moduleId: string; versionId: string;
+    wbs: string; role: string; actorUserId: string;
+  }, context?: TransactionContext): Promise<void>;
   listTasksAssignedToUser(userId: string, context?: TransactionContext): Promise<TaskAssignedToUserRecord[]>;
   listDeliveriesAssignedToUser(userId: string, context?: TransactionContext): Promise<DeliveryAssignedToUserRecord[]>;
 }

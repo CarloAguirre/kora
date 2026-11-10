@@ -13,13 +13,15 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
-import { useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useProjectDetail, useProjectPhases, useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { PhaseSegmentFields, overflowByBlock } from './DailyEntryForm';
+import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
+import { ProjectHourPlanFields } from './ProjectHourPlanFields';
+import { activityForTaskChange, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId } from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -91,6 +93,7 @@ export function WeeklyEntryForm({
   const [moduleId, setModuleId] = useState('');
   /** Tiempo de ejecución de la fase elegida — vacío ⇔ sin tramo. */
   const [segmentId, setSegmentId] = useState('');
+  const [taskId, setTaskId] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [designatedApproverUserId, setDesignatedApproverUserId] = useState('');
@@ -102,6 +105,31 @@ export function WeeklyEntryForm({
 
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(assignment as HourEntryAssignment);
   const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
+  // Colaborador usa /phases y no solicita detalle que podría estar prohibido.
+  const { data: projectDetail } = useProjectDetail(
+    needsProject && projectId && user?.role !== 'collaborator' ? projectId : null,
+  );
+  const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
+  const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
+  const selectedHourPhase = hourPhases?.find((phase) => phase.id === moduleId);
+  const availableTasks = selectAttributableTasks(
+    hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [],
+    user?.id, segmentId,
+  );
+  const allowedTeamIds = new Set([
+    ...(projectDetail?.members ?? []).filter((member) => member.userId === user?.id && !member.blockedAt)
+      .map((member) => member.teamId),
+    ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === user?.id)
+      .map((team) => team.teamId),
+  ]);
+  // Usar /phases si el actor sólo tiene permiso hours:register.
+  const availableSegments = selectedModule
+    ? selectedModule.segments.filter((segment) => allowedTeamIds.has(segment.teamId))
+    : (selectedHourPhase?.segments ?? []);
+  const hasEligibleRoadmapBlocks = projectDetail
+    ? projectDetail.modules.some((module) =>
+        module.segments.some((segment) => allowedTeamIds.has(segment.teamId)))
+    : (hourPhases ?? []).some((phase) => phase.segments.length > 0);
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const weekTotal = dayHours.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
@@ -178,6 +206,12 @@ export function WeeklyEntryForm({
     if (activeDays.some((day) => day.hours > 24)) return 'No puede registrar más de 24 horas en un día.';
     if (activeDays.some((day) => holidayDayIndexes.has(day.index))) return 'No se pueden registrar horas en un día feriado.';
     if (needsProject && !projectId) return 'Selecciona un proyecto para esta asignación.';
+    if (needsProject && hasEligibleRoadmapBlocks && !moduleId)
+      return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
+    if (needsProject && availableSegments.length > 0 && !segmentId)
+      return 'Selecciona el bloque al que corresponden estas HH.';
+    if (needsProject && segmentId && availableTasks.length > 0 && !taskId)
+      return 'Selecciona una tarea o «Otro trabajo del bloque».';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
     if (!category.trim()) return 'Indica la actividad realizada.';
@@ -210,6 +244,7 @@ export function WeeklyEntryForm({
           projectId: needsProject ? projectId : undefined,
           moduleId: needsProject && moduleId ? moduleId : undefined,
           segmentId: needsProject && moduleId && segmentId ? segmentId : undefined,
+          taskId: needsProject && moduleId ? toHourTaskId(taskId) : undefined,
           category: category.trim(),
           description: description || undefined,
           hours: day.hours,
@@ -312,26 +347,55 @@ export function WeeklyEntryForm({
               setProjectId(nextProjectId);
               setModuleId('');
               setSegmentId('');
+              setTaskId('');
+              setCategory((previous) => activityForTaskChange(
+                previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
+              ));
               if (!nextProject?.allowsOvertime) setIsOvertime(false);
             }}
           />
         )}
       </div>
 
-      {needsProject && (
-        <PhaseSegmentFields
-          projectId={projectId}
-          moduleId={moduleId}
+      {needsProject && projectId && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+        <ProjectHourPlanFields
+          phases={projectDetail?.modules ?? hourPhases ?? []}
+          phaseId={moduleId}
+          segments={availableSegments}
           segmentId={segmentId}
-          onChange={(patch) => {
-            setModuleId(patch.moduleId);
-            setSegmentId(patch.segmentId);
+          tasks={availableTasks}
+          taskId={taskId}
+          requiresPhase={hasEligibleRoadmapBlocks}
+          approverName={projectDetail?.teams.find((team) =>
+            team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
+          )?.leader?.fullName ?? resolveHourApprover(hourPhases, user?.id, segmentId)}
+          onPhaseChange={(id) => {
+            setModuleId(id); setSegmentId(''); setTaskId('');
+            setCategory((previous) => activityForTaskChange(
+              previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
+            ));
+          }}
+          onSegmentChange={(id) => {
+            setSegmentId(id); setTaskId('');
+            setCategory((previous) => activityForTaskChange(
+              previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
+            ));
+          }}
+          onTaskChange={(id) => {
+            setCategory((previous) => activityForTaskChange(
+              previous,
+              availableTasks.find((task) => task.id === taskId)?.name,
+              availableTasks.find((task) => task.id === id)?.name,
+            ));
+            setTaskId(id);
           }}
         />
       )}
 
       <div className={styles.row}>
-        <TextField label="Actividad" required placeholder="Ej: Diseño webapp" value={category} onChange={(event) => setCategory(event.target.value)} />
+        <TextField label="Actividad" required
+          placeholder={taskId === OTHER_TASK_OPTION ? 'Describe el trabajo realizado fuera de las tareas asignadas' : 'Ej: Diseño webapp'}
+          value={category} onChange={(event) => setCategory(event.target.value)} />
         <div className={styles.overtimeField}>
           <span className={styles.stepperLabel}>Horas Extra</span>
           <label
@@ -402,10 +466,14 @@ export function WeeklyEntryForm({
       )}
 
       <div className={styles.textareaField}>
-        <label className={styles.textareaLabel}>Descripción / Bitácora Detallada</label>
+        <label className={styles.textareaLabel}>
+          Descripción / Bitácora Detallada {availableTasks.some((task) => task.id === taskId) && '(opcional, ya está vinculada a una tarea)'}
+        </label>
         <textarea
           className={styles.textarea}
-          placeholder="Describa detalladamente el avance técnico realizado (mínimo 5 caracteres)"
+          placeholder={availableTasks.some((task) => task.id === taskId)
+            ? 'Agrega detalles si te sirven para la bitácora'
+            : 'Describa detalladamente el avance realizado (mínimo 5 caracteres)'}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />

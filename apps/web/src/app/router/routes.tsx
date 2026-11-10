@@ -17,6 +17,8 @@ import { TeamLeaderPreviewPage } from '@/modules/teams/pages/TeamLeaderPreviewPa
 import { TeamMemberDetailPage } from '@/modules/teams/pages/TeamMemberDetailPage';
 import { ProjectsListPage } from '@/modules/projects/pages/ProjectsListPage';
 import { ProjectDetailPage } from '@/modules/projects/pages/ProjectDetailPage';
+import { MyProjectsPage } from '@/modules/projects/pages/MyProjectsPage';
+import { MyProjectDetailPage } from '@/modules/projects/pages/MyProjectDetailPage';
 import { ProjectTeamDetailPage } from '@/modules/projects/pages/ProjectTeamDetailPage';
 import { NewProjectPage } from '@/modules/projects/pages/NewProjectPage';
 import { SupportPlanDetailPage } from '@/modules/projects/pages/SupportPlanDetailPage';
@@ -33,6 +35,9 @@ import { ClientProjectDetailPage } from '@/modules/client-portal/pages/ClientPro
 import { ClientSupportContractDetailPage } from '@/modules/client-portal/pages/ClientSupportContractDetailPage';
 import { ForbiddenPage } from '@/app/pages/ForbiddenPage';
 import { NotFoundPage } from '@/app/pages/NotFoundPage';
+import { CalculatorPage } from '@/modules/estimation/pages/CalculatorPage';
+import { EstimationWorkspacePage } from '@/modules/estimation/pages/EstimationWorkspacePage';
+import { QuotationWorkspacePage } from '@/modules/estimation/pages/QuotationWorkspacePage';
 
 /**
  * Tabla de rutas.
@@ -105,6 +110,15 @@ export const router = createBrowserRouter([
     ],
   },
 
+  // ── Mis proyectos del colaborador — consulta propia, sin edición ───────
+  {
+    element: <ProtectedRoute permission="hours:read_own" />,
+    children: [
+      { path: '/mis-proyectos', element: <MyProjectsPage /> },
+      { path: '/mis-proyectos/:projectId', element: <MyProjectDetailPage /> },
+    ],
+  },
+
   // ── Módulo de proyectos ───────────────────────────────────────────────
   {
     element: <ProtectedRoute anyOf={['projects:read', 'projects:read_assigned']} />,
@@ -112,13 +126,25 @@ export const router = createBrowserRouter([
   },
   {
     element: <ProtectedRoute permission="projects:manage" />,
-    children: [{ path: '/proyectos/nuevo', element: <NewProjectPage /> }],
+    children: [
+      { path: '/proyectos/nuevo', element: <NewProjectPage /> },
+      { path: '/proyectos/:projectId/estimacion', element: <EstimationWorkspacePage /> },
+    ],
   },
   {
     element: <ProtectedRoute anyOf={['projects:read', 'projects:read_assigned']} />,
     children: [
       { path: '/proyectos/:projectId', element: <ProjectDetailPage /> },
       { path: '/proyectos/:projectId/equipos/:teamId', element: <ProjectTeamDetailPage /> },
+    ],
+  },
+
+  // ── Cotizaciones: Líder PM del proyecto o Gerencia/PMO; API verifica pertenencia. ──
+  {
+    element: <ProtectedRoute anyOf={['projects:manage', 'projects:read_assigned']} />,
+    children: [
+      { path: '/calculadora', element: <CalculatorPage /> },
+      { path: '/proyectos/:projectId/cotizacion', element: <QuotationWorkspacePage /> },
     ],
   },
 

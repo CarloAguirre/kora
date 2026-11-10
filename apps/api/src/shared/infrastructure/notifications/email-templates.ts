@@ -11,6 +11,7 @@ import type {
   SupportBillingDigestItem,
   SupportBillingDigestNotification,
   TeamReportDataRequestEmail,
+  ProjectTaskStatusEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
 
@@ -637,5 +638,38 @@ export function renderTeamReportDataRequest(input: TeamReportDataRequestEmail, w
       ],
       footer,
     ),
+  };
+}
+
+
+// ─────────────────────────── Revisión de tareas ───────────────────────────
+
+export function renderProjectTaskStatus(input: ProjectTaskStatusEmail, webAppUrl: string): RenderedEmail {
+  const returned = input.kind === 'returned';
+  const subject = returned
+    ? `Kora: tu tarea "${input.taskName}" necesita correcciones`
+    : `Kora: tarea "${input.taskName}" pendiente de aprobación`;
+  const url = projectUrl(webAppUrl, input.projectSlug);
+  const detail = returned
+    ? `La tarea "${input.taskName}" del proyecto "${input.projectName}" fue devuelta para correcciones.`
+    : `La tarea "${input.taskName}" del proyecto "${input.projectName}" está completada y espera tu aprobación.`;
+  return {
+    subject,
+    html: layout({
+      webAppUrl, subject, firstName: input.recipientFirstName,
+      paragraphs: [
+        escapeHtml(detail),
+        ...(input.assigneeName && !returned ? [`Colaborador: ${escapeHtml(input.assigneeName)}`] : []),
+        ...(returned && input.reason ? [`<strong>Motivo de devolución:</strong> ${escapeHtml(input.reason)}`] : []),
+      ],
+      action: { label: returned ? 'Ver tarea devuelta' : 'Revisar tarea', url },
+      footer: AUTOMATIC_FOOTER,
+    }),
+    text: plainText(input.recipientFirstName, [
+      detail,
+      ...(input.assigneeName && !returned ? ['Colaborador: ' + input.assigneeName] : []),
+      ...(returned && input.reason ? ['Motivo de devolución: ' + input.reason] : []),
+      'Abrir proyecto: ' + url,
+    ], AUTOMATIC_FOOTER),
   };
 }

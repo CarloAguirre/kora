@@ -1,11 +1,114 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ProjectStatus, RoleCode } from '@kora/contracts';
-import { UpdateHourEntryUseCase } from './update-hour-entry.use-case';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import type { HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
-import type { HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
 import type { HourEntryUserReader } from '../ports/hour-entry-user-reader.port';
+import type { HourEntryProjectReader } from '../ports/hour-entry-project-reader.port';
 import type { HourEntryApprovalAuthorityService } from '../services/hour-entry-approval-authority.service';
+import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
+import { UpdateHourEntryUseCase } from './update-hour-entry.use-case';
+
+const actor = { userId: 'worker-1', email: 'worker@example.com' };
+
+function setup() {
+  const result = HourEntry.create({
+    id: 'entry-1', userId: 'worker-1', assignment: 'Proyecto',
+    projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
+    taskId: 'task-1',
+    hours: 4, date: new Date('2026-11-04T00:00:00Z'),
+    ownerRequiresApproval: true, now: new Date('2026-11-04T12:00:00Z'),
+  });
+  if (!result.isOk()) throw new Error('Fallo fixture');
+  const entry = result.value;
+  const save = vi.fn().mockResolvedValue(undefined);
+  const projects = {
+    findModuleById: vi.fn().mockResolvedValue({
+      id: 'module-1', projectId: 'project-1',
+      segments: [{ id: 'segment-1', name: 'Bloque 1' }, { id: 'segment-2', name: 'Bloque 2' }],
+      tasks: [
+        { id: 'task-1', segmentId: 'segment-1', assigneeUserId: 'worker-1', cancelledAt: null },
+        { id: 'task-2', segmentId: 'segment-2', assigneeUserId: 'worker-1', cancelledAt: null },
+        { id: 'task-3', segmentId: 'segment-1', assigneeUserId: 'other-user', cancelledAt: null },
+      ],
+    }),
+    findSegmentsForModule: vi.fn().mockResolvedValue([
+      { id: 'segment-1', projectId: 'project-1', moduleId: 'module-1', teamId: 'team-1' },
+      { id: 'segment-2', projectId: 'project-1', moduleId: 'module-1', teamId: 'team-1' },
+    ]),
+    isUserOnSegmentTeam: vi.fn().mockResolvedValue(true),
+    hasAttributableWorkBlocks: vi.fn().mockResolvedValue(true),
+  };
+  const useCase = new UpdateHourEntryUseCase(
+    { findById: vi.fn().mockResolvedValue(entry), save,
+      sumApprovedHoursForProject: vi.fn(),
+      sumRegularHoursForUserAndDate: vi.fn().mockResolvedValue(0) } as unknown as HourEntryRepository,
+    { canDecide: vi.fn().mockResolvedValue(false) } as unknown as HourEntryApprovalAuthorityService,
+    { findById: vi.fn().mockResolvedValue({ role: 'collaborator' }) } as unknown as HourEntryUserReader,
+    projects as unknown as HourEntryProjectReader,
+    { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder,
+    { now: () => new Date('2026-11-04T16:00:00Z') },
+    new SequentialIdGenerator(),
+  );
+  return { useCase, entry, save, projects };
+}
+
+describe('edición de horas y atribución a bloque', () => {
+  it('conserva taskId mientras cambian únicamente HH y descripción', async () => {
+    const { useCase, entry } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { hours: 3, description: 'Trabajo corregido' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({ taskId: 'task-1', hours: 3 });
+  });
+
+  it('permite cambiar la atribución a una tarea válida de otro bloque', async () => {
+    const { useCase, entry } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { segmentId: 'segment-2', taskId: 'task-2' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({ taskId: 'task-2', segmentId: 'segment-2' });
+  });
+
+  it('no permite vincular una tarea ajena al autor', async () => {
+    const { useCase, save } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { taskId: 'task-3' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_TASK_INVALID');
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('puede corregir una imputación aún pendiente sin modificar su número de horas', async () => {
+    const { useCase, entry, save } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { segmentId: 'segment-2' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(save).toHaveBeenCalledOnce();
+    expect(entry.toSnapshot()).toMatchObject({
+      segmentId: 'segment-2', taskId: null, moduleId: 'module-1', hours: 4,
+    });
+  });
+
+  it('no permite trasladar las HH a un bloque ajeno', async () => {
+    const { useCase, save } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { segmentId: 'segment-foreign' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_SEGMENT_NOT_IN_MODULE');
+    expect(save).not.toHaveBeenCalled();
+  });
+});
+
+import type { ProjectStatus, RoleCode } from '@kora/contracts';
 import { FixedClock, RecordingAuditRecorder, SequentialIdGenerator } from '../../../../test/fakes';
 
 const NOW = new Date('2026-10-21T12:00:00.000Z');
@@ -43,6 +146,7 @@ function buildUseCase(
       statuses[id] ? { id, name: id, status: statuses[id], leaderUserId: null, allowsOvertime: false } : null,
     ),
     recalculateUsedHours: vi.fn().mockResolvedValue(undefined),
+    hasAttributableWorkBlocks: vi.fn().mockResolvedValue(false),
   } as unknown as HourEntryProjectReader;
   const authority = {
     canDecide: vi.fn().mockResolvedValue(options.canDecide ?? false),

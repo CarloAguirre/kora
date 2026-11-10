@@ -18,11 +18,13 @@ import {
   ProjectNotFoundError,
   ProjectApprovalRequiredForActivationError,
   ProjectTeamMaxMembersBelowAssignedError,
+  ProjectTeamHasRoadmapBlocksError,
   ReferencedClientNotFoundError,
   SoldHoursChangeReasonRequiredError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { PROJECT_TEAM_REPOSITORY, type ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
+import { PROJECT_MODULE_REPOSITORY, type ProjectModuleRepository } from '../../domain/repositories/project-module.repository';
 import {
   PROJECT_PAYMENT_MILESTONE_REPOSITORY,
   type ProjectPaymentMilestoneRepository,
@@ -62,6 +64,7 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(PROJECT_PAYMENT_MILESTONE_REPOSITORY) private readonly paymentMilestones: ProjectPaymentMilestoneRepository,
     private readonly paymentTriggers: PaymentMilestoneTriggerService,
+    @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
   ) {}
 
   async execute(command: UpdateProjectCommand): Promise<Result<void, ApplicationError>> {
@@ -105,6 +108,19 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
       const assignedByTeam = new Map(
         (await this.projectTeams.findByProject(project.id)).map((team) => [team.teamId, team]),
       );
+      const retainedIds = new Set(data.teams.map((team) => team.teamId));
+      const removed = [...assignedByTeam.values()].filter((team) => !retainedIds.has(team.teamId));
+      if (removed.length > 0) {
+        // Regla de negocio del Roadmap: un equipo con bloques persistidos no
+        // desaparece del proyecto. El frontend también lo advierte, pero la
+        // API debe impedirlo incluso ante llamadas PATCH directas.
+        const modules = await this.modules.listForProject(project.id);
+        const segments = modules.flatMap((module) => module.segments);
+        for (const team of removed) {
+          const count = segments.filter((segment) => segment.teamId === team.teamId).length;
+          if (count > 0) return err(new ProjectTeamHasRoadmapBlocksError(team.teamName, count));
+        }
+      }
       for (const team of data.teams) {
         const current = assignedByTeam.get(team.teamId);
         if (current && team.memberCount != null && team.memberCount < current.memberCount) {

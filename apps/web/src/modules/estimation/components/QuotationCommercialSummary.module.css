@@ -1,0 +1,23 @@
+.summary{display:grid;gap:10px;color:var(--kora-text)}.topLine{display:flex;align-items:center;gap:9px;justify-content:space-between;font-size:12px;color:var(--kora-text-muted)}.bigNumber{font-size:32px;line-height:1.06;font-weight:800;letter-spacing:-.055em;font-variant-numeric:tabular-nums;color:var(--kora-navy)}.bigNumber small{font-size:13px;letter-spacing:0;font-weight:700;color:var(--kora-text-muted)}.duration{font-size:11px;color:var(--kora-text-muted);margin:-4px 0 3px}.money{display:grid;grid-template-columns:1fr 1fr;gap:8px}.money>div{border:1px solid var(--kora-border-subtle);border-radius:9px;padding:12px 10px;display:grid;gap:5px;min-width:0}.money span{font-size:11px;color:var(--kora-text-muted)}.money strong{font-size:17px;line-height:1.25;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.distribution{height:9px;border-radius:9px;overflow:hidden;display:flex;background:var(--kora-surface-muted);margin-top:3px}.distribution>span{height:100%;display:block;flex-shrink:0}.emptyBar{width:100%;background:var(--kora-border-subtle)}.legend{display:grid;gap:8px}.legendRow{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px}.legendRow strong{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}.name{display:flex;align-items:center;gap:7px;min-width:0;overflow-wrap:anywhere}.dot{width:9px;height:9px;flex:0 0 9px;border-radius:3px}.legend p{margin:3px 0 0;color:var(--kora-text-muted);font-size:11px}.warning,.aiNotice,.draftNotice{font-size:12px;line-height:1.45;padding:10px;border-radius:7px;margin:0}.warning{background:var(--kora-badge-warning-bg);color:var(--kora-badge-warning-text)}
+
+
+/* HTML v5: dense sticky summary proportions. */
+.summary{gap:10px}
+.topLine{font-size:12px;color:var(--kora-text-muted)}
+.bigNumber{font-size:36px;letter-spacing:-.045em;color:var(--kora-navy)}
+.bigNumber small{font-size:13px;color:var(--kora-text-muted);font-weight:600}
+.duration{font-size:12px;color:var(--kora-text-muted);margin:-4px 0 4px}
+.money{gap:8px}
+.money>div{background:var(--kora-surface-alt);border:1px solid var(--kora-border-soft);border-radius:11px;padding:12px 11px;min-height:68px}
+.money strong{font-size:16px;color:var(--kora-navy)}
+.warning{background:var(--kora-badge-warning-bg);color:var(--kora-badge-warning-text);font-size:11.5px}
+.distribution{height:10px;margin-top:2px}
+.legend{gap:7px}
+.legendRow{font-size:12px;color:var(--kora-text-muted)}
+.legendRow strong{font-weight:550;color:var(--kora-text-muted)}
+
+
+/* Panel lateral HTML v5: solo cifras, leyenda y acciones. */
+.unsaved{font-size:10px;color:var(--kora-warning-text)}
+.recurring{color:var(--kora-text-muted);font-size:11.5px;margin:0}
+.summary{gap:10px}

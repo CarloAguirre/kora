@@ -1,0 +1,19 @@
+.page { display: flex; flex-direction: column; width: 100%; min-width: 0; gap: var(--kora-space-4); }
+.card { min-width: 0; gap: var(--kora-space-4); }
+.head { display: flex; align-items: start; justify-content: space-between; flex-wrap: wrap; gap: var(--kora-space-3); }
+.head h1 { margin: 0 0 var(--kora-space-1); font-size: var(--kora-text-xl); color: var(--kora-navy); }
+.head p { margin: 0; color: var(--kora-text-muted); font-size: var(--kora-text-sm); }
+.count { background: var(--kora-surface-muted); border: 1px solid var(--kora-border-soft);
+  border-radius: var(--kora-radius-pill); padding: 6px 10px; font-size: var(--kora-text-xs); white-space: nowrap; }
+.projectLink { display: flex; flex-direction: column; gap: 3px; color: var(--kora-navy); text-decoration: none; }
+.projectLink:hover strong { text-decoration: underline; }
+.projectLink span { font-size: var(--kora-text-xs); color: var(--kora-text-muted); }
+.stage { display: inline-block; border-radius: var(--kora-radius-pill); background: var(--kora-badge-neutral-bg);
+  color: var(--kora-badge-neutral-text); padding: 4px 9px; white-space: nowrap; }
+.progress { display: flex; align-items: center; gap: var(--kora-space-2); min-width: 140px; }
+.progress strong { white-space: nowrap; font-weight: var(--kora-weight-medium); font-size: var(--kora-text-xs); }
+.progressTrack { position: relative; height: 8px; min-width: 65px; flex: 1;
+  border-radius: var(--kora-radius-pill); background: var(--kora-surface-disabled); overflow: hidden; }
+.progressTrack span { display: block; height: 100%; background: var(--kora-success); border-radius: inherit; }
+.open { display: inline-flex; color: var(--kora-navy); padding: 6px; }
+.date { white-space: nowrap; }

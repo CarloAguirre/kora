@@ -27,8 +27,20 @@ export function clientSupportContractPreviewPath(client: WithSlug, plan: WithSlu
   return `${clientSupportPortalPreviewPath(client)}/${segment(plan)}`;
 }
 
+export function myProjectPath(project: WithSlug): string {
+  return `/mis-proyectos/${segment(project)}`;
+}
+
 export function projectPath(project: WithSlug): string {
   return `/proyectos/${segment(project)}`;
+}
+
+export function projectQuotationPath(project: WithSlug): string {
+  return `${projectPath(project)}/cotizacion`;
+}
+
+export function projectEstimationPath(project: WithSlug): string {
+  return `${projectPath(project)}/estimacion`;
 }
 
 export function projectTeamPath(project: WithSlug, team: WithSlug): string {

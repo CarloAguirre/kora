@@ -6,7 +6,9 @@ WITH hito0_rows AS (
   SELECT DISTINCT ON (o.project_id) o.id, p.hito0_at
   FROM "project_observations" o
   JOIN "projects" p ON p.id = o.project_id
-  WHERE o.type = 'cambio_proyecto'
+  -- La migración corre en una transacción junto al ALTER TYPE que agregó este valor.
+  -- Comparar como texto evita el error 55P04 (uso prematuro de un valor nuevo del enum).
+  WHERE o.type::text = 'cambio_proyecto'
     AND p.hito0_at IS NOT NULL
     AND (
       o.message LIKE 'Proyecto activado manualmente (Hito 0)%'

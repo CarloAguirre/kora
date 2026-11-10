@@ -3,6 +3,7 @@ import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '
 import { PROJECT_STATUS_LABELS, type ChangeProjectStatusInput, type Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
+  ProjectQuotationTransferRequiredError,
   ManualHito0ReasonRequiredError,
   ProjectNotFoundError,
   ProjectApprovalRequiredForActivationError,
@@ -70,6 +71,13 @@ export class ChangeProjectStatusUseCase
       if (previousStatus === 'finished' && !hasActiveContract) {
         return err(new SupportContractRequiredForStatusError('Se necesita un contrato activo para reabrir un soporte terminado.'));
       }
+    }
+
+    if (previousStatus === 'draft' && command.data.status === 'active' &&
+        project.type === 'development' &&
+        (project.salesStage !== 'approved' ||
+         await this.projects.hasPendingQuotationTransfer?.(project.id))) {
+      return err(new ProjectQuotationTransferRequiredError());
     }
 
     /**

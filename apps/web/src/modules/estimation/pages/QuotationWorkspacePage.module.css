@@ -1,0 +1,92 @@
+.page{display:grid;gap:20px;min-width:0}.breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:9px;color:var(--kora-text-muted,var(--kora-text-muted));font-size:13px}.breadcrumb a{color:inherit;text-decoration:none}.breadcrumb strong{color:var(--kora-text,var(--kora-text))}.eyebrow{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--kora-text-muted);font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}.main,.sidebar{display:grid;gap:16px;min-width:0}.sidebar{position:sticky;top:18px}.cardTitle{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:16px}.cardTitle h2,.cardTitle h3{margin:0 0 5px}.cardTitle p{font-size:13px;color:var(--kora-text-muted);margin:0}.cardTitle h2{font-size:18px}.cardTitle h3{font-size:15px}.versions{display:flex;gap:8px;flex-wrap:wrap}.version{flex:0 0 auto}.helper{font-size:12px;line-height:1.5;color:var(--kora-text-muted);margin:10px 0 0}.longField{display:grid;gap:7px;font-size:13px;font-weight:650;margin-top:14px}.longField textarea{width:100%;min-height:85px;border:1px solid var(--kora-border-soft);padding:11px;border-radius:9px;font:inherit;font-weight:400;background:var(--kora-surface,var(--kora-surface));color:var(--kora-text,var(--kora-text))}.warn{color:var(--kora-warning-text);font-size:12px}@media(max-width:1000px){.layout{grid-template-columns:1fr}.sidebar{position:static}}
+
+.simulation{display:grid;gap:12px;margin-top:12px;padding:14px;background:var(--kora-surface-alt);border:1px solid var(--kora-border-soft);border-radius:10px}
+.simulation>strong{font-size:14px}
+.mapping{display:grid;gap:10px}
+.mappingRow{display:grid;grid-template-columns:150px minmax(180px,1fr);gap:14px;align-items:center}
+.mappingRow>div:first-child{display:grid;gap:4px}
+.mappingRow small{font-size:12px;color:var(--kora-text-muted)}
+.summaryStats{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:12px;font-weight:650}
+.summaryStats span{background:var(--kora-blue-surface-alt);padding:6px 9px;border-radius:7px}
+.simulation>.warn{margin:0}
+@media(max-width:600px){.mappingRow{grid-template-columns:1fr}}
+
+
+/* Cotizaciones v5 — capas locales de fidelidad visual; no alteran tokens globales. */
+.page{width:100%;min-width:0;margin:0;gap:14px;padding:0}
+.breadcrumb{justify-content:space-between;margin:2px 0 0;font-size:12px}
+.breadcrumb a:first-child{font-weight:700;color:var(--kora-navy)}
+.listLink{color:var(--kora-text-muted)}
+.layout{grid-template-columns:minmax(0,1fr) 262px;gap:16px}
+.main{gap:14px}
+.sidebar{gap:12px;top:18px}
+.sidebar>p{margin:0}
+.identityHeading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:9px}
+.identityHeading h1{font-size:16px;line-height:1.35;margin:0 0 4px;font-weight:800;color:var(--kora-navy)}
+.identityHeading p{margin:0;font-size:11px;color:var(--kora-text-muted);line-height:1.5}
+.versions{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;padding:3px 0 12px}
+.versions .version{min-width:46px}
+.identityFields{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(105px,.65fr);align-items:end;gap:10px;padding:8px 0 0;border-top:1px solid var(--kora-border-subtle)}
+.readonlyField,.statusField{min-height:58px;display:grid;align-content:start;gap:7px;min-width:0}
+.readonlyField>span,.statusField>span{font-size:11px;color:var(--kora-text-muted)}
+.readonlyField strong{font-size:12px;font-weight:650;color:var(--kora-text);padding:9px 9px;border:1px solid var(--kora-border-soft);background:var(--kora-surface-muted);border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.statusField>span:last-child{justify-self:start}
+
+.priceGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media(max-width:1100px){.layout{grid-template-columns:minmax(0,1fr) 250px}}
+@media(max-width:910px){.layout{grid-template-columns:1fr}.sidebar{position:static;max-width:none}.priceGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:630px){.identityHeading{flex-wrap:wrap}.identityFields{grid-template-columns:1fr}.priceGrid{grid-template-columns:1fr}.listLink{display:none}}
+
+
+/* Cotización fluida: usa los márgenes de DashboardLayout, con resumen lateral.
+   Las modificaciones son locales a esta ruta. */
+.page{width:100%;min-width:0;max-width:none;margin:0;gap:15px;padding:0}
+.projectTitle{font-size:26px;font-weight:650;color:var(--kora-navy);line-height:1.25;margin:3px 0 0}
+.breadcrumb{margin:0 0 2px;justify-content:flex-start;gap:22px;min-height:26px;font-size:12.5px}
+.breadcrumb a:first-child{color:var(--kora-navy);font-weight:700}
+.layout{grid-template-columns:minmax(0,1fr) 330px;gap:20px;align-items:start}
+.main{gap:16px}
+.main>div:has(> .identityHeading),
+.main>div:has(> .cardTitle),
+.main>div:has(> .teamsHeading){padding:20px 22px;gap:12px;border:1px solid var(--kora-border-subtle);border-radius:15px}
+.sidebar{position:sticky;top:16px;align-self:start;gap:12px}
+.sidebar>div:first-child{border:1px solid var(--kora-border-subtle);border-radius:15px;padding:21px 22px;gap:10px;box-shadow:0 2px 10px var(--kora-shadow)}
+.identityHeading{margin:0 0 10px}
+.identityHeading h2{font-size:15px;line-height:1.4;margin:0;color:var(--kora-navy);font-weight:750}
+.identityFields{grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) minmax(115px,.7fr);border-top:0;padding:6px 0 0;gap:12px}
+.readonlyField strong{min-height:39px;background:var(--kora-surface-alt);font-weight:550;border-color:var(--kora-border-subtle);padding:10px 11px}
+.readonlyField>span,.statusField>span{color:var(--kora-text-muted);font-size:11.5px}
+.identityFields input{min-height:38px}
+.versions{padding:0 0 7px;gap:8px 12px}
+
+
+.cardTitle{margin:0 0 5px}
+.cardTitle h2{font-size:15px;color:var(--kora-navy);font-weight:750}
+.priceGrid{gap:12px}
+@media(max-width:1240px){.layout{grid-template-columns:minmax(0,1fr) 300px;gap:16px}}
+@media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static;max-width:100%}.priceGrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:650px){.projectTitle{font-size:22px}.identityFields{grid-template-columns:1fr}.priceGrid{grid-template-columns:1fr}.main>div:has(> .identityHeading),.main>div:has(> .cardTitle),.main>div:has(> .teamsHeading){padding:16px}.sidebar>div:first-child{padding:18px}}
+
+
+/* Contenido con scroll propio: el resumen permanece visible durante la EDT. */
+.sidebar{display:block;position:sticky;top:12px;align-self:start;height:max-content;max-height:calc(100vh - 24px);min-width:0}
+.sidebar>div:first-child{width:100%;max-height:calc(100vh - 24px);overflow-y:auto;scrollbar-width:thin}
+.mappingDisclosure,.technicalPanel{border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius-input);background:var(--kora-surface-alt);min-width:0}
+.mappingDisclosure summary,.technicalPanel>summary{cursor:pointer;padding:11px 13px;font-size:12px;color:var(--kora-navy);font-weight:700}
+.mappingDisclosure[open],.technicalPanel[open]{background:var(--kora-surface)}
+.mappingDisclosure>div,.technicalPanel>div{margin:10px}
+.technicalPanel{margin-top:4px}
+.technicalPanel>*:not(summary){margin:14px}
+@media(max-width:980px){.sidebar{position:static;height:auto;max-height:none}.sidebar>div:first-child{max-height:none}}
+
+
+/* Un único acceso secundario al mapeo IA: las tablas técnicas y
+   desplegables inventados no forman parte de la vista principal del v5. */
+
+
+/* Exportación: acción secundaria en la cabecera, UI kit sin estilos paralelos. */
+.projectHeading{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.projectHeading .projectTitle{margin:3px 0 0}
+
+/* Acción compacta de aceptación después de guardar los ajustes de una cotización IA. */
+.aiAcceptanceAction{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:9px;padding:10px 12px;border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius-input);background:var(--kora-surface-alt);font-size:12px;color:var(--kora-text-muted)}

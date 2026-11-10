@@ -51,6 +51,28 @@ function buildItem(overrides: Partial<HourEntryListItem> = {}): HourEntryListIte
  * tiene autoridad ahí). El mapper debe ignorarlo para que la UI nunca
  * muestre "debe aprobar" a alguien sin autoridad real sobre ese registro.
  */
+describe('toHourEntrySummary — bloque real de trabajo', () => {
+  it('expone la tarea seleccionada sin inventar tareas en registros legados', () => {
+    const linked = toHourEntrySummary(buildItem({
+      projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
+      taskId: 'task-1',
+    }));
+    expect(linked.taskId).toBe('task-1');
+    const previous = toHourEntrySummary(buildItem({ taskId: null }));
+    expect(previous.taskId).toBeNull();
+  });
+
+  it('incluye el segmento persistido y deja sin atribución los registros legacy', () => {
+    const attributed = toHourEntrySummary(buildItem({
+      projectId: 'project-1', moduleId: 'module-1', moduleName: 'Fase',
+      segmentId: 'segment-1', segmentName: 'Desarrollo · Bloque 1',
+    }));
+    expect(attributed.segment).toEqual({ id: 'segment-1', name: 'Desarrollo · Bloque 1' });
+    const legacy = toHourEntrySummary(buildItem({ projectId: 'project-1', moduleId: 'module-1' }));
+    expect(legacy.segment).toBeNull();
+  });
+});
+
 describe('toHourEntrySummary — designatedApprover', () => {
   it('ignora el aprobador designado heredado cuando el registro tiene proyecto', () => {
     const summary = toHourEntrySummary(

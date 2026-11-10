@@ -1,0 +1,71 @@
+.workspace{display:grid;gap:12px;min-width:0}
+.header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.header h2{font-size:15px;font-weight:750;color:var(--kora-text);margin:0}
+.caption{margin:0;color:var(--kora-text-muted);font-size:11.5px;line-height:1.5}
+.tableScroll{overflow-x:auto;max-width:100%}
+.columns,.line{display:grid;gap:9px;align-items:center}
+.compactColumns{grid-template-columns:minmax(180px,1fr) 100px 110px}
+.detailedColumns{grid-template-columns:minmax(185px,1.6fr) 80px 96px 80px 95px 95px 110px}
+.columns{padding:10px 9px;border-bottom:1px solid var(--kora-border-subtle);background:var(--kora-surface-alt);font-size:11px;color:var(--kora-text-muted)}
+.line{padding:7px 9px;min-height:51px;border-bottom:1px solid var(--kora-border-subtle)}
+.line:last-child{border-bottom:0}
+/* TextField y Select son nativos: los estilos del foco, disabled, borde
+   y superficie se heredan de sus propios CSS Modules. Solo adaptamos
+   el tamaño compacto de la grilla y la alineación numérica. */
+.numberField,.unitField{width:100%;min-width:0}
+.numberField>div,.unitField>div{height:var(--kora-control-height-sm);min-width:0}
+.numberField input{font-size:var(--kora-text-xs);text-align:right;font-variant-numeric:tabular-nums}
+.unitField select{font-size:var(--kora-text-xs);min-width:0}
+.line .hoursInput{border-color:var(--kora-blue-200);color:var(--kora-navy)}
+.name{display:flex;align-items:center;gap:9px;min-width:0;font-size:12.5px}
+.name strong{font-weight:650;overflow-wrap:anywhere}
+.name input{width:14px;height:14px;accent-color:var(--kora-navy);flex:none}
+.name i{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none}
+.hours{text-align:right;font-size:12.5px;color:var(--kora-text);font-variant-numeric:tabular-nums}
+.inactive{color:var(--kora-text-disabled)}.inactive strong{color:var(--kora-text-disabled)}
+.empty{color:var(--kora-text-muted);font-size:12px;padding:12px 8px}
+@media(max-width:700px){.compactColumns{grid-template-columns:minmax(150px,1fr) 85px 85px}
+ .detailedColumns{min-width:760px}.name{font-size:11.5px}}
+
+/* SegmentedControl mantiene íntegros sus estados y colores del sistema Kora.
+   No sobrescribimos radiogroup ni radio desde este módulo. */
+
+/* Etiqueta de equipo con el color de referencia (quotationTeamColor). */
+.teamLabel{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pendingProfiles{display:grid;gap:10px;padding:13px;border:1px solid var(--kora-border-subtle);
+ background:var(--kora-blue-surface-alt);border-radius:var(--kora-radius-input)}
+.pendingProfiles h3{font-size:12.5px;font-weight:750;color:var(--kora-navy);margin:0 0 4px}
+.pendingProfiles p{margin:0;font-size:11px;line-height:1.5;color:var(--kora-text-muted)}
+.pendingList{display:grid;gap:7px}
+.pendingRole{display:grid;grid-template-columns:minmax(0,1fr) 110px minmax(150px,.9fr);
+ align-items:center;gap:12px;padding:8px 10px;background:var(--kora-surface);border:1px solid var(--kora-border-subtle);
+ border-radius:var(--kora-radius)}
+.pendingRole strong{font-size:12px;color:var(--kora-text)}
+.pendingRole>span{font-size:11.5px;color:var(--kora-text-muted);font-variant-numeric:tabular-nums}
+.pendingPeopleField{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;
+ gap:var(--kora-space-2);min-width:0}
+.pendingPeopleField>label{font-size:10.5px;flex:1;color:var(--kora-text-muted)}
+.pendingPeopleField>div{width:64px;height:var(--kora-control-height-sm);min-width:0}
+.pendingPeopleField input{text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:650px){.pendingRole{grid-template-columns:1fr 1fr}
+ .pendingPeopleField{grid-column:1/-1;justify-content:flex-start}}
+
+/* Capacidad EDT: indicadores derivados; inputs y badges mantienen UI kit Kora. */
+.capacityContext{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  flex-wrap:wrap;padding:9px 12px;border:1px solid var(--kora-border-subtle);
+  border-radius:var(--kora-radius-input);background:var(--kora-surface-alt);
+  color:var(--kora-text-muted);font-size:11px;line-height:1.5}
+.capacityContext strong{color:var(--kora-text);font-weight:650}
+.derivedLoad,.occupancy{display:flex;align-items:center;justify-content:flex-end;
+  min-width:0;min-height:var(--kora-control-height-sm);padding:0 9px;
+  border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius-input);
+  background:var(--kora-surface-alt);font-size:var(--kora-text-xs);
+  color:var(--kora-text);font-variant-numeric:tabular-nums}
+.occupancy{font-weight:600}
+.capacityWarning{grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  color:var(--kora-text-muted);font-size:11px;line-height:1.5;
+  padding:6px 9px;background:var(--kora-surface-alt);
+  border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius)}
+.peakLoad{grid-column:1/-1;margin:0;color:var(--kora-text-muted);
+  font-size:10.5px;line-height:1.4}
+@media(max-width:850px){.detailedColumns{min-width:790px}}

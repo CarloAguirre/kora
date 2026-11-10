@@ -99,6 +99,17 @@ export class ProjectTeamMaxMembersBelowAssignedError extends ValidationError {
   }
 }
 
+/** Impide quitar un equipo aún vinculado al cronograma operativo. */
+export class ProjectTeamHasRoadmapBlocksError extends ConflictError {
+  constructor(teamName: string, blockCount: number) {
+    super(
+      `El equipo "${teamName}" tiene ${blockCount} bloque(s) en el Roadmap. Elimínalos antes de quitar el equipo del proyecto.`,
+      'PROJECT_TEAM_HAS_ROADMAP_BLOCKS',
+      { details: { blockCount } },
+    );
+  }
+}
+
 export class InvalidTeamMemberAssignmentError extends ValidationError {
   constructor() {
     super('La persona indicada no es un miembro de equipo activo.', 'PROJECT_INVALID_TEAM_MEMBER');
@@ -370,5 +381,24 @@ export class ProjectNotApprovedForInvoicingError extends ValidationError {
 export class ManualHito0ReasonRequiredError extends ValidationError {
   constructor() {
     super('Escribe el motivo o la referencia de la activación antes de continuar.', 'PROJECT_MANUAL_HITO0_REASON_REQUIRED');
+  }
+}
+
+/**
+ * Pasar un proyecto a Activo a mano (Hito 0 sin factura, o reactivarlo tras
+ * Detenido) es de Gerencia/PMO — el líder del proyecto por sí solo no basta.
+ */
+export class ProjectQuotationTransferRequiredError extends ValidationError {
+  constructor() {
+    super(
+      'Debes aprobar una versión de cotización y traspasarla antes de pasar el proyecto a Activo.',
+      'PROJECT_QUOTATION_TRANSFER_REQUIRED',
+    );
+  }
+}
+
+export class CannotActivateProjectError extends ForbiddenError {
+  constructor() {
+    super('Solo Gerencia/PMO puede pasar este proyecto a Activo.', 'PROJECT_CANNOT_ACTIVATE');
   }
 }

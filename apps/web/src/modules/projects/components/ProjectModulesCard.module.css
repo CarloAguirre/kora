@@ -305,3 +305,354 @@
     grid-column: 3;
   }
 }
+
+/* EDT de referencia, dentro de las fases reales, sin fechas de tareas inventadas. */
+.referenceTasks{flex-basis:100%;border-top:1px solid var(--kora-border,#e4e9ee);padding-top:12px;font-size:12px}.referenceTasks summary{cursor:pointer;font-weight:var(--kora-weight-semibold);color:#0f2a44}.referenceTasks p{color:#637384;line-height:1.5}.referenceTasks ol{display:grid;gap:9px;padding-left:20px}.referenceTasks li{display:grid;gap:3px}.referenceTasks li strong{font-weight:var(--kora-weight-semibold)}.referenceTasks li span,.referenceTasks li small{color:#637384}
+
+
+/* Referencias de cotización debajo del Gantt: filas compactas, como el HTML v5.
+   La regla legacy '.referenceTasks li { display: grid }' tiene mayor especificidad
+   que '.referenceTaskRow' y separaba nombre, HH y acción en filas enormes.
+   Estas reglas se acotan a la lista comercial para no alterar otras tareas. */
+.commercialReferences { display: grid; gap: 8px; padding: 10px 14px; border-top: 1px solid #e6e8ee; }
+.commercialReferences details { min-width: 0; font-size: 12px; }
+.commercialReferences summary { cursor: pointer; color: #667085; font-weight: 400; }
+.commercialReferences .referenceTasks { padding-top: 8px; border-top: 1px solid #e6e8ee; }
+.referenceTasks .referenceTaskList { display: block; margin: 6px 0 0; padding: 0; list-style: none; }
+.referenceTasks .referenceTaskRow {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  column-gap: 4px;
+  row-gap: 0;
+  min-width: 0;
+  min-height: 18px;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.referenceTasks .referenceTaskRow .referenceTaskDot {
+  display: inline-block;
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  align-self: baseline;
+}
+.referenceTasks .referenceTaskRow .referenceTaskName {
+  color: #26384d;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.referenceTasks .referenceTaskRow .referenceTaskMeta { color: #667085; }
+.referenceTasks .referenceTaskRow button {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+  line-height: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.referenceTasks .referenceTaskRow .referenceConverted { color: #247748; font-size: 11px; margin-left: 4px; }
+.referenceBlockList { display: grid; gap: 5px; margin-top: 8px; }
+.referenceBlockRow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; padding: 3px 0; }
+.referenceBlockRow .referenceTaskDot { display: inline-block; flex: 0 0 8px; width: 8px; height: 8px; border-radius: 3px; }
+.referenceBlockRow .referenceTaskName { color: #26384d; min-width: 0; overflow-wrap: anywhere; }
+.referenceBlockRow .referenceTaskMeta { color: #667085; }
+.referenceBlockRow button { font-size: 12px; padding: 2px 6px; min-height: 24px; text-decoration: underline; }
+.referenceBlocks { border-bottom: 1px solid #e6e8ee; padding-bottom: 10px; }
+.referenceBlockList { display: grid; gap: 5px; margin-top: 8px; }
+.drawerBackdrop { position: fixed; inset: 0; z-index: 1100; background: rgba(15, 23, 42, .48); display: flex; justify-content: flex-end; }
+.drawer { width: min(520px, 100%); min-height: 0; height: 100%; background: #fff; box-shadow: -8px 0 24px rgba(0, 0, 0, .12); display: flex; flex-direction: column; }
+.drawerScroll { flex: 1; overflow-y: auto; padding: 16px; display: grid; gap: 14px; align-content: start; }
+.drawerPhase { margin: 0; font-size: 11px; color: #6b7280; }
+.drawerSection { display: grid; gap: 10px; border-top: 1px solid #e9edf2; padding-top: 16px; }
+.drawerSection h4 { margin: 0; font-size: 13px; font-weight: 700; }
+.drawerTeam { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 0; font-size: 12px; }
+.drawerTeam span:last-child { color: #667085; }
+.drawerFacts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 12px; background: #f7f8fa; border-radius: 10px; }
+.drawerFacts span { display: grid; gap: 5px; color: #667085; font-size: 11px; }
+.drawerFacts b { color: #17263f; font-size: 12px; overflow-wrap: anywhere; }
+.drawerHint { color: #667085; font-size: 12px; line-height: 1.5; margin: 0; }
+.drawerDelivery { display: grid; gap: 5px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; font-size: 12px; }
+.drawerDelivery > span { color: #667085; }
+.drawerDeliveryAction { display: grid; gap: 7px; font-size: 12px; }
+.drawerDeliveryAction textarea { border: 1px solid #d0d5dd; border-radius: 8px; padding: 8px; font: inherit; }
+.drawerTaskList { padding-left: 16px; font-size: 12px; line-height: 1.6; }
+.drawerFooter { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; border-top: 1px solid #e5e7eb; padding: 14px 16px; background: #fff; }
+@media (max-width: 580px) { .drawerFacts { grid-template-columns: 1fr; } }
+
+/* Cabecera de fase en modo Ver/Planificar, fiel al HTML v5; solo Roadmap interno. */
+/* Selector de modo compartido con Bitácora: PillSwitcher del UI kit. */
+.headerPhaseName { font-size: 13px; font-weight: 650; color: #142039; overflow-wrap: anywhere; }
+.headerPhaseInput { width: min(260px, 100%); min-width: 130px; height: 32px; padding: 5px 9px; border: 1px solid #bfcbe0; border-radius: 7px; font-size: 13px; font-weight: 500; color: #142039; background: white; }
+.headerPhaseInput:focus { outline: 2px solid #bfd8ff; outline-offset: 1px; }
+.phaseHeadingActions { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.phaseHeadingMeta { color: #6b768a; font-size: 11px; white-space: nowrap; }
+.phaseHeadingProgress { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; min-width: 0; color: #637083; font-size: 10.5px; white-space: nowrap; }
+.phaseHeadingBar { display: inline-block; flex: 0 0 90px; position: relative; width: 90px; height: 5px; border-radius: 8px; background: #e0e4ed; overflow: hidden; }
+.phaseHeadingReal { display: block; height: 100%; background: #b0e84a; border-radius: 8px; }
+.phaseHeadingMarker { position: absolute; top: 0; bottom: 0; width: 2px; background: #192338; transform: translateX(-1px); }
+.phaseHeadingActions .phaseAddBlock { min-height: 29px; height: auto; padding: 5px 9px; border-radius: 7px; font-size: 11px; font-weight: 500; white-space: nowrap; background: #fff; }
+.phaseHeadingActions .phaseDeleteButton { min-height: 28px; width: 28px; padding: 3px; color: #8a97a9; font-size: 14px; }
+.phaseHeadingActions .phaseDeleteButton:hover:not(:disabled) { color: #af3a3a; }
+@media (max-width: 1050px) {
+  .phaseHeadingActions { flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+  .phaseHeadingProgress { min-width: 106px; }
+}
+
+
+/* Roadmap v5.02: avisos de equipo + tareas operativas, debajo del cronograma. */
+.operationalContent { display: grid; gap: 10px; min-width: 0; }
+.awaitingAssignment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #ddd1fa;
+  border-radius: 10px;
+  background: #f4efff;
+}
+.awaitingBadge {
+  min-width: 31px;
+  height: 26px;
+  border-radius: 5px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+}
+.awaitingText {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  color: #4b3d75;
+  font-size: 12.5px;
+}
+.awaitingText strong { color: #15243a; font-size: 13px; font-weight: 650; }
+.awaitingAssignment > button {
+  flex: none;
+  min-height: 30px;
+  background: #0f1729;
+  color: #fff;
+}
+.operationalTasks {
+  min-width: 0;
+  border-top: 1px dashed var(--kora-border-subtle);
+  padding-top: var(--kora-space-3);
+}
+.operationalTasks > summary {
+  cursor: pointer;
+  font-size: var(--kora-text-sm);
+  color: var(--kora-navy);
+  padding: 3px 0 8px;
+  list-style: revert;
+}
+/* Apariencia de cabecera, filas y scroll provienen de DataTable nativo Kora. */
+.operationalBlockName { overflow-wrap: anywhere; }
+.operationalTaskActions { display: inline-flex; align-items: center; gap: var(--kora-space-1); white-space: nowrap; }
+.noOperationalTasks { color: var(--kora-text-muted); font-size: var(--kora-text-xs); }
+.legacyReferences {
+  border-top: 1px solid #e5e8ef;
+  padding-top: 10px;
+  font-size: 12px;
+  color: #64748b;
+}
+.legacyReferences > summary { cursor: pointer; }
+@media (max-width: 760px) {
+  .awaitingAssignment { flex-wrap: wrap; }
+  .awaitingAssignment > button { margin-left: 40px; }
+}
+
+
+.operationalTeamDot {
+  display: inline-block;
+  vertical-align: middle;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  margin-right: 5px;
+}
+.unlinkedBlock { font-size: 11.5px; color: var(--kora-text-muted); }
+
+/* Nueva fase: modal corto de un solo campo, igual al flujo prototipado. */
+.phaseCreationModal { max-width: min(400px, calc(100vw - 32px)); }
+.phaseCreationModal .phaseCreationForm { gap: 8px; }
+.phaseCreationForm { display: grid; gap: 8px; }
+.phaseCreationDates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 580px) { .phaseCreationDates { grid-template-columns: 1fr; } }
+
+/* Información temporal junto al nombre, como la cabecera de fases v5.02. */
+.phaseHeadingIdentity {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 7px 12px;
+}
+.phaseHeadingIdentity .headerPhaseName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #142039;
+}
+.phaseHeadingIdentity .phaseHeadingMeta {
+  color: #69768c;
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .phaseHeadingIdentity { gap: 6px 9px; }
+  .phaseHeadingIdentity .phaseHeadingMeta { white-space: normal; }
+}
+
+/* Avance objetivo del bloque: tareas aprobadas / HH estimadas de esas tareas. */
+.drawerProgressBar {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #e6ecf3;
+}
+.drawerProgressBar > span { display: block; height: 100%; background: #a8da44; border-radius: inherit; }
+
+/* Planificar v5: nombre editable + período + HH en la misma línea, como prototipo. */
+.phaseHeadingIdentityPlanning { display: flex; flex-wrap: nowrap; width: 100%; gap: 12px; }
+.phaseHeadingIdentityPlanning .headerPhaseInput {
+  width: clamp(235px, 23vw, 300px);
+  flex: 0 1 300px;
+  min-width: 190px;
+  height: 38px;
+  font-size: 15px;
+}
+.phaseHeadingIdentityPlanning .phaseHeadingMeta { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 1130px) {
+  .phaseHeadingIdentityPlanning { flex-wrap: wrap; }
+  .phaseHeadingIdentityPlanning .phaseHeadingMeta { white-space: normal; }
+}
+
+
+/* Cola de revisión del Líder PM, calculada desde tareas in_review no canceladas. */
+.reviewNotice {
+  display: grid;
+  padding: 12px 14px;
+  border: 1px solid #f6d288;
+  border-radius: 11px;
+  background: #fff9ed;
+  gap: 0;
+}
+.reviewNoticeHead, .reviewNoticeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 9px 18px;
+}
+.reviewNoticeHead {
+  padding-bottom: 10px;
+  color: #15243a;
+  font-size: 13px;
+}
+.reviewNoticeHead small { color: #8c7460; font-size: 11px; }
+.reviewNoticeRow {
+  border-top: 1px solid #f5e5c3;
+  padding: 9px 0;
+}
+.reviewNoticeRow > div:first-child { display: grid; gap: 3px; flex: 1 1 200px; min-width: 0; }
+.reviewNoticeRow strong { font-size: 12px; color: #16243c; font-weight: 650; }
+.reviewNoticeRow small { font-size: 11px; color: #7c8190; }
+.reviewActions { display: inline-flex; align-items: center; flex: none; gap: 6px; }
+.reviewActions button { min-height: 28px; font-size: 11px; }
+.operationalTaskActions .reviewActions { margin-right: 6px; vertical-align: middle; }
+.operationalTaskActions .reviewActions button { padding: 4px 8px; }
+
+/* HH todavía en revisión: informativas, no forman parte de avance real. */
+.taskPendingHours {
+  display: block;
+  margin-top: 3px;
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: #98610e;
+  white-space: nowrap;
+}
+
+/* Colaborador: las últimas columnas son Estado y Fecha límite, no acciones de gestión. */
+.readonlyTaskTable th:last-child,
+.readonlyTaskTable td:last-child {
+  width: auto;
+  min-width: 120px;
+  text-align: left;
+  padding: 9px 10px;
+}
+
+
+/* Inicio de Roadmap sin fases: mismas superficies y colores del sistema Kora. */
+.emptyRoadmap { display: grid; gap: var(--kora-space-3); min-width: 0; }
+.emptyRoadmapTop {
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: var(--kora-space-3);
+}
+.emptyRoadmapCounters { display: flex; flex-wrap: wrap; gap: var(--kora-space-2); }
+.emptyRoadmapCounters span {
+  border: 1px solid var(--kora-border-subtle);
+  background: var(--kora-surface);
+  color: var(--kora-text);
+  border-radius: var(--kora-radius-input);
+  padding: 7px 11px; font-size: var(--kora-text-xs);
+}
+.emptyRoadmapDefinition {
+  border-left: 3px solid var(--kora-navy);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-surface-muted);
+  color: var(--kora-text-muted);
+  padding: 10px 14px;
+  font-size: var(--kora-text-xs); line-height: 1.5;
+}
+.emptyRoadmapDefinition strong { color: var(--kora-navy); }
+.emptyRoadmapCard {
+  display: grid; gap: var(--kora-space-4);
+  padding: var(--kora-space-6);
+  border: 1px solid var(--kora-border-subtle);
+  border-radius: var(--kora-radius-lg);
+  box-shadow: var(--kora-shadow-sm);
+}
+.emptyRoadmapCard h2 { color: var(--kora-navy); font-size: var(--kora-text-lg); }
+.emptyRoadmapSteps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--kora-space-3); }
+.emptyRoadmapSteps li {
+  display: grid; align-content: start; gap: var(--kora-space-2);
+  min-width: 0; padding: var(--kora-space-4);
+  border: 1px solid var(--kora-border-subtle); border-radius: var(--kora-radius-input);
+  background: var(--kora-surface-alt);
+}
+.emptyRoadmapStepNumber {
+  display: grid; place-items: center; width: 26px; height: 26px;
+  background: var(--kora-navy); color: white;
+  border-radius: 50%; font-size: var(--kora-text-xs); font-weight: var(--kora-weight-bold);
+}
+.emptyRoadmapSteps strong { color: var(--kora-navy); font-size: var(--kora-text-sm); }
+.emptyRoadmapSteps p { color: var(--kora-text-muted); font-size: var(--kora-text-xs); line-height: 1.45; }
+.emptyRoadmapActions { display: flex; justify-content: flex-start; }
+.emptyRoadmapReadOnly { font-size: var(--kora-text-xs); color: var(--kora-text-muted); }
+.missingTeamsModal { max-width: min(420px, calc(100vw - 32px)); }
+.missingTeamsModal p { font-size: var(--kora-text-sm); line-height: 1.6; color: var(--kora-text-muted); }
+@media (max-width: 750px) {
+  .emptyRoadmapSteps { grid-template-columns: 1fr; }
+  .emptyRoadmapCard { padding: var(--kora-space-4); }
+}

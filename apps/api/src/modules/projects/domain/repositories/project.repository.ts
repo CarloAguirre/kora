@@ -1,5 +1,5 @@
 import type { Page, PageRequest, SortRequest, TransactionContext } from '@kora/core';
-import type { ProjectKind, ProjectPhase, ProjectStatus, ProjectType } from '@kora/contracts';
+import type { ProjectKind, ProjectPhase, ProjectStatus, ProjectType, ProjectSalesStage, ProjectQuotationListStatus } from '@kora/contracts';
 import type { Project } from '../entities/project.entity';
 
 export interface ProjectFilters {
@@ -7,6 +7,10 @@ export interface ProjectFilters {
   readonly type?: ProjectType | undefined;
   readonly status?: readonly ProjectStatus[] | undefined;
   readonly phase?: readonly ProjectPhase[] | undefined;
+  readonly salesStage?: readonly ProjectSalesStage[] | undefined;
+  readonly quotationStatus?: readonly ProjectQuotationListStatus[] | undefined;
+  /** Acota filtros comerciales para el líder asignado; nunca revela el estado de otro proyecto. */
+  readonly quotationViewerUserId?: string | undefined;
   /** "Tipo de proyecto" — ver `PROJECT_KINDS`. */
   readonly kind?: readonly ProjectKind[] | undefined;
   readonly clientId?: string | undefined;
@@ -24,6 +28,8 @@ export interface ProjectFilters {
 export type ProjectSortableField =
   | 'name'
   | 'status'
+  | 'salesStage'
+  | 'quotationStatus'
   | 'stage'
   | 'kind'
   | 'priority'
@@ -48,6 +54,7 @@ export interface ProjectListItem {
   readonly clientName: string | null;
   readonly type: ProjectType;
   readonly salesStage: string | null;
+  readonly quotationStatus: ProjectQuotationListStatus;
   readonly status: ProjectStatus;
   readonly phase: string | null;
   readonly priority: string | null;
@@ -76,6 +83,9 @@ export interface ProjectRepository {
   findById(id: string, context?: TransactionContext): Promise<Project | null>;
   findBySlug(slug: string, context?: TransactionContext): Promise<Project | null>;
   findByLegacyId(legacyId: number, context?: TransactionContext): Promise<Project | null>;
+  /** Bloquea un primer Hito 0 si el proyecto tiene cotización comercial
+   * pero su versión aprobada no está traspasada. Opcional para adaptadores legados. */
+  hasPendingQuotationTransfer?(projectId: string): Promise<boolean>;
 
   search(
     filters: ProjectFilters,

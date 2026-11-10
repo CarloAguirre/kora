@@ -1,0 +1,622 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import type {
+  EstimationCreationMode,
+  EstimationDriveFolderResolution,
+  EstimationDriveInventory,
+  EstimationDriveInventoryItem,
+  ProjectSummary,
+} from '@kora/contracts';
+import { projectEstimationPath, projectQuotationPath } from '@/app/router/paths';
+import { useCreateQuotationVersion } from '../api/quotation.queries';
+import {
+  useProjectDetail,
+  useUpdateProjectExtras,
+} from '@/modules/projects/api/projects.queries';
+import { Button } from '@/shared/components/ui/Button';
+import { estimationApi } from '../api/estimation.api';
+import { Modal } from '@/shared/components/ui/Modal';
+import { Select } from '@/shared/components/ui/Select';
+import { TextField } from '@/shared/components/ui/TextField';
+import {
+  useEstimationDriveInventory,
+  useEstimationDriveOAuthPocStatus,
+  useResolveEstimationDriveFolder,
+} from '../api/estimation.queries';
+import styles from './NewEstimationModal.module.css';
+
+interface NewEstimationModalProps {
+  open: boolean;
+  prospects: readonly ProjectSummary[];
+  onClose: () => void;
+}
+
+const MODE_OPTIONS: readonly {
+  value: EstimationCreationMode;
+  title: string;
+  description: string;
+}[] = [
+  {
+    value: 'standard',
+    title: 'En blanco · cotización versionada',
+    description: 'Crea un borrador persistente y agrega equipos y fases de Kora, tarifa y costos.',
+  },
+  {
+    value: 'ai',
+    title: '✦ Propuesta del agente IA (PoC)',
+    description: 'El agente IA aún usa el flujo anterior. No guarda una versión comercial hasta R4.',
+  },
+];
+
+export function NewEstimationModal({ open, prospects, onClose }: NewEstimationModalProps) {
+  const navigate = useNavigate();
+  const { can } = usePermissions();
+  const [projectRef, setProjectRef] = useState('');
+  const [mode, setMode] = useState<EstimationCreationMode>('standard');
+  const [driveFolderUrl, setDriveFolderUrl] = useState('');
+  const [instructions, setInstructions] = useState('');
+  const [driveTouched, setDriveTouched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [drivePocBusy, setDrivePocBusy] = useState(false);
+  const [drivePocResult, setDrivePocResult] = useState<string | null>(null);
+  const drivePocWindow = useRef<Window | null>(null);
+
+  const selected = useMemo(
+    () => prospects.find((project) => project.slug === projectRef || project.id === projectRef) ?? null,
+    [projectRef, prospects],
+  );
+  const detail = useProjectDetail(selected?.slug ?? null);
+  const updateProjectExtras = useUpdateProjectExtras();
+  const createQuotation = useCreateQuotationVersion(selected?.id ?? '');
+
+  const resolutionInput = useMemo(() => {
+    if (!detail.data) return null;
+    return {
+      projectId: detail.data.id,
+      projectName: detail.data.name,
+      clientName: detail.data.client?.companyName ?? null,
+      documentationLink: detail.data.documentationLink,
+      quotationLink: detail.data.quotationLink,
+    };
+  }, [detail.data]);
+
+  const driveResolution = useResolveEstimationDriveFolder(
+    resolutionInput,
+    open && mode === 'ai' && Boolean(selected),
+  );
+
+  const drivePocStatus = useEstimationDriveOAuthPocStatus(open && mode === 'ai');
+  const driveUrlIsValid = isGoogleDriveFolderUrl(driveFolderUrl);
+  const driveInventory = useEstimationDriveInventory(
+    driveFolderUrl.trim(),
+    open && mode === 'ai' && driveUrlIsValid,
+  );
+
+  useEffect(() => {
+    if (!open) {
+      setProjectRef('');
+      setMode('standard');
+      setDriveFolderUrl('');
+      setInstructions('');
+      setDriveTouched(false);
+      setError(null);
+      setDrivePocBusy(false);
+      setDrivePocResult(null);
+    }
+  }, [open]);
+
+  // El callback OAuth abre una página en la MISMA origin y comunica SOLO
+  // resultado y conteo. Jamás viajan tokens a la interfaz de Kora.
+  useEffect(() => {
+    const onDrivePocMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin ||
+          event.source !== drivePocWindow.current) return;
+      const data: unknown = event.data;
+      if (!data || typeof data !== 'object') return;
+      const value = data as Record<string, unknown>;
+      if (value.type !== 'kora-drive-oauth-poc' ||
+          (value.status !== 'ok' && value.status !== 'error') ||
+          typeof value.message !== 'string') return;
+      setDrivePocBusy(false);
+      setDrivePocResult(value.status === 'ok'
+        ? `Lectura real confirmada: ${value.message} Archivos en primera página: ${value.filesInSample ?? 0}.`
+        : `No se completó la prueba: ${value.message} (${value.code ?? 'sin código'}).`);
+    };
+    window.addEventListener('message', onDrivePocMessage);
+    return () => window.removeEventListener('message', onDrivePocMessage);
+  }, []);
+
+  useEffect(() => {
+    if (!selected) {
+      setDriveFolderUrl('');
+      return;
+    }
+    if (driveTouched) return;
+
+    const explicit = detail.data?.documentationLink ?? '';
+    if (isGoogleDriveFolderUrl(explicit)) {
+      setDriveFolderUrl(explicit);
+      return;
+    }
+
+    const resolved = driveResolution.data?.selectedFolder?.url ?? '';
+    setDriveFolderUrl(isGoogleDriveFolderUrl(resolved) ? resolved : '');
+  }, [
+    detail.data?.documentationLink,
+    driveResolution.data?.selectedFolder?.url,
+    driveTouched,
+    selected,
+  ]);
+
+  const projectOptions = prospects.map((project) => ({
+    value: project.slug,
+    label: `${project.client?.companyName ?? 'Cliente por confirmar'} — ${project.name}`,
+  }));
+
+  const submit = async () => {
+    if (!selected) {
+      setError('Elige un prospecto en cotización.');
+      return;
+    }
+
+    if (mode === 'standard') {
+      setError(null);
+      try {
+        const created = await createQuotation.mutateAsync({});
+        navigate(projectQuotationPath(selected) + '?version=' + created.id);
+        onClose();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'No fue posible crear la cotización.');
+      }
+      return;
+    }
+
+    const normalizedDriveUrl = driveFolderUrl.trim();
+    const usingFallbackDrive =
+      normalizedDriveUrl.includes('/folders/kora-poc-fallback');
+
+    if (mode === 'ai') {
+      if (!normalizedDriveUrl) {
+        setError('Confirma o vincula la carpeta de Drive del levantamiento para usar el agente IA.');
+        return;
+      }
+      if (driveInventory.isLoading || driveInventory.isFetching) {
+        setError('Espera a que Kora termine de revisar la carpeta de Drive.');
+        return;
+      }
+      if (driveInventory.data?.connection !== 'connected') {
+        setError(
+          driveInventory.data?.message ??
+            'Kora todavía no puede leer esta carpeta de Drive.',
+        );
+        return;
+      }
+
+      const analyzableCount = driveInventory.data.items.filter(
+        (item) =>
+          item.itemType === 'file' &&
+          item.priority !== 'excluded' &&
+          item.analyzable,
+      ).length;
+
+      if (analyzableCount === 0) {
+        setError(
+          'La carpeta no contiene antecedentes compatibles para esta PoC.',
+        );
+        return;
+      }
+
+      if (
+        !usingFallbackDrive &&
+        detail.data?.documentationLink !== normalizedDriveUrl
+      ) {
+        try {
+          await updateProjectExtras.mutateAsync({
+            projectId: selected.id,
+            input: { documentationLink: normalizedDriveUrl },
+          });
+        } catch {
+          setError(
+            'La carpeta es válida, pero no se pudo guardar el vínculo en el proyecto.',
+          );
+          return;
+        }
+      }
+    }
+
+    navigate(`${projectEstimationPath(selected)}?mode=${mode}`, {
+      state: {
+        creationMode: mode,
+        driveFolderUrl: normalizedDriveUrl,
+        instructions: instructions.trim(),
+      },
+    });
+    onClose();
+  };
+
+  /** Diagnóstico aislado: no cambia el lector de Drive de la cotización. */
+  const startDriveOAuthPoc = async () => {
+    if (!selected || !driveUrlIsValid || drivePocBusy) return;
+    setDrivePocResult(null);
+    // Abrir de forma síncrona desde el clic para no activar el bloqueo de popups.
+    const popup = window.open('about:blank', 'kora-drive-oauth-poc',
+      'width=580,height=730,scrollbars=yes');
+    if (!popup) {
+      setDrivePocResult('El navegador bloqueó la ventana de Google. Permite ventanas emergentes para Kora.');
+      return;
+    }
+    drivePocWindow.current = popup;
+    setDrivePocBusy(true);
+    try {
+      const { authorizationUrl } = await estimationApi.startDriveOAuthPoc({
+        projectId: selected.id, driveFolderUrl: driveFolderUrl.trim(),
+      });
+      const googleUrl = new URL(authorizationUrl);
+      if (googleUrl.origin !== 'https://accounts.google.com') {
+        throw new Error('La API devolvió un proveedor OAuth inesperado.');
+      }
+      popup.location.replace(googleUrl.href);
+    } catch (cause) {
+      popup.close();
+      setDrivePocBusy(false);
+      setDrivePocResult(cause instanceof Error ? cause.message : 'No se pudo iniciar la prueba Drive.');
+    }
+  };
+
+  const selectCandidate = (url: string) => {
+    setDriveTouched(true);
+    setDriveFolderUrl(url);
+    setError(null);
+  };
+
+  return (
+    <Modal
+      open={open}
+      title="Nueva estimación"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button
+            loading={updateProjectExtras.isPending || createQuotation.isPending}
+            onClick={() => void submit()}
+          >
+            Crear estimación
+          </Button>
+        </>
+      }
+    >
+      <Select
+        label="Prospecto"
+        placeholder="Elige un prospecto"
+        value={projectRef}
+        onChange={(event) => {
+          setProjectRef(event.target.value);
+          setDriveTouched(false);
+          setDriveFolderUrl('');
+          setError(null);
+        }}
+        options={projectOptions}
+        helperText="Proyectos de desarrollo en etapa Prospecto o Cotización, aunque su estado operativo sea Activo. Los borradores no cambian las HH ni la ejecución."
+      />
+
+      <fieldset className={styles.fieldset}>
+        <legend>Partir desde</legend>
+        <div className={styles.options}>
+          {MODE_OPTIONS.filter((option) => option.value !== 'ai' || can('projects:manage')).map((option) => (
+            <label
+              key={option.value}
+              className={[
+                styles.option,
+                mode === option.value ? styles.optionSelected : '',
+              ].filter(Boolean).join(' ')}
+            >
+              <input
+                type="radio"
+                name="estimation-mode"
+                value={option.value}
+                checked={mode === option.value}
+                onChange={() => {
+                  setMode(option.value);
+                  setError(null);
+                }}
+              />
+              <span>
+                <strong>{option.title}</strong>
+                <small>{option.description}</small>
+              </span>
+            </label>
+          ))}
+          <div className={styles.optionDisabled} aria-disabled="true">
+            <span className={styles.fakeRadio} />
+            <span>
+              <strong>Copiar versión de cotización</strong>
+              <small>En el editor de cotizaciones puedes copiar cualquiera de sus versiones guardadas.</small>
+            </span>
+          </div>
+        </div>
+      </fieldset>
+
+      {mode === 'ai' && (
+        <div className={styles.driveBox}>
+          <TextField
+            label="Carpeta de Drive del levantamiento"
+            type="url"
+            value={driveFolderUrl}
+            onChange={(event) => {
+              setDriveTouched(true);
+              setDriveFolderUrl(event.target.value);
+              setError(null);
+            }}
+            placeholder="https://drive.google.com/drive/folders/…"
+            helperText={
+              detail.isLoading
+                ? 'Buscando antecedentes del prospecto…'
+                : driveFolderUrl
+                  ? 'Kora usará esta carpeta como fuente documental de la estimación.'
+                  : 'Kora intenta descubrir una carpeta por proyecto/cliente; también puedes pegarla manualmente.'
+            }
+          />
+
+          <DriveResolutionPreview
+            loading={driveResolution.isLoading || driveResolution.isFetching}
+            resolution={driveResolution.data}
+            hasSelectedFolder={driveUrlIsValid}
+            onSelect={selectCandidate}
+          />
+
+          <DriveInventoryPreview
+            loading={driveInventory.isLoading || driveInventory.isFetching}
+            inventory={driveInventory.data}
+          />
+
+          {drivePocStatus.data?.enabled && <div className={styles.drivePocPanel}>
+            <div>
+              <strong>Diagnóstico de conexión Google Drive (PoC)</strong>
+              <p>Google solicitará permiso de lectura sobre los archivos de tu Drive.
+                Esta prueba consulta únicamente la carpeta indicada. La API conserva
+                el token temporalmente en memoria para permitir análisis durante la cotización,
+                sin guardarlo en base de datos ni alterar tu sesión de Kora.</p>
+            </div>
+            <div className={styles.drivePocButtons}>
+              <Button variant="outline" size="sm"
+                disabled={!selected || !driveUrlIsValid || drivePocBusy}
+                loading={drivePocBusy}
+                onClick={() => void startDriveOAuthPoc()}>
+                Probar acceso con Google
+              </Button>
+              {drivePocBusy && <Button variant="ghost" size="sm"
+                onClick={() => {
+                  // No depender de Window.closed: Google aplica COOP en algunos navegadores.
+                  try { drivePocWindow.current?.close(); } catch { /* Puede estar aislado. */ }
+                  drivePocWindow.current = null;
+                  setDrivePocBusy(false);
+                  setDrivePocResult('Prueba cancelada. Puedes intentarla nuevamente.');
+                }}>
+                Cancelar prueba
+              </Button>}
+            </div>
+            {drivePocResult && <p className={styles.drivePocResult} role="status">{drivePocResult}</p>}
+          </div>}
+
+          <label className={styles.instructions}>
+            <span>Indicaciones para el agente (opcional)</span>
+            <textarea
+              value={instructions}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder="Ej. Considerar solo el módulo de despacho; el cliente ya tiene licencias."
+            />
+          </label>
+        </div>
+      )}
+
+      {error && <p className={styles.error}>{error}</p>}
+    </Modal>
+  );
+}
+
+function DriveResolutionPreview({
+  loading,
+  resolution,
+  hasSelectedFolder,
+  onSelect,
+}: {
+  loading: boolean;
+  resolution: EstimationDriveFolderResolution | undefined;
+  hasSelectedFolder: boolean;
+  onSelect: (url: string) => void;
+}) {
+  if (loading && !hasSelectedFolder) {
+    return <div className={styles.driveStatus}>Buscando carpeta del proyecto en Drive…</div>;
+  }
+
+  if (!resolution || hasSelectedFolder) return null;
+
+  if (resolution.connection !== 'connected') {
+    return <div className={styles.driveWarning}>{resolution.message}</div>;
+  }
+
+  if (resolution.status === 'not_found') {
+    return (
+      <div className={styles.driveWarning}>
+        {resolution.message} Puedes pegar la carpeta manualmente.
+      </div>
+    );
+  }
+
+  if (resolution.candidates.length === 0) return null;
+
+  return (
+    <div className={styles.candidates}>
+      <div className={styles.candidateTitle}>
+        <strong>Carpetas candidatas</strong>
+        <span>Confirma la fuente correcta antes de analizar.</span>
+      </div>
+      {resolution.candidates.slice(0, 4).map((candidate) => (
+        <button
+          key={candidate.folderId}
+          type="button"
+          className={styles.candidate}
+          onClick={() => onSelect(candidate.url)}
+        >
+          <span>
+            <strong>{candidate.name}</strong>
+            {candidate.ancestorNames.length > 0 && (
+              <small>{candidate.ancestorNames.join(' / ')}</small>
+            )}
+          </span>
+          <b>{candidate.score}%</b>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function DriveInventoryPreview({
+  loading,
+  inventory,
+}: {
+  loading: boolean;
+  inventory: EstimationDriveInventory | undefined;
+}) {
+  if (loading) {
+    return <div className={styles.driveStatus}>Inventariando antecedentes…</div>;
+  }
+
+  if (!inventory) return null;
+
+  if (inventory.connection !== 'connected') {
+    return (
+      <div
+        className={
+          inventory.connection === 'not_configured'
+            ? styles.driveWarning
+            : styles.driveError
+        }
+      >
+        {inventory.message}
+      </div>
+    );
+  }
+
+  const analyzableFiles = inventory.items.filter(
+    (item) =>
+      item.itemType === 'file' &&
+      item.priority !== 'excluded' &&
+      item.analyzable,
+  );
+  const visibleItems = analyzableFiles
+    .sort((left, right) => priorityRank(left) - priorityRank(right))
+    .slice(0, 8);
+
+  return (
+    <div className={styles.inventory}>
+      <div className={styles.inventorySummary}>
+        <strong>Antecedentes detectados</strong>
+        <span>
+          {inventory.summary.files} archivos · {analyzableFiles.length} analizables
+          {inventory.summary.recommended > 0
+            ? ` · ${inventory.summary.recommended} prioritarios`
+            : ''}
+          {inventory.summary.excluded > 0
+            ? ` · ${inventory.summary.excluded} excluidos`
+            : ''}
+        </span>
+      </div>
+
+      {inventory.message && (
+        <div className={styles.driveStatus}>{inventory.message}</div>
+      )}
+
+      {visibleItems.length === 0 ? (
+        <div className={styles.driveStatus}>
+          No se encontraron archivos utilizables dentro de los primeros niveles de la carpeta.
+        </div>
+      ) : (
+        <div className={styles.driveFiles}>
+          {visibleItems.map((file) => (
+            <div key={file.id} className={styles.driveFile}>
+              <span className={styles.driveFileIcon} aria-hidden="true">
+                {driveFileIcon(file.kind)}
+              </span>
+              <span className={styles.driveFileInfo}>
+                {file.url ? (
+                  <a href={file.url} target="_blank" rel="noreferrer">
+                    {file.name}
+                  </a>
+                ) : (
+                  <span className={styles.driveFileName}>{file.name}</span>
+                )}
+                <small>{file.path}</small>
+              </span>
+              <time dateTime={file.modifiedAt}>{formatRelativeTime(file.modifiedAt)}</time>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {analyzableFiles.length > visibleItems.length && (
+        <span className={styles.moreFiles}>
+          + {analyzableFiles.length - visibleItems.length} archivos analizables adicionales
+        </span>
+      )}
+      {inventory.summary.files > analyzableFiles.length && (
+        <span className={styles.moreFiles}>
+          Los archivos Office no convertidos y otros formatos incompatibles se muestran en Drive, pero no se envían a la IA en esta PoC.
+        </span>
+      )}
+    </div>
+  );
+}
+
+function priorityRank(item: EstimationDriveInventoryItem): number {
+  return item.priority === 'recommended' ? 0 : 1;
+}
+
+function isGoogleDriveFolderUrl(value: string): boolean {
+  if (!value.trim()) return false;
+  try {
+    const url = new URL(value);
+    return (
+      url.hostname === 'drive.google.com' &&
+      (/\/folders\/[a-zA-Z0-9_-]+/.test(url.pathname) ||
+        /^[a-zA-Z0-9_-]+$/.test(url.searchParams.get('id') ?? ''))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function driveFileIcon(
+  kind: EstimationDriveInventoryItem['kind'],
+): string {
+  switch (kind) {
+    case 'spreadsheet':
+      return '📊';
+    case 'presentation':
+      return '📑';
+    case 'image':
+      return '🖼️';
+    case 'pdf':
+    case 'document':
+      return '📄';
+    default:
+      return '📎';
+  }
+}
+
+function formatRelativeTime(value: string): string {
+  const date = new Date(value);
+  const diffMs = date.getTime() - Date.now();
+  const absMs = Math.abs(diffMs);
+  const formatter = new Intl.RelativeTimeFormat('es-CL', { numeric: 'auto' });
+
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (absMs < hour) return formatter.format(Math.round(diffMs / minute), 'minute');
+  if (absMs < day) return formatter.format(Math.round(diffMs / hour), 'hour');
+  return formatter.format(Math.round(diffMs / day), 'day');
+}

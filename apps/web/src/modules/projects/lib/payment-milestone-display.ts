@@ -24,13 +24,15 @@ export function addToIsoDay(isoDate: string, amount: { days?: number; months?: n
 export function paymentTriggerLabel(trigger: {
   triggerType: ProjectPaymentTrigger | null;
   triggerPhase: ProjectPhase | null;
+  triggerModuleId?: string | null;
   triggerDate: string | null;
 }): string {
   switch (trigger.triggerType) {
     case 'approval':
       return 'Al aprobar el proyecto';
     case 'phase':
-      return trigger.triggerPhase ? `Al entrar en ${PROJECT_PHASE_LABELS[trigger.triggerPhase]}` : 'Al entrar en una fase';
+      return trigger.triggerPhase ? `Al entrar en ${PROJECT_PHASE_LABELS[trigger.triggerPhase]}` :
+        trigger.triggerModuleId ? 'Al iniciar módulo comercial cotizado' : 'Al entrar en una fase';
     case 'date':
       return trigger.triggerDate ? `El ${formatIsoDay(trigger.triggerDate)}` : 'En una fecha';
     case 'manual':

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ChangeProjectStatusUseCase } from './change-project-status.use-case';
 import { Project } from '../../domain/entities/project.entity';
 import {
+  ProjectQuotationTransferRequiredError,
   ActiveSupportContractMustBeClosedError,
   CannotManageProjectError,
   ManualHito0ReasonRequiredError,
@@ -35,6 +36,7 @@ function buildApprovedDraftProject() {
 function buildUseCase(project: Project, contractStatuses: SupportPlanStatus[] = []) {
   const projects = {
     findById: vi.fn().mockResolvedValue(project),
+    hasPendingQuotationTransfer: vi.fn().mockResolvedValue(false),
     save: vi.fn().mockResolvedValue(undefined),
   } as unknown as ProjectRepository;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
@@ -54,6 +56,50 @@ function buildSupportProject(status: ProjectStatus = 'on_hold') {
     id: 'support-1', name: 'Soporte CPT', slug: 'soporte-cpt', type: 'support', status, now: NOW,
   }).unwrap();
 }
+
+describe('Regla de inicio: cotización aprobada y traspasada', () => {
+  it('bloquea la primera activación cuando el proyecto tiene cotización pendiente', async () => {
+    const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
+    vi.mocked(projects.hasPendingQuotationTransfer!).mockResolvedValueOnce(true);
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { status: 'active', reason: 'Contrato firmado' },
+      actor: ACTOR, actorPermissions: ['projects:manage'],
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectQuotationTransferRequiredError);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('no permite iniciar un prospecto o cotización sin aprobación del cliente', async () => {
+    for (const salesStage of ['prospect', 'quoted'] as const) {
+      const project = Project.create({
+        id: 'project-1', name: 'Prospecto', slug: 'prospecto',
+        type: 'development', status: 'draft', salesStage,
+        leaderUserId: 'leader-1', now: NOW,
+      }).unwrap();
+      const { useCase, projects } = buildUseCase(project);
+      const result = await useCase.execute({
+        projectId: project.id,
+        data: { status: 'active', reason: 'Preparar ejecución' },
+        actor: ACTOR, actorPermissions: ['projects:manage'],
+      });
+      expect(result.isErr()).toBe(true);
+      expect(result.isErr() && result.error).toBeInstanceOf(ProjectApprovalRequiredForActivationError);
+      expect(projects.save).not.toHaveBeenCalled();
+    }
+  });
+
+  it('no bloquea proyectos heredados sin cotización pendiente', async () => {
+    const { useCase, projects } = buildUseCase(buildApprovedDraftProject());
+    vi.mocked(projects.hasPendingQuotationTransfer!).mockResolvedValueOnce(false);
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { status: 'active', reason: 'Contrato firmado' },
+      actor: ACTOR, actorPermissions: ['projects:manage'],
+    });
+    expect(result.isOk()).toBe(true);
+    expect(projects.save).toHaveBeenCalled();
+  });
+});
 
 describe('ChangeProjectStatusUseCase — Hito 0 manual', () => {
   it('rechaza activar manualmente a un líder que no es el de este proyecto (sin projects:manage)', async () => {

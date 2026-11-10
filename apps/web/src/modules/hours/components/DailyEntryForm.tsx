@@ -7,6 +7,7 @@ import {
   type CreateHourEntryInput,
   type HourEntryAssignment,
   type ProjectSummary,
+  type ProjectPhaseOption,
 } from '@kora/contracts';
 import styles from './HourEntryFormDialog.module.css';
 import { Button } from '@/shared/components/ui/Button';
@@ -15,12 +16,14 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronDownIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
-import { useProjectPhases, useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useProjectDetail, useProjectPhases, useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { ProjectHourPlanFields } from './ProjectHourPlanFields';
+import { activityForTaskChange, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId } from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -30,12 +33,29 @@ export const DAILY_CAP_HOURS = 8;
 const MIN_DESCRIPTION_LENGTH = 5;
 const HOURS_STEP = 0.25;
 const today = () => new Date().toISOString().slice(0, 10);
-/** `2026-11-03` → `03-11-2026`. */
+/** `2026-11-03` → `03-11-2026`. Usado por PhaseSegmentFields legado. */
 const formatSegmentDate = (isoDate: string) => isoDate.split('-').reverse().join('-');
 export const isWeekend = (isoDate: string) => {
   const day = new Date(`${isoDate}T00:00:00`).getDay();
   return day === 0 || day === 6;
 };
+
+/**
+ * Solo se pueden imputar HH a tareas activas asignadas al autor y pertenecientes
+ * al bloque seleccionado. El filtro se replica y refuerza en el backend.
+ */
+export function selectAttributableTasks<
+  T extends Pick<ProjectPhaseOption['tasks'][number], 'assigneeUserId' | 'segmentId' | 'cancelledAt'>,
+>(
+  tasks: readonly T[],
+  ownerId: string | null | undefined,
+  segmentId: string | null | undefined,
+): T[] {
+  if (!ownerId) return [];
+  return tasks.filter((task) =>
+    !task.cancelledAt && task.assigneeUserId === ownerId &&
+    (task.segmentId ?? null) === (segmentId || null));
+}
 
 export interface DailyBlock {
   key: string;
@@ -43,8 +63,14 @@ export interface DailyBlock {
   assignment: HourEntryAssignment | '';
   projectId: string;
   moduleId: string;
-  /** Tiempo de ejecución de la fase elegida — vacío ⇔ sin tramo. */
-  segmentId: string;
+  segmentId?: string;
+  /** FK opcional de tarea, nunca se infiere al guardar. */
+  taskId?: string;
+  /** Solo estado visual: lo informa el detalle del proyecto para validar antes de enviar. */
+  roadmapNeedsPhase?: boolean;
+  roadmapNeedsSegment?: boolean;
+  /** Debe elegir una tarea propia o «Otro trabajo del bloque», si hay tareas disponibles. */
+  roadmapNeedsTask?: boolean;
   category: string;
   hours: string;
   description: string;
@@ -52,6 +78,33 @@ export interface DailyBlock {
   designatedApproverUserId: string;
   hasBlocker: boolean;
   blockerDescription: string;
+}
+
+/** Contexto específico para el flujo «Registrar horas y completar tarea». */
+export interface TaskHourEntryTarget {
+  projectId: string;
+  moduleId: string;
+  taskId: string;
+  taskTitle: string;
+}
+
+/** No completar una tarea con HH imputadas a un proyecto, bloque o persona distinta. */
+export function matchesTaskHourTarget(
+  blocks: readonly DailyBlock[],
+  target: TaskHourEntryTarget | undefined,
+  phases: readonly ProjectPhaseOption[] | undefined,
+  userId: string | undefined,
+): boolean {
+  if (!target) return true;
+  const task = phases?.find((phase) => phase.id === target.moduleId)
+    ?.tasks.find((item) => item.id === target.taskId);
+  const block = blocks[0];
+  return Boolean(task && !task.cancelledAt && task.assigneeUserId === userId &&
+    blocks.length === 1 && block?.assignment === 'Proyecto' &&
+    block.projectId === target.projectId &&
+    block.moduleId === target.moduleId &&
+    block.taskId === target.taskId &&
+    block.segmentId === (task.segmentId ?? ''));
 }
 
 let blockCounter = 0;
@@ -62,6 +115,7 @@ const createEmptyBlock = (): DailyBlock => ({
   projectId: '',
   moduleId: '',
   segmentId: '',
+  taskId: '',
   category: '',
   hours: '',
   description: '',
@@ -124,6 +178,12 @@ export function validateDailyBlock(
   if (hours > 24) return 'No puede registrar más de 24 horas en un día.';
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment);
   if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsPhase && !block.moduleId)
+    return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId)
+    return 'Selecciona el bloque al que corresponden estas HH.';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
+    return 'Selecciona una tarea o «Otro trabajo del bloque».';
   if (needsProject && block.isOvertime && !overtimeAlreadyGranted) {
     const project = projects.find((p) => p.id === block.projectId);
     if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
@@ -154,9 +214,11 @@ export function DailyEntryForm({
   onClose,
   onSuccess,
   onTotalChange,
+  initialTask,
 }: {
   onClose: () => void;
   onSuccess: (message: string) => void;
+  initialTask?: TaskHourEntryTarget;
   /** Notifica al diálogo contenedor el total de horas del día (para el contador junto al cierre). */
   onTotalChange?: (total: number) => void;
 }) {
@@ -175,7 +237,31 @@ export function DailyEntryForm({
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const [date, setDate] = useState(today());
-  const [blocks, setBlocks] = useState<DailyBlock[]>([createEmptyBlock()]);
+  const [blocks, setBlocks] = useState<DailyBlock[]>(() => [{
+    ...createEmptyBlock(),
+    ...(initialTask ? {
+      assignment: 'Proyecto' as const,
+      projectId: initialTask.projectId,
+      moduleId: initialTask.moduleId,
+      taskId: initialTask.taskId,
+      category: initialTask.taskTitle,
+    } : {}),
+  }]);
+  // La tarea determina su segmento por ID persistido desde /phases, nunca por nombre.
+  const { data: taskPhases, isError: taskPhasesError } = useProjectPhases(initialTask?.projectId ?? null);
+  const targetTask = taskPhases?.find((phase) => phase.id === initialTask?.moduleId)
+    ?.tasks.find((task) => task.id === initialTask?.taskId);
+  const targetAllowed = Boolean(targetTask && !targetTask.cancelledAt &&
+    targetTask.assigneeUserId === user?.id);
+  useEffect(() => {
+    if (!initialTask || !targetAllowed || !targetTask) return;
+    const segmentId = targetTask.segmentId ?? '';
+    const taskId = initialTask.taskId;
+    setBlocks((current) => current.map((block) =>
+      block.taskId === taskId && block.segmentId !== segmentId
+        ? { ...block, segmentId } : block));
+  }, [initialTask, targetAllowed, targetTask]);
+  const validTaskPrefill = matchesTaskHourTarget(blocks, initialTask, taskPhases, user?.id);
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -237,11 +323,12 @@ export function DailyEntryForm({
       exceedsDailyCap: (overflowByKey.get(block.key) ?? 0) > 0,
     });
 
-  const canSubmit = !blockingMessage && blocks.every((block) => validateBlock(block) === null);
+  const canSubmit = !blockingMessage && validTaskPrefill &&
+    blocks.every((block) => validateBlock(block) === null);
 
   const onSubmit = async () => {
     setServerError(null);
-    if (blockingMessage) return;
+    if (blockingMessage || !validTaskPrefill) return;
     const nextErrors: Record<string, string> = {};
     for (const block of blocks) {
       const error = validateBlock(block);
@@ -261,6 +348,7 @@ export function DailyEntryForm({
           projectId: needsProject ? block.projectId : undefined,
           moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
           segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : undefined,
+          taskId: needsProject && block.moduleId ? toHourTaskId(block.taskId) : undefined,
           category: block.category.trim(),
           description: block.description || undefined,
           hours: Number(block.hours),
@@ -284,7 +372,23 @@ export function DailyEntryForm({
 
   return (
     <div className={styles.form}>
-      <p className={styles.formSubtitle}>Agrega uno o más registros y registra tus horas del día</p>
+      <p className={styles.formSubtitle}>{initialTask
+        ? 'Registra las horas de «' + initialTask.taskTitle +
+          '». Al guardarlas, la tarea se enviará a aprobación.'
+        : 'Agrega uno o más registros y registra tus horas del día'}</p>
+      {initialTask && taskPhasesError &&
+        <p className={styles.alert} role="alert">
+          No se pudo consultar la tarea. Cancela e inténtalo nuevamente.
+        </p>}
+      {initialTask && taskPhases && !targetAllowed &&
+        <p className={styles.alert} role="alert">
+          Esta tarea ya no está disponible para registrar horas. Cancela y vuelve al dashboard.
+        </p>}
+      {initialTask && taskPhases && targetAllowed && !validTaskPrefill &&
+        <p className={styles.noticeWarning} role="status">
+          Para registrar y completar esta tarea, conserva el mismo proyecto, fase,
+          bloque y tarea. Revisa la selección antes de guardar.
+        </p>}
 
       {serverError && (
         <div className={styles.alert} role="alert">
@@ -350,10 +454,10 @@ export function DailyEntryForm({
         />
       ))}
 
-      <button type="button" className={styles.addBlockButton} onClick={addBlock}>
+      {!initialTask && <button type="button" className={styles.addBlockButton} onClick={addBlock}>
         <PlusIcon size={16} />
         Agregar otro registro
-      </button>
+      </button>}
 
       <div className={styles.dailyTotal}>
         Total del día: <strong>{dailyTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })} horas</strong>
@@ -455,6 +559,7 @@ export function DailyEntryBlockFields({
   onRemove,
   onToggleExpand,
   onAdjustHours,
+  ownerUserId,
 }: {
   block: DailyBlock;
   index: number;
@@ -472,12 +577,57 @@ export function DailyEntryBlockFields({
   onRemove: () => void;
   onToggleExpand: () => void;
   onAdjustHours: (delta: number) => void;
+  ownerUserId?: string;
 }) {
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
   const showApproverInRow =
     block.assignment !== '' && !needsProject && (isCollaborator || (overtimeNeedsApproval && (block.isOvertime || exceedsDailyCap)));
   const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
+  const { user } = useAuth();
+  // Los colaboradores no requieren projects:read para registrar horas; /phases
+  // entrega el contexto autorizado. Evita un GET de detalle innecesario/403.
+  const { data: projectDetail } = useProjectDetail(
+    needsProject && block.projectId && user?.role !== 'collaborator' ? block.projectId : null,
+  );
+  const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
+  const { data: hourPhases } = useProjectPhases(needsProject && block.projectId ? block.projectId : null);
+  const selectedHourPhase = hourPhases?.find((phase) => phase.id === block.moduleId);
+  const availableTasks = selectAttributableTasks(
+    hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [],
+    ownerUserId ?? user?.id, block.segmentId,
+  );
+  const selectedTask = availableTasks.find((task) => task.id === block.taskId);
+  const allowedTeamIds = new Set([
+    ...(projectDetail?.members ?? []).filter((member) => member.userId === (ownerUserId ?? user?.id) && !member.blockedAt)
+      .map((member) => member.teamId),
+    ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === (ownerUserId ?? user?.id))
+      .map((team) => team.teamId),
+  ]);
+  // Un colaborador puede registrar HH aunque no tenga projects:read_assigned.
+  // En ese caso, la ruta /phases (hours:register) es la fuente de selección.
+  // La API valida equipo y autor siempre, incluso si aparecen otros bloques.
+  const availableSegments = selectedModule
+    ? selectedModule.segments.filter((segment) => allowedTeamIds.has(segment.teamId))
+    : (selectedHourPhase?.segments ?? []);
+  const requiresPhase = projectDetail
+    ? projectDetail.modules.some((module) =>
+        module.segments.some((segment) => allowedTeamIds.has(segment.teamId)))
+    : (hourPhases ?? []).some((phase) => phase.segments.length > 0);
+
+  // La obligatoriedad depende de los equipos REALES del autor en este proyecto.
+  // La capa de API conserva la misma regla y vuelve a comprobarla al guardar.
+  useEffect(() => {
+    const roadmapNeedsPhase = Boolean(needsProject && block.projectId && requiresPhase);
+    const roadmapNeedsSegment = Boolean(needsProject && block.moduleId && availableSegments.length > 0);
+    const roadmapNeedsTask = Boolean(needsProject && block.segmentId && availableTasks.length > 0);
+    if (block.roadmapNeedsPhase !== roadmapNeedsPhase ||
+      block.roadmapNeedsSegment !== roadmapNeedsSegment || block.roadmapNeedsTask !== roadmapNeedsTask) {
+      onUpdate({ roadmapNeedsPhase, roadmapNeedsSegment, roadmapNeedsTask });
+    }
+  }, [needsProject, block.projectId, block.moduleId, block.segmentId,
+    block.roadmapNeedsPhase, block.roadmapNeedsSegment, block.roadmapNeedsTask,
+    requiresPhase, availableSegments.length, availableTasks.length, onUpdate]);
 
   return (
     <div className={styles.block}>
@@ -527,6 +677,10 @@ export function DailyEntryBlockFields({
                   projectId: needsProjectNext ? block.projectId : '',
                   moduleId: needsProjectNext ? block.moduleId : '',
                   segmentId: needsProjectNext ? block.segmentId : '',
+                  taskId: needsProjectNext ? block.taskId : '',
+                  category: needsProjectNext
+                    ? block.category
+                    : activityForTaskChange(block.category, selectedTask?.name, undefined),
                   designatedApproverUserId: needsProjectNext ? '' : block.designatedApproverUserId,
                 });
               }}
@@ -553,6 +707,8 @@ export function DailyEntryBlockFields({
                     projectId: nextProjectId,
                     moduleId: '',
                     segmentId: '',
+                    taskId: '',
+                    category: activityForTaskChange(block.category, selectedTask?.name, undefined),
                     isOvertime: nextProject?.allowsOvertime ? block.isOvertime : false,
                   });
                 }}
@@ -560,19 +716,42 @@ export function DailyEntryBlockFields({
             )}
           </div>
 
-          {needsProject && (
-            <PhaseSegmentFields
-              projectId={block.projectId}
-              moduleId={block.moduleId}
-              segmentId={block.segmentId}
-              onChange={onUpdate}
+          {needsProject && block.projectId && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+            <ProjectHourPlanFields
+              phases={projectDetail?.modules ?? hourPhases ?? []}
+              phaseId={block.moduleId}
+              segments={availableSegments}
+              segmentId={block.segmentId ?? ''}
+              tasks={availableTasks}
+              taskId={block.taskId ?? ''}
+              requiresPhase={requiresPhase}
+              approverName={projectDetail?.teams.find((team) =>
+                team.teamId === selectedModule?.segments.find((segment) => segment.id === block.segmentId)?.teamId
+              )?.leader?.fullName ?? resolveHourApprover(
+                hourPhases, ownerUserId ?? user?.id, block.segmentId,
+              )}
+              onPhaseChange={(moduleId) => onUpdate({
+                moduleId, segmentId: '', taskId: '',
+                category: activityForTaskChange(block.category, selectedTask?.name, undefined),
+              })}
+              onSegmentChange={(segmentId) => onUpdate({
+                segmentId, taskId: '',
+                category: activityForTaskChange(block.category, selectedTask?.name, undefined),
+              })}
+              onTaskChange={(taskId) => onUpdate({
+                taskId,
+                category: activityForTaskChange(
+                  block.category, selectedTask?.name,
+                  availableTasks.find((task) => task.id === taskId)?.name,
+                ),
+              })}
             />
           )}
 
           <TextField
             label="Actividad"
             required
-            placeholder="Ej: Diseño de wireframes de alta fidelidad para módulo dashboard"
+            placeholder={block.taskId === OTHER_TASK_OPTION ? 'Describe el trabajo realizado fuera de las tareas asignadas' : 'Ej: Diseño de wireframes para el módulo'}
             value={block.category}
             onChange={(event) => onUpdate({ category: event.target.value })}
           />
@@ -630,10 +809,12 @@ export function DailyEntryBlockFields({
           </div>
 
           <div className={styles.textareaField}>
-            <label className={styles.textareaLabel}>Descripción / Bitácora Detallada</label>
+            <label className={styles.textareaLabel}>
+              Descripción / Bitácora Detallada {selectedTask && '(opcional, ya está vinculada a una tarea)'}
+            </label>
             <textarea
               className={styles.textarea}
-              placeholder="Describa detalladamente el avance técnico realizado (mínimo 5 caracteres)"
+              placeholder={selectedTask ? 'Agrega detalles si te sirven para la bitácora' : 'Describa detalladamente el avance realizado (mínimo 5 caracteres)'}
               value={block.description}
               onChange={(event) => onUpdate({ description: event.target.value })}
             />

@@ -13,6 +13,9 @@ import {
   isUuid,
   ne,
   or,
+  projectQuotations,
+  quotationVersions,
+  quotationEvents,
   projectTeamMembers,
   projectTeams,
   projects,
@@ -35,6 +38,30 @@ import { DATABASE } from '../../../../shared/infrastructure/database/database.mo
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 import { toDomain, toPersistence } from './project.persistence-mapper';
 
+/** Calculado desde versiones y eventos reales, sin inferir aprobación desde sales_stage.
+ * Es una subconsulta correlacionada: no multiplica filas ni altera la paginación. */
+const quotationStatusSql = sql<
+  'none' | 'draft' | 'sent' | 'approved_pending' | 'transferred' | 'planning_applied'
+>`coalesce((
+  select case
+    when qv.status = 'approved' and exists (
+      select 1 from quotation_events qe
+      where qe.version_id = qv.id and qe.action = 'quotation_transferred'
+    ) then 'transferred'
+    when qv.status = 'approved' then 'approved_pending'
+    when qv.status = 'sent' then 'sent'
+    when exists (
+      select 1 from quotation_events qe
+      where qe.version_id = qv.id and qe.action = 'planning_baseline_applied'
+    ) then 'planning_applied'
+    else 'draft'
+  end
+  from project_quotations pq
+  join quotation_versions qv on qv.quotation_id = pq.id
+  where pq.project_id = ${projects.id}
+  order by qv.version_number desc
+  limit 1
+), 'none')`;
 type SupportPlanType = ProjectListItem['supportPlanType'];
 
 /**
@@ -51,6 +78,25 @@ const supportPlanTypeOfProject = sql<SupportPlanType>`(
 @Injectable()
 export class DrizzleProjectRepository implements ProjectRepository {
   constructor(@Inject(DATABASE) private readonly database: Database) {}
+
+  async hasPendingQuotationTransfer(projectId: string): Promise<boolean> {
+    const [quotation] = await this.database.select({ id: projectQuotations.id })
+      .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
+    if (!quotation) return false; // Proyectos heredados sin calculadora no se bloquean retroactivamente.
+    // Hito 0 es un hito de inicio, NO una operación de recotización:
+    // una transferencia histórica válida permite continuar operando aunque
+    // después se abra un borrador comercial independiente.
+    const [alreadyTransferred] = await this.database.select({ id: quotationEvents.id })
+      .from(quotationEvents)
+      .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
+      .where(and(eq(quotationVersions.quotationId, quotation.id),
+        eq(quotationEvents.action, 'quotation_transferred'))).limit(1);
+    if (alreadyTransferred) return false;
+    const [anyVersion] = await this.database.select({ id: quotationVersions.id })
+      .from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id))
+      .limit(1);
+    return Boolean(anyVersion);
+  }
 
   async findById(id: string, context?: TransactionContext): Promise<Project | null> {
     if (!isUuid(id)) return this.findBySlug(id, context);
@@ -101,6 +147,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
           clientName: clients.companyName,
           type: projects.type,
           salesStage: projects.salesStage,
+          quotationStatus: quotationStatusSql,
           status: projects.status,
           phase: projects.phase,
           priority: projects.priority,
@@ -145,6 +192,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       clientName: row.clientName,
       type: row.type,
       salesStage: row.salesStage,
+      quotationStatus: row.quotationStatus,
       status: row.status,
       phase: row.phase,
       priority: row.priority,
@@ -330,6 +378,11 @@ export class DrizzleProjectRepository implements ProjectRepository {
     if (filters.type) conditions.push(eq(projects.type, filters.type));
     if (filters.status?.length) conditions.push(inArray(projects.status, filters.status));
     if (filters.phase?.length) conditions.push(inArray(projects.phase, filters.phase));
+    if (filters.salesStage?.length) conditions.push(inArray(projects.salesStage, [...filters.salesStage]));
+    if (filters.quotationStatus?.length) conditions.push(inArray(quotationStatusSql, [...filters.quotationStatus]));
+    if (filters.quotationViewerUserId) {
+      conditions.push(eq(projects.leaderUserId, filters.quotationViewerUserId));
+    }
     if (filters.kind?.length) {
       // Mismo criterio que `deriveTipo` del diálogo de edición: Finalizado manda sobre la etapa comercial.
       const notFinished = sql`${projects.status} <> 'finished'`;
@@ -374,8 +427,8 @@ export class DrizzleProjectRepository implements ProjectRepository {
     }
     if (filters.assignedToUserId) {
       // Lidera el proyecto, desarrolla, es el responsable comercial, lidera alguno de sus
-      // equipos asignados (`project_teams.leaderUserId` — puede ser distinto del líder
-      // orgánico del equipo, `teams.leaderUserId`), o está asignado como miembro del proyecto.
+      // equipos asignados (override de proyecto o líder habitual, igual criterio
+      // que GetProjectUseCase), o está asignado como miembro activo del proyecto.
       conditions.push(
         or(
           eq(projects.leaderUserId, filters.assignedToUserId),
@@ -383,14 +436,16 @@ export class DrizzleProjectRepository implements ProjectRepository {
           eq(projects.commercialManagerUserId, filters.assignedToUserId),
           sql`exists (
             select 1 from ${projectTeams}
+            inner join ${teams} on ${teams.id} = ${projectTeams.teamId}
             where ${projectTeams.projectId} = ${projects.id}
-              and ${projectTeams.leaderUserId} = ${filters.assignedToUserId}
+              and coalesce(${projectTeams.leaderUserId}, ${teams.leaderUserId}) = ${filters.assignedToUserId}
           )`,
           sql`exists (
             select 1 from ${projectTeamMembers}
             inner join ${teamMembers} on ${teamMembers.id} = ${projectTeamMembers.teamMemberId}
             where ${projectTeamMembers.projectId} = ${projects.id}
               and ${teamMembers.userId} = ${filters.assignedToUserId}
+              and ${projectTeamMembers.blockedAt} is null
           )`,
         ),
       );
@@ -428,6 +483,13 @@ export class DrizzleProjectRepository implements ProjectRepository {
 
     if (sort.field === 'leader') {
       return [sql`${users.firstName} ${sqlDirection} nulls last`, sql`${users.lastName} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+
+    if (sort.field === 'salesStage') {
+      return [sql`${projects.salesStage} ${sqlDirection} nulls last`, asc(projects.id)];
+    }
+    if (sort.field === 'quotationStatus') {
+      return [sql`${quotationStatusSql} ${sqlDirection}`, asc(projects.id)];
     }
 
     if (sort.field === 'startDate') {

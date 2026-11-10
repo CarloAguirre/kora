@@ -75,3 +75,42 @@ describe('SendOverdueNotificationEmailsUseCase', () => {
     expect(inbox.releaseEmailClaim).toHaveBeenCalledWith('n1');
   });
 });
+
+
+describe('Correos de respaldo para tareas del Roadmap', () => {
+  it('envía el correo si el líder no abrió la solicitud de revisión tras 48h', async () => {
+    const sender = new RecordingNotificationSender();
+    const item: OverdueNotification = {
+      id: 'n-review',
+      recipientEmail: 'lider@kabeli.cl',
+      recipientFirstName: 'Eduardo',
+      notification: {
+        id: '11111111-1111-4111-8111-111111111111',
+        type: 'task_review_requested',
+        title: 'Tarea completada pendiente de aprobación',
+        createdAt: '2026-10-16T12:00:00.000Z',
+        readAt: null,
+        data: {
+          projectId: '22222222-2222-4222-8222-222222222222',
+          projectSlug: 'prueba-dev-2', projectName: 'Prueba Dev 2',
+          moduleId: '33333333-3333-4333-8333-333333333333',
+          taskId: '44444444-4444-4444-8444-444444444444',
+          taskName: 'Mejoras en bitácora',
+          assigneeName: 'Claudio Flores', reason: null,
+        },
+      },
+    };
+    const inbox = {
+      claimOverdueForEmail: vi.fn().mockResolvedValue([item]),
+      releaseEmailClaim: vi.fn(),
+    };
+    const useCase = new SendOverdueNotificationEmailsUseCase(
+      inbox as unknown as NotificationInbox, sender, new FixedClock(NOW), silentLogger,
+    );
+    expect((await useCase.execute()).unwrap()).toEqual({ sent: 1, failed: 0 });
+    expect(sender.projectTaskStatusEmails).toEqual([
+      expect.objectContaining({ kind: 'review_requested', taskName: 'Mejoras en bitácora',
+        projectSlug: 'prueba-dev-2', recipientEmail: 'lider@kabeli.cl' }),
+    ]);
+  });
+});

@@ -13,6 +13,8 @@ import {
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
   ReferencedModuleNotFoundError,
+  InvalidHourEntrySegmentError,
+  HourEntrySegmentRequiredError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -114,6 +116,10 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         : (moduleId ?? null) === previous.moduleId
           ? previous.segmentId
           : null;
+    const taskId = data.taskId !== undefined
+      ? data.taskId
+      : (moduleId === previous.moduleId && segmentId === previous.segmentId &&
+         projectId === previous.projectId ? previous.taskId ?? null : null);
     if (moduleId) {
       const module = await this.projects.findModuleById(moduleId);
       if (!module) return err(new ReferencedModuleNotFoundError(moduleId));
@@ -121,8 +127,40 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       if (segmentId && !module.segments.some((segment) => segment.id === segmentId)) {
         return err(new SegmentNotInModuleError());
       }
+      if (taskId && (taskId !== previous.taskId || segmentId !== previous.segmentId ||
+        moduleId !== previous.moduleId || projectId !== previous.projectId) &&
+        !module.tasks?.some((task) => task.id === taskId && !task.cancelledAt &&
+          task.assigneeUserId === entry.userId && task.segmentId === (segmentId ?? null))) {
+        return err(new ForbiddenError('Selecciona una tarea activa, asignada al autor y al bloque elegido.', 'HOUR_ENTRY_TASK_INVALID'));
+      }
+    }
+    if (taskId && !moduleId) {
+      return err(new ForbiddenError('Selecciona una fase antes de elegir la tarea.', 'HOUR_ENTRY_TASK_INVALID'));
     }
 
+    if (projectId && !moduleId && data.projectId !== undefined &&
+      await this.projects.hasAttributableWorkBlocks(projectId, entry.userId)) {
+      return err(new HourEntrySegmentRequiredError());
+    }
+    if (segmentId && !moduleId) {
+      return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
+    }
+    if (moduleId) {
+      const segments = await this.projects.findSegmentsForModule(moduleId);
+      if (segmentId) {
+        const selected = segments.find((segment) =>
+          segment.id === segmentId && segment.projectId === projectId);
+        if (!selected || !await this.projects.isUserOnSegmentTeam(
+          selected.projectId, selected.teamId, entry.userId,
+        )) return err(new InvalidHourEntrySegmentError());
+      } else if (data.segmentId !== undefined || (data.moduleId !== undefined &&
+        data.moduleId !== previous.moduleId)) {
+        const hasEligibleSegment = (await Promise.all(segments.map((segment) =>
+          this.projects.isUserOnSegmentTeam(segment.projectId, segment.teamId, entry.userId),
+        ))).some(Boolean);
+        if (hasEligibleSegment) return err(new HourEntrySegmentRequiredError());
+      }
+    }
     // Una hora normal que con la edición pase de la jornada de 8h del día se
     // queda con lo que cabe; el resto pasa a un registro nuevo de horas extra
     // (o el registro entero, si la jornada ya estaba completa) — misma regla
@@ -144,6 +182,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         projectId: data.projectId === undefined ? undefined : data.projectId,
         moduleId: data.moduleId === undefined ? undefined : data.moduleId,
         segmentId: moduleId ? (segmentId ?? null) : null,
+        taskId: moduleId ? taskId : null,
         category: data.category,
         description: data.description,
         hours: ownTranche!.hours,
@@ -168,6 +207,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         projectId: updated.projectId,
         moduleId: updated.moduleId,
         segmentId: updated.segmentId,
+        taskId: updated.taskId ?? null,
         assignment: updated.assignment ?? '',
         category: updated.category,
         description: updated.description,

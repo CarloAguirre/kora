@@ -262,6 +262,7 @@ export const projectTeamMembers = pgTable(
     activity: text('activity'),
     assignedHours: numeric('assigned_hours', { precision: 10, scale: 2 }).notNull().default('0'),
     consumedHours: numeric('consumed_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+    blockedAt: timestamp('blocked_at', { withTimezone: true, mode: 'date' }),
     ...timestamps,
   },
   (table) => [
@@ -303,6 +304,25 @@ export const projectModules = pgTable('project_modules', {
   ...timestamps,
 });
 
+/** Exclusión operativa de una referencia EDT (no modifica la cotización de origen).
+ * Se identifica por versión de cotización, fase, WBS y rol, no por el texto visible.
+ */
+export const projectRoadmapReferenceExclusions = pgTable('project_roadmap_reference_exclusions', {
+  id: primaryId(),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull().references(() => projectModules.id, { onDelete: 'cascade' }),
+  versionId: uuid('version_id').notNull(),
+  wbs: varchar('wbs', { length: 160 }).notNull(),
+  role: varchar('role', { length: 160 }).notNull(),
+  actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('roadmap_ref_exclusion_identity_key').on(
+    table.moduleId, table.versionId, table.wbs, table.role,
+  ),
+  index('roadmap_ref_exclusion_project_idx').on(table.projectId),
+]);
+
 /** Entrega estimada de un módulo — hace de hito "Entrega a cliente" (no existe un concepto de hito genérico separado). */
 export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   id: primaryId(),
@@ -314,14 +334,18 @@ export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   /** Nullable por entregas creadas antes de este campo — las nuevas siempre lo piden (ver `addProjectModuleDeliverySchema`). */
   name: varchar('name', { length: 300 }),
   description: text('description'),
+  /** Identidad del bloque que cierra; NULL en entregas de fase independientes. */
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
-  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece la entrega — opcional. */
-  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   estimatedDate: date('estimated_date', { mode: 'date' }).notNull(),
   status: projectModuleDeliveryStatusEnum('status').notNull().default('planned'),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
   rejectionReason: text('rejection_reason'),
+  /** Cierre confirmado de la entrega de un bloque: distinto de la fecha prometida. */
+  completedOn: date('completed_on', { mode: 'date' }),
+  completedByUserId: uuid('completed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  completionComment: text('completion_comment'),
   ...timestamps,
 });
 
@@ -337,6 +361,8 @@ export const projectModuleSegments = pgTable('project_module_segments', {
   name: varchar('name', { length: 300 }).notNull(),
   startDate: date('start_date', { mode: 'date' }).notNull(),
   endDate: date('end_date', { mode: 'date' }).notNull(),
+  estimatedHours: numeric('estimated_hours', { precision: 10, scale: 2 }),
+  closedAt: timestamp('closed_at', { withTimezone: true, mode: 'date' }),
   ...timestamps,
 });
 
@@ -367,13 +393,12 @@ export const projectModuleSegmentMembers = pgTable(
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
 export const projectModuleTasks = pgTable('project_module_tasks', {
   id: primaryId(),
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   moduleId: uuid('module_id')
     .notNull()
     .references(() => projectModules.id, { onDelete: 'cascade' }),
   teamId: uuid('team_id').references(() => teams.id, { onDelete: 'set null' }),
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
-  /** Tiempo de ejecución (tramo) de la misma fase al que pertenece la tarea — opcional. */
-  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   name: varchar('name', { length: 300 }).notNull(),
   description: text('description'),
   /** Inicio de la tarea — el Roadmap la dibuja como barra hasta `date` (fecha límite) y el Forecast reparte sus HH en ese rango. */
@@ -383,6 +408,7 @@ export const projectModuleTasks = pgTable('project_module_tasks', {
   status: projectModuleTaskStatusEnum('status').notNull().default('todo'),
   scope: projectModuleTaskScopeEnum('scope').notNull().default('desarrollo'),
   completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'date' }),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla en revisión. */
   rejectionReason: text('rejection_reason'),
   ...timestamps,
@@ -457,6 +483,8 @@ export const projectPaymentMilestones = pgTable('project_payment_milestones', {
   triggerType: projectPaymentTriggerEnum('trigger_type').notNull().default('manual'),
   /** Solo con `trigger_type = 'phase'`: al entrar el proyecto a esta fase (o a una posterior) el tramo queda por facturar. */
   triggerPhase: projectPhaseEnum('trigger_phase'),
+  /** Fase comercial concreta del módulo cotizado; nunca se convierte artificialmente en project_phase. */
+  triggerModuleId: uuid('trigger_module_id').references(() => projectModules.id, { onDelete: 'set null' }),
   /** Solo con `trigger_type = 'date'`: desde esta fecha el tramo queda por facturar. */
   triggerDate: date('trigger_date', { mode: 'date' }),
   ...timestamps,

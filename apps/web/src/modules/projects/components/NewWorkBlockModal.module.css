@@ -1,0 +1,28 @@
+.form { display: grid; gap: 15px; min-width: 0; padding: 1px 0; }
+.dates { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.hint { margin: -6px 0 0; color: #78859a; font-size: 12px; line-height: 1.5; }
+.capacity {
+  padding: 9px 11px; border-radius: 8px; background: #fff4c4;
+  color: #8a4a09; font-size: 12px; line-height: 1.5;
+}
+.delivery {
+  display: grid; gap: 12px; padding: 15px; border: 1px solid #e3e8f1;
+  border-radius: 12px; background: #f8fafc;
+}
+.delivery h3 { margin: 0; color: #17243a; font-size: 13px; font-weight: 700; }
+.delivery > p { margin: -6px 0 0; color: #6b778b; font-size: 12px; line-height: 1.5; }
+.deliveryFields { display: grid; gap: 12px; }
+.hiddenDelivery { display: none; }
+.deliveryFields small { color: #6b778b; font-size: 11px; }
+.description { display: grid; gap: 6px; font-size: 12px; }
+.description label { font-weight: 600; color: #26344d; }
+.description textarea {
+  width: 100%; resize: vertical; padding: 10px 12px;
+  min-height: 68px; font: inherit; color: #15253d;
+  border-radius: 9px; border: 1px solid #c5cfe0; background: #fff;
+}
+.description textarea:focus-visible { outline: 2px solid #a8c2f0; }
+.noDelivery { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; cursor: pointer; }
+.noDelivery input { margin-top: 2px; accent-color: #12223e; }
+.footer { display: flex; justify-content: flex-end; gap: 9px; flex-wrap: wrap; }
+@media (max-width: 540px) { .dates { grid-template-columns: 1fr; } }

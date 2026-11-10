@@ -13,6 +13,7 @@ export interface ProjectTeamMemberRecord {
   readonly activity: string | null;
   readonly assignedHours: number;
   readonly consumedHours: number;
+  readonly blockedAt?: Date | null;
 }
 
 export interface AssignProjectTeamMemberRecord {
@@ -39,6 +40,8 @@ export interface ProjectTeamMemberRepository {
 
   assign(record: AssignProjectTeamMemberRecord, context?: TransactionContext): Promise<string>;
   unassign(id: string, context?: TransactionContext): Promise<void>;
+  block(id: string, when: Date, context?: TransactionContext): Promise<void>;
+  reactivate(id: string, record: Pick<AssignProjectTeamMemberRecord, 'activity' | 'assignedHours'>, context?: TransactionContext): Promise<void>;
   update(id: string, patch: UpdateProjectTeamMemberPatch, context?: TransactionContext): Promise<void>;
 }
 

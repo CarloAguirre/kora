@@ -180,10 +180,11 @@ export interface ClientRoadmapPhase {
  * de 3 módulos fijos × 4 tareas fijas (`ProjectGantt`/`GanttModule`), que ya
  * no calzaba con el Figma actualizado.
  */
-export type PhaseRoadmapRole = 'dev' | 'qa' | 'ia' | 'ux' | 'rpa';
+export type PhaseRoadmapRole = 'dev' | 'pmo' | 'qa' | 'ia' | 'ux' | 'rpa';
 
 export const PHASE_ROADMAP_ROLE_LABELS: Readonly<Record<PhaseRoadmapRole, string>> = {
   dev: 'DEV',
+  pmo: 'PMO',
   qa: 'QA',
   ia: 'IA',
   ux: 'UX',
@@ -193,6 +194,7 @@ export const PHASE_ROADMAP_ROLE_LABELS: Readonly<Record<PhaseRoadmapRole, string
 /** Colores por rol tomados del Figma (node 9669:31017, fila de leyenda). */
 export const PHASE_ROADMAP_ROLE_COLORS: Readonly<Record<PhaseRoadmapRole, string>> = {
   dev: '#2e9e52',
+  pmo: '#64748b',
   qa: '#6c63e8',
   ia: '#4c7ef3',
   ux: '#b8790e',
@@ -226,6 +228,8 @@ export interface PhaseRoadmapTask {
   readonly label: string;
   readonly startDate: string;
   readonly endDate: string;
+  /** Fecha real de cierre del bloque (ISO), no su fecha planificada. */
+  readonly closedAt?: string | null;
 }
 
 export type PhaseRoadmapDeliveryState = 'delivered' | 'committed' | 'delayed';

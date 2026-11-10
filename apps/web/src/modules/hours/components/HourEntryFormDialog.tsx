@@ -29,9 +29,11 @@ import {
   stepBlockHours,
   validateDailyBlock,
   type DailyBlock,
+  type TaskHourEntryTarget,
 } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
 import { canEditAnyMonth, isInCurrentMonth, OUTSIDE_CURRENT_MONTH_MESSAGE } from '../lib/edit-window';
+import { OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
 
 const formatDateTime = (value: string) => new Date(value).toLocaleString('es-CL');
 const NEW_ENTRY_TABS = [
@@ -47,6 +49,8 @@ export interface HourEntryFormDialogProps {
   onSuccess: (message: string) => void;
   /** Solo lectura — para revisar el registro de otro colaborador sin poder editarlo. */
   readOnly?: boolean;
+  /** Alta vinculada a una tarea, con finalización posterior al guardado exitoso. */
+  initialTask?: TaskHourEntryTarget;
 }
 
 /**
@@ -57,7 +61,7 @@ export interface HourEntryFormDialogProps {
  * "Registro diario" (varios proyectos el mismo día) y "Registro semanal"
  * (un proyecto, lunes a viernes) — ver `DailyEntryForm`/`WeeklyEntryForm`.
  */
-export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly = false }: HourEntryFormDialogProps) {
+export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly = false, initialTask }: HourEntryFormDialogProps) {
   const [tab, setTab] = useState<'diario' | 'semanal'>('diario');
   const [total, setTotal] = useState(0);
 
@@ -87,15 +91,17 @@ export function HourEntryFormDialog({ open, entry, onClose, onSuccess, readOnly 
       onClose={onClose}
       title="Registrar horas"
       wide
+      bodyScrollOnly
       headerExtra={
         <span className={styles.headerTotal}>Total: {total.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h</span>
       }
     >
-      <div className={styles.tabsRow}>
+      {!initialTask && <div className={styles.tabsRow}>
         <Tabs tabs={NEW_ENTRY_TABS} activeId={tab} onSelect={(id) => setTab(id as 'diario' | 'semanal')} />
-      </div>
-      {tab === 'diario' ? (
-        <DailyEntryForm onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
+      </div>}
+      {initialTask || tab === 'diario' ? (
+        <DailyEntryForm key={initialTask ? 'task-' + initialTask.taskId : 'standard'}
+          initialTask={initialTask} onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
       ) : (
         <WeeklyEntryForm onClose={onClose} onSuccess={onSuccess} onTotalChange={setTotal} />
       )}
@@ -113,6 +119,7 @@ const blockFromEntry = (entry: HourEntrySummary): DailyBlock => ({
   projectId: entry.project?.id ?? '',
   moduleId: entry.module?.id ?? '',
   segmentId: entry.segment?.id ?? '',
+  taskId: entry.taskId ?? OTHER_TASK_OPTION,
   category: entry.category,
   hours: String(entry.hours),
   description: entry.description,
@@ -221,6 +228,7 @@ function EditEntryForm({
           projectId: needsProject ? block.projectId : null,
           moduleId: needsProject && block.moduleId ? block.moduleId : null,
           segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : null,
+          taskId: needsProject && block.moduleId ? (toHourTaskId(block.taskId) ?? null) : null,
           category: block.category.trim(),
           description: block.description,
           hours: Number(block.hours),
@@ -290,6 +298,7 @@ function EditEntryForm({
         onRemove={() => undefined}
         onToggleExpand={() => setBlock((prev) => ({ ...prev, expanded: !prev.expanded }))}
         onAdjustHours={(delta) => setBlock((prev) => ({ ...prev, hours: stepBlockHours(prev.hours, delta) }))}
+        ownerUserId={entry.user.id}
       />
 
       <div className={styles.actions}>
@@ -394,4 +403,3 @@ function ViewEntryDetail({ entry, onClose }: { entry: HourEntrySummary; onClose:
     </div>
   );
 }
-

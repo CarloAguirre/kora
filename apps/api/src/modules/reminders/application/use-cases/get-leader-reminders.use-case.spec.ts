@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Permission, RoleCode } from '@kora/contracts';
 import type { HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import type { DailyHours, HourReminderReader } from '../ports/hour-reminder-reader.port';
-import type { LedProjectReader, LedProjectTeamRow } from '../ports/led-project-reader.port';
+import type { LedProjectReader, LedProjectTeamRow, TeamAwaitingStaffingRow } from '../ports/led-project-reader.port';
 import { GetLeaderRemindersUseCase } from './get-leader-reminders.use-case';
 
 const LEADER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -30,8 +30,8 @@ function setup({
   daily = [],
   holidays = [],
   firstEntryDate = '2026-10-01',
-  teams = [],
-}: { daily?: DailyHours[]; holidays?: string[]; firstEntryDate?: string | null; teams?: LedProjectTeamRow[] } = {}) {
+  teams = [], staffing = [],
+}: { daily?: DailyHours[]; holidays?: string[]; firstEntryDate?: string | null; teams?: LedProjectTeamRow[]; staffing?: TeamAwaitingStaffingRow[] } = {}) {
   const hourEntries = { summarize: vi.fn().mockResolvedValue({ entries: 12, hours: 34.5 }) };
   const reader = {
     findFirstEntryDate: vi.fn().mockResolvedValue(firstEntryDate),
@@ -40,7 +40,10 @@ function setup({
       daily.filter((row) => row.date >= from && row.date <= to),
     ),
   };
-  const ledProjects = { listTeamsOfLedProjects: vi.fn().mockResolvedValue(teams) };
+  const ledProjects = {
+    listTeamsOfLedProjects: vi.fn().mockResolvedValue(teams),
+    listTeamsAwaitingStaffing: vi.fn().mockResolvedValue(staffing),
+  };
   const useCase = new GetLeaderRemindersUseCase(
     hourEntries as unknown as HourEntryRepository,
     reader as unknown as HourReminderReader,
@@ -57,9 +60,10 @@ describe('GetLeaderRemindersUseCase', () => {
   it('a quien no es líder no le calcula nada', async () => {
     const { run, hourEntries, ledProjects } = setup();
 
-    expect(await run('pmo')).toEqual({ pendingApprovals: { entries: 0, hours: 0 }, missingHourDays: [], projectsMissingData: [] });
+    expect(await run('pmo')).toEqual({ pendingApprovals: { entries: 0, hours: 0 }, missingHourDays: [], projectsMissingData: [], teamsAwaitingStaffing: [] });
     expect(hourEntries.summarize).not.toHaveBeenCalled();
     expect(ledProjects.listTeamsOfLedProjects).not.toHaveBeenCalled();
+    expect(ledProjects.listTeamsAwaitingStaffing).not.toHaveBeenCalled();
   });
 
   it('cuenta las horas por aprobar con el alcance de su cola, sin las propias', async () => {
@@ -115,4 +119,24 @@ describe('GetLeaderRemindersUseCase', () => {
       },
     ]);
   });
+  it('notifica al líder de equipo cuando un proyecto traspasado requiere colaboradores', async () => {
+    const pending: TeamAwaitingStaffingRow = {
+      projectId: '00000000-0000-4000-8000-000000000001',
+      projectSlug: 'prueba-dev-2',
+      projectName: 'Prueba Dev 2',
+      clientName: 'Cliente',
+      teamId: '00000000-0000-4000-8000-000000000002',
+      teamSlug: 'ux-ui',
+      teamName: 'UX-UI',
+    };
+    const { run, ledProjects } = setup({ staffing: [pending] });
+    expect((await run()).teamsAwaitingStaffing).toEqual([pending]);
+    expect(ledProjects.listTeamsAwaitingStaffing).toHaveBeenCalledWith(LEADER);
+  });
+
+  it('deja de notificar cuando el lector no detecta equipos pendientes', async () => {
+    const { run } = setup();
+    expect((await run()).teamsAwaitingStaffing).toEqual([]);
+  });
+
 });

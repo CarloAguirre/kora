@@ -74,6 +74,9 @@ importers:
       csv-parse:
         specifier: ^5.6.0
         version: 5.6.0
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(postgres@3.4.9)

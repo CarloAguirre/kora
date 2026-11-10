@@ -5,6 +5,7 @@ import { Project } from '../../domain/entities/project.entity';
 import {
   ProjectIsInternalError,
   ProjectNotApprovedForInvoicingError,
+  ProjectQuotationTransferRequiredError,
   ProjectPaymentMilestoneAlreadyIssuedError,
 } from '../../domain/errors/project.errors';
 import type { ProjectPaymentMilestoneRecord, ProjectPaymentMilestoneRepository } from '../../domain/repositories/project-payment-milestone.repository';
@@ -74,6 +75,7 @@ function buildUseCase(options: {
 
   const projects = {
     findById: vi.fn().mockResolvedValue(project),
+    hasPendingQuotationTransfer: vi.fn().mockResolvedValue(false),
     save: vi.fn().mockResolvedValue(undefined),
   } as unknown as ProjectRepository;
 
@@ -176,6 +178,20 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
 
     expect(result.isErr()).toBe(true);
     expect(result.isErr() && result.error).toBeInstanceOf(ProjectPaymentMilestoneAlreadyIssuedError);
+  });
+
+  it('bloquea facturar el primer tramo si activaría un proyecto con traspaso pendiente', async () => {
+    const { useCase, projects, milestones } = buildUseCase({});
+    vi.mocked(projects.hasPendingQuotationTransfer!).mockResolvedValueOnce(true);
+    const result = await useCase.execute({
+      milestoneId: 'milestone-1',
+      data: { folio: 'F-1', issuedAt: '2026-09-24' },
+      actor: ACTOR,
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectQuotationTransferRequiredError);
+    expect(projects.save).not.toHaveBeenCalled();
+    expect(milestones.markIssued).not.toHaveBeenCalled();
   });
 
   it('dispara Hito 0 (activa) al facturar el primer tramo de un proyecto Aprobado/No iniciado, y avisa a Gerencia/PMO', async () => {

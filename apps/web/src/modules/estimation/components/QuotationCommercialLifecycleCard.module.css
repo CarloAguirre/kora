@@ -1,0 +1,6 @@
+.heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.heading h2{font-size:16px;margin:0}.heading span{font-size:12px;color:var(--kora-text-muted);font-weight:700}.helper{font-size:12px;color:var(--kora-text-muted);line-height:1.5}.warning{font-size:12px;padding:10px;background:var(--kora-surface-muted);border:1px solid var(--kora-border-soft);border-radius:8px}.success{font-size:12px;color:var(--kora-success-text)}.action{border-top:1px solid var(--kora-border-soft);padding-top:12px;margin-top:12px;display:flex;justify-content:space-between;gap:16px;align-items:center}.action strong,.approval strong{font-size:13px}.action p,.approval p{margin:5px 0 0;font-size:12px;color:var(--kora-text-muted);line-height:1.4}.approval{display:grid;gap:12px;border-top:1px solid var(--kora-border-soft);padding-top:12px;margin-top:12px}.approval button{justify-self:start}@media(max-width:700px){.heading,.action{display:grid}}
+
+
+/* Acciones del resumen de cotización v5, sin documentos ni paneles extra. */
+.v5Actions{display:grid;gap:8px;padding:5px 0 0;min-width:0}
+.v5Actions button{width:100%}

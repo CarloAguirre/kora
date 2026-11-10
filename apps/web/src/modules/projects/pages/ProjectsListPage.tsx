@@ -5,12 +5,17 @@ import {
   PROJECT_KIND_LABELS,
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
+  PROJECT_SALES_STAGES,
+  PROJECT_SALES_STAGE_LABELS,
+  PROJECT_QUOTATION_LIST_STATUSES,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   SUPPORT_PLAN_TYPE_LABELS,
   projectKindOf,
   type ProjectKind,
   type ProjectPhase,
+  type ProjectSalesStage,
+  type ProjectQuotationListStatus,
   type ProjectSortField,
   type ProjectStatus,
   type ProjectSummary,
@@ -55,6 +60,20 @@ const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_STATUS_FILTER
   label: PROJECT_STATUS_LABELS[status],
 }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
+const SALES_STAGE_OPTIONS = PROJECT_SALES_STAGES.map((stage) => ({
+  value: stage, label: PROJECT_SALES_STAGE_LABELS[stage],
+}));
+const QUOTATION_LABELS: Record<ProjectQuotationListStatus, string> = {
+  none: 'Sin cotización',
+  draft: 'En cotización',
+  sent: 'Enviada al cliente',
+  approved_pending: 'Traspaso pendiente',
+  transferred: 'Traspasada',
+  planning_applied: 'Planificación preliminar aplicada',
+};
+const QUOTATION_OPTIONS = PROJECT_QUOTATION_LIST_STATUSES.map((status) => ({
+  value: status, label: QUOTATION_LABELS[status],
+}));
 // Igual que en Estado, "Finalizado" no se ofrece como filtro de Tipo de proyecto.
 const KIND_OPTIONS = PROJECT_KINDS.filter((kind) => kind !== 'finished').map((kind) => ({
   value: kind,
@@ -93,6 +112,8 @@ const DATE_COLUMN_WIDTH = '120px';
 export function ProjectsListPage() {
   const { can } = usePermissions();
   const toast = useToast();
+  const [salesStages, setSalesStages] = useState<ProjectSalesStage[]>([]);
+  const [quotationStatuses, setQuotationStatuses] = useState<ProjectQuotationListStatus[]>([]);
   const location = useLocation();
   const [listSearch, setListSearch] = useState(() => initialProjectsListSearch(location.state));
   const { tab, supportSubTab, search, leaderUserIds, kinds, statuses, phases, page, pageSize, sort } = listSearch;
@@ -117,6 +138,8 @@ export function ProjectsListPage() {
           kind: kinds.length > 0 ? kinds : undefined,
           status: statuses.length > 0 ? statuses : undefined,
           phase: phases.length > 0 ? phases : undefined,
+          salesStage: salesStages.length > 0 ? salesStages : undefined,
+          quotationStatus: quotationStatuses.length > 0 ? quotationStatuses : undefined,
         }
       : {
           type: tab,
@@ -236,6 +259,14 @@ export function ProjectsListPage() {
       header: 'Etapa',
       sortable: true,
       render: (p) => (p.phase ? PROJECT_PHASE_LABELS[p.phase] : <span className={styles.empty}>—</span>),
+    },
+    {
+      key: 'quotationStatus', header: 'Cotización', sortable: true,
+      render: (p) => p.quotationStatus
+        ? <span className={styles.quotationStatus} data-state={p.quotationStatus}>
+            {QUOTATION_LABELS[p.quotationStatus]}
+          </span>
+        : <span className={styles.empty}>—</span>,
     },
     {
       key: 'startDate',
@@ -394,6 +425,18 @@ export function ProjectsListPage() {
                 />
                 <MultiSelect
                   className={styles.filter}
+                  label="Tipo de proyecto"
+                  placeholder="Todos"
+                  searchPlaceholder="Buscar tipo"
+                  options={SALES_STAGE_OPTIONS}
+                  value={salesStages}
+                  onChange={(next) => {
+                    setSalesStages(next as ProjectSalesStage[]);
+                    setPage(1);
+                  }}
+                />
+                <MultiSelect
+                  className={styles.filter}
                   label="Estado"
                   placeholder="Todos"
                   searchPlaceholder="Buscar estado"
@@ -409,6 +452,18 @@ export function ProjectsListPage() {
                   options={PHASE_OPTIONS}
                   value={phases}
                   onChange={(next) => updateListSearch({ phases: next as ProjectPhase[], page: 1 })}
+                />
+                <MultiSelect
+                  className={styles.filter}
+                  label="Cotización"
+                  placeholder="Todas"
+                  searchPlaceholder="Buscar cotización"
+                  options={QUOTATION_OPTIONS}
+                  value={quotationStatuses}
+                  onChange={(next) => {
+                    setQuotationStatuses(next as ProjectQuotationListStatus[]);
+                    setPage(1);
+                  }}
                 />
               </>
             )}

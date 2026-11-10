@@ -15,6 +15,7 @@ import { PROJECTS_LIST_PATH, RESTORE_PROJECTS_LIST_STATE } from '../lib/projects
 import { ProjectViewTabs } from '@/modules/client-portal/components/ProjectViewTabs';
 import { useProjectDetail, useSetProjectOvertimeAuthorization } from '../api/projects.queries';
 import { EditProjectDialog } from '../components/EditProjectDialog';
+import { EditDevelopmentProjectDialog } from '../components/EditDevelopmentProjectDialog';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { DevelopmentProjectDetailView } from './DevelopmentProjectDetailView';
 import { SupportProjectDetailView } from './SupportProjectDetailView';
@@ -35,6 +36,7 @@ export function ProjectDetailPage() {
   const setOvertimeAuthorization = useSetProjectOvertimeAuthorization();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
   const [editing, setEditing] = useState(false);
+  const [quotationTabRequestId, setQuotationTabRequestId] = useState(0);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
 
   const onToggleOvertime = async () => {
@@ -139,17 +141,30 @@ export function ProjectDetailPage() {
             project={project}
             projectId={projectId}
             onEdit={onEdit}
+            quotationTabRequestId={quotationTabRequestId}
             readOnlyTeamIds={isTeamLeaderOnly ? new Set(ledTeams.map((t) => t.teamId)) : undefined}
           />
         )}
 
-        <EditProjectDialog
-          open={editing}
-          project={project}
-          onClose={() => setEditing(false)}
-          onSuccess={(message) => toast.success(message)}
-          isManagement={can('projects:manage')}
-        />
+        {project.type === 'development'
+          ? <EditDevelopmentProjectDialog
+              open={editing}
+              project={project}
+              onClose={() => setEditing(false)}
+              onSuccess={(message) => toast.success(message)}
+              onViewQuotations={() => {
+                setEditing(false);
+                setQuotationTabRequestId((previous) => previous + 1);
+              }}
+              isManagement={can('projects:manage')}
+            />
+          : <EditProjectDialog
+              open={editing}
+              project={project}
+              onClose={() => setEditing(false)}
+              onSuccess={(message) => toast.success(message)}
+              isManagement={can('projects:manage')}
+            />}
       </div>
     </DashboardLayout>
   );

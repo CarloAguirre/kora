@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ProjectsController } from './presentation/projects.controller';
 import { TeamsModule } from '../teams/teams.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ProjectTaskReviewNotifier } from './infrastructure/services/project-task-review-notifier';
+import { PROJECT_TASK_REVIEW_NOTIFIER } from './application/ports/project-task-review-notifier.port';
 
 import { CreateProjectUseCase } from './application/use-cases/create-project.use-case';
 import { UpdateProjectUseCase } from './application/use-cases/update-project.use-case';
@@ -19,6 +22,7 @@ import { UpdateProjectObservationUseCase } from './application/use-cases/update-
 import { ResolveProjectObservationUseCase } from './application/use-cases/resolve-project-observation.use-case';
 import { DeleteProjectObservationUseCase } from './application/use-cases/delete-project-observation.use-case';
 import { ProjectChangeLogRecorder } from './application/services/project-change-log.recorder';
+import { CollaboratorProjectActivityService } from './application/services/collaborator-project-activity.service';
 import { ForecastSourceSyncService } from './application/services/forecast-source-sync.service';
 import { PaymentMilestoneTriggerService } from './application/services/payment-milestone-trigger.service';
 import { ProjectProgressRecalculator } from './application/services/project-progress-recalculator';
@@ -34,6 +38,11 @@ import { DeleteProjectModuleSegmentUseCase } from './application/use-cases/delet
 import { CreateProjectModuleTaskUseCase } from './application/use-cases/create-project-module-task.use-case';
 import { UpdateProjectModuleTaskUseCase } from './application/use-cases/update-project-module-task.use-case';
 import { DeleteProjectModuleTaskUseCase } from './application/use-cases/delete-project-module-task.use-case';
+import { ProjectRoadmapReferenceExclusionsService } from './application/services/project-roadmap-reference-exclusions.service';
+import { ROADMAP_REFERENCE_EXCLUSION_STORE } from './application/ports/roadmap-reference-exclusion-store.port';
+import { DrizzleRoadmapReferenceExclusionStore } from './infrastructure/persistence/drizzle-roadmap-reference-exclusion.store';
+import { APPROVED_PROJECT_CALENDAR } from './application/ports/approved-project-calendar.port';
+import { DrizzleApprovedProjectCalendar } from './infrastructure/persistence/drizzle-approved-project-calendar';
 import { CreateProjectPaymentMilestoneUseCase } from './application/use-cases/create-project-payment-milestone.use-case';
 import { UpdateProjectPaymentMilestoneUseCase } from './application/use-cases/update-project-payment-milestone.use-case';
 import { DeleteProjectPaymentMilestoneUseCase } from './application/use-cases/delete-project-payment-milestone.use-case';
@@ -89,7 +98,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
  * M1 y desde el módulo de usuario original.
  */
 @Module({
-  imports: [TeamsModule],
+  imports: [TeamsModule, NotificationsModule],
   controllers: [ProjectsController, ProjectInvoiceDocumentsController, ProjectPaymentReceiptsController],
   providers: [
     CreateProjectUseCase,
@@ -109,6 +118,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
     ResolveProjectObservationUseCase,
     DeleteProjectObservationUseCase,
     ProjectChangeLogRecorder,
+    CollaboratorProjectActivityService,
     ForecastSourceSyncService,
     PaymentMilestoneTriggerService,
     ProjectProgressRecalculator,
@@ -123,7 +133,11 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
     DeleteProjectModuleSegmentUseCase,
     CreateProjectModuleTaskUseCase,
     UpdateProjectModuleTaskUseCase,
+    { provide: PROJECT_TASK_REVIEW_NOTIFIER, useClass: ProjectTaskReviewNotifier },
     DeleteProjectModuleTaskUseCase,
+    ProjectRoadmapReferenceExclusionsService,
+    { provide: ROADMAP_REFERENCE_EXCLUSION_STORE, useClass: DrizzleRoadmapReferenceExclusionStore },
+    { provide: APPROVED_PROJECT_CALENDAR, useClass: DrizzleApprovedProjectCalendar },
     CreateProjectPaymentMilestoneUseCase,
     UpdateProjectPaymentMilestoneUseCase,
     DeleteProjectPaymentMilestoneUseCase,
@@ -156,7 +170,10 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
   ],
   exports: [
     PROJECT_REPOSITORY,
+    GetProjectUseCase,
     PROJECT_MODULE_REPOSITORY,
+    PROJECT_TEAM_MEMBER_REPOSITORY,
+    PROJECT_TEAM_REPOSITORY,
     PROJECT_PAYMENT_MILESTONE_REPOSITORY,
     ForecastSourceSyncService,
     PaymentMilestoneTriggerService,

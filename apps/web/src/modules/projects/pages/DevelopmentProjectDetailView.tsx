@@ -1,4 +1,5 @@
 import { useAuth } from "@/modules/auth/hooks/useAuth";
+import { ProjectQuotationCard } from "@/modules/estimation/components/ProjectQuotationCard";
 import { usePermissions } from "@/modules/auth/hooks/usePermissions";
 import {
   useHourEntriesList,
@@ -11,9 +12,10 @@ import { Card } from "@/shared/components/ui/Card";
 import { useToast } from "@/shared/components/ui/Toast";
 import { ApiRequestError } from "@/shared/lib/api-client";
 import type { ProjectDetail } from "@kora/contracts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useResolveProjectManagementApproval } from "../api/projects.queries";
 import { AssignedTeamsCard, type AssignedTeamSummary } from "../components/AssignedTeamsCard";
+import { ProjectTeamsManagementCard } from "../components/ProjectTeamsManagementCard";
 import { BitacoraCard } from "../components/BitacoraCard";
 import { BitacoraMiniCard } from "../components/BitacoraMiniCard";
 import { ProjectExtrasTab } from "../components/ProjectExtrasTab";
@@ -22,7 +24,8 @@ import {
   type ProjectDocument,
 } from "../components/ProjectInfoBar";
 import { ProjectModulesCard } from "../components/ProjectModulesCard";
-import { ProjectTimeline } from "../components/ProjectTimeline";
+import { ProjectExecutionProgressCard } from "../components/ProjectExecutionProgressCard";
+import { calculateProjectExecutionProgress } from "../lib/project-execution-progress";
 import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
 import styles from "./ProjectDetailPage.module.css";
 
@@ -39,18 +42,21 @@ const formatHours = (value: number) =>
  * docs/PLAN-MODULOS.md). La ficha de soporte es una pantalla distinta —
  * ver `SupportProjectDetailView`.
  */
-type DetailTab = "resumen" | "roadmap" | "bitacora" | "extras";
+type DetailTab = "resumen" | "roadmap" | "bitacora" | "extras" | "cotizaciones";
 
 export function DevelopmentProjectDetailView({
   project,
   projectId,
   onEdit,
+  quotationTabRequestId = 0,
   readOnlyTeamIds,
 }: {
   project: ProjectDetail;
   projectId: string;
   /** Abre "Editar proyecto" — sin él (quien no puede editar) no se muestra el lápiz. */
   onEdit?: () => void;
+  /** Solicitud explícita del enlace «Ver cotizaciones» del editor de desarrollo. */
+  quotationTabRequestId?: number;
   /**
    * Vista de consulta para un líder de equipo que no lidera el proyecto: ve la
    * ficha completa sin editar nada (sin Extras, Roadmap de solo lectura) y solo
@@ -63,6 +69,20 @@ export function DevelopmentProjectDetailView({
   const { user } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState<DetailTab>("resumen");
+  const [manageTeamsOnArrival, setManageTeamsOnArrival] = useState(false);
+  const teamsSectionRef = useRef<HTMLDivElement>(null);
+  const goToAssignedTeams = () => {
+    setManageTeamsOnArrival(true);
+    setTab("resumen");
+  };
+  useEffect(() => {
+    if (tab !== "resumen" || !manageTeamsOnArrival) return;
+    teamsSectionRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    setManageTeamsOnArrival(false);
+  }, [tab, manageTeamsOnArrival]);
+  useEffect(() => {
+    if (quotationTabRequestId > 0) setTab('cotizaciones');
+  }, [quotationTabRequestId]);
   const resolveManagementApproval = useResolveProjectManagementApproval();
   const { data: projectHourEntries } = useHourEntriesList({
     projectId,
@@ -143,6 +163,8 @@ export function DevelopmentProjectDetailView({
     () => project.teams.map((team) => ({ value: team.teamId, label: team.teamName })),
     [project.teams],
   );
+
+  const projectExecutionProgress = useMemo(() => calculateProjectExecutionProgress(project), [project]);
 
   const remainingHours = project.soldHours - project.usedHours;
 
@@ -259,7 +281,7 @@ export function DevelopmentProjectDetailView({
         </div>
       )}
 
-      {/* Datos del proyecto y Timeline: siempre visibles, fuera de las tabs (igual que en el mockup del líder de proyecto). */}
+      {/* Datos del proyecto y avance operativo: siempre visibles, fuera de las pestañas. */}
       <Card className={styles.infoCard}>
         <ProjectInfoBar
           clientName={project.client?.companyName ?? "Sin cliente"}
@@ -287,10 +309,7 @@ export function DevelopmentProjectDetailView({
       </Card>
 
       <Card>
-        <p className={styles.sectionTitle}>Avance del proyecto</p>
-        <div style={{ marginTop: "var(--kora-space-4)" }}>
-          <ProjectTimeline progress={project.progress} />
-        </div>
+        <ProjectExecutionProgressCard progress={projectExecutionProgress} />
 
         <div className={styles.metricsDivider} />
         <div className={styles.metricsStrip}>
@@ -342,7 +361,13 @@ export function DevelopmentProjectDetailView({
 
       <div className={styles.tabsShell}>
         <div className={styles.tabsShellBar}>
-          {DETAIL_TABS.filter((tabDef) => !readOnly || tabDef.id !== "extras").map((tabDef) => (
+          {DETAIL_TABS.filter((tabDef) =>
+            (tabDef.id !== 'extras' || !readOnly) &&
+            (tabDef.id !== 'cotizaciones' || (!readOnly && (
+              can('projects:manage') ||
+              (can('projects:read_assigned') && user?.id === project.leader?.id)
+            )))
+          ).map((tabDef) => (
             <button
               key={tabDef.id}
               type="button"
@@ -363,12 +388,23 @@ export function DevelopmentProjectDetailView({
               <div className={styles.colLeft}>
                 <TeamHoursSummaryChart teams={teamSummaries} unassignedHours={unassignedHours} />
 
-                <AssignedTeamsCard
-                  project={project}
-                  teams={teamSummaries}
-                  onViewHours={() => setTab("bitacora")}
-                  canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
-                />
+                <div id="project-assigned-teams" className={styles.assignedTeamsAnchor}
+                  ref={teamsSectionRef}>
+                  {canManageProject ? (
+                    <ProjectTeamsManagementCard
+                      project={project}
+                      catalog={teamsCatalog?.items ?? []}
+                      startManaging={manageTeamsOnArrival}
+                    />
+                  ) : (
+                    <AssignedTeamsCard
+                      project={project}
+                      teams={teamSummaries}
+                      onViewHours={() => setTab("bitacora")}
+                      canOpenTeam={readOnlyTeamIds ? (teamId) => readOnlyTeamIds.has(teamId) : undefined}
+                    />
+                  )}
+                </div>
               </div>
 
               <div className={styles.colRight}>
@@ -384,23 +420,29 @@ export function DevelopmentProjectDetailView({
             </div>
           )}
 
-          {tab === "roadmap" &&
-            (project.salesStage === "approved" ||
-            project.status === "finished" ? (
+          {tab === "roadmap" && (
+            project.salesStage === "approved" ||
+            project.status === "active" ||
+            project.status === "finished" ||
+            project.status === "draft" ? (
+              // También se puede preparar el plan en Prospecto / No iniciado.
+              // La creación de fases no modifica el estado comercial del proyecto.
               <ProjectModulesCard
                 project={project}
                 hourEntries={projectHourEntries?.items ?? []}
                 teamOptions={segmentTeamOptions}
                 canManage={canManageProject}
+                onNavigateToTeams={goToAssignedTeams}
               />
             ) : (
               <Card>
                 <p className={styles.empty}>
-                  El Roadmap está disponible para proyectos aprobados o
-                  finalizados.
+                  El Roadmap está disponible para proyectos no iniciados,
+                  aprobados, activos o finalizados.
                 </p>
               </Card>
-            ))}
+            )
+          )}
 
           {tab === "bitacora" && (
             <BitacoraCard
@@ -418,6 +460,10 @@ export function DevelopmentProjectDetailView({
           {tab === "extras" && !readOnly && (
             <ProjectExtrasTab project={project} canManage={canManageExtras} />
           )}
+          {tab === "cotizaciones" && !readOnly &&
+            (can('projects:manage') || (can('projects:read_assigned') && user?.id === project.leader?.id)) && (
+              <ProjectQuotationCard project={project} />
+            )}
         </div>
       </div>
     </div>
@@ -429,4 +475,5 @@ const DETAIL_TABS: ReadonlyArray<{ id: DetailTab; label: string }> = [
   { id: "roadmap", label: "Roadmap" },
   { id: "bitacora", label: "Bitácora" },
   { id: "extras", label: "Extras" },
+  { id: "cotizaciones", label: "Cotizaciones" },
 ];

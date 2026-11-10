@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import { ProjectManagementApprovalNotPendingError, ProjectNotFoundError } from '../../domain/errors/project.errors';
+import { ProjectManagementApprovalNotPendingError, ProjectNotFoundError, ProjectQuotationTransferRequiredError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
@@ -27,6 +27,10 @@ export class ResolveProjectManagementApprovalUseCase
     const project = await this.projects.findById(command.projectId);
     if (!project || project.isDeleted) return err(new ProjectNotFoundError(command.projectId));
     if (!project.pendingManagementApproval) return err(new ProjectManagementApprovalNotPendingError());
+    if (project.type === 'development' &&
+        await this.projects.hasPendingQuotationTransfer?.(project.id)) {
+      return err(new ProjectQuotationTransferRequiredError());
+    }
 
     const now = this.clock.now();
     project.resolveManagementApproval(now);

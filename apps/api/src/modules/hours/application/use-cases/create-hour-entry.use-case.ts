@@ -10,6 +10,8 @@ import {
   ProjectOvertimeNotAllowedError,
   ProjectStoppedError,
   ReferencedModuleNotFoundError,
+  InvalidHourEntrySegmentError,
+  HourEntrySegmentRequiredError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -85,6 +87,38 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       if (segmentId && !module.segments.some((segment) => segment.id === segmentId)) {
         return err(new SegmentNotInModuleError());
       }
+      if (data.taskId && !module.tasks?.some((task) =>
+        task.id === data.taskId && !task.cancelledAt &&
+        task.assigneeUserId === ownerId && task.segmentId === (segmentId ?? null))) {
+        return err(new ForbiddenError('Selecciona una tarea activa, asignada al autor y al bloque elegido.', 'HOUR_ENTRY_TASK_INVALID'));
+      }
+    }
+    if (data.taskId && !data.moduleId) {
+      return err(new ForbiddenError('Selecciona una fase antes de elegir la tarea.', 'HOUR_ENTRY_TASK_INVALID'));
+    }
+
+    if (data.projectId && data.assignment === 'Proyecto' && !data.moduleId &&
+      await this.projects.hasAttributableWorkBlocks(data.projectId, ownerId)) {
+      return err(new HourEntrySegmentRequiredError());
+    }
+    if (data.segmentId && !data.moduleId) {
+      return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
+    }
+    if (data.moduleId) {
+      const segments = await this.projects.findSegmentsForModule(data.moduleId);
+      if (data.segmentId) {
+        const selected = segments.find((segment) =>
+          segment.id === data.segmentId && segment.projectId === data.projectId);
+        if (!selected || !await this.projects.isUserOnSegmentTeam(
+          selected.projectId, selected.teamId, ownerId,
+        )) return err(new InvalidHourEntrySegmentError());
+      } else if (data.assignment === 'Proyecto' && (await Promise.all(
+        segments.map((segment) => this.projects.isUserOnSegmentTeam(
+          segment.projectId, segment.teamId, ownerId,
+        )),
+      )).some(Boolean)) {
+        return err(new HourEntrySegmentRequiredError());
+      }
     }
 
     if (data.designatedApproverUserId) {
@@ -114,6 +148,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
         projectId: data.projectId ?? null,
         moduleId: data.moduleId ?? null,
         segmentId: data.moduleId ? (data.segmentId ?? null) : null,
+        taskId: data.moduleId ? (data.taskId ?? null) : null,
         assignment: data.assignment,
         category: data.category,
         description: data.description,

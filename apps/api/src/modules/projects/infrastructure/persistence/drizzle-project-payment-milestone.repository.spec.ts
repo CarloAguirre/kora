@@ -21,6 +21,15 @@ function setup(inserted = true) {
 }
 
 describe('Persistencia del PDF del tramo de proyecto', () => {
+  it('conserva el disparador por modulo al actualizar el tramo sin eliminar documentos', async () => {
+    const { repository, db, set } = setup();
+    await repository.update('milestone-1', { triggerType: 'phase', triggerModuleId: 'module-1' });
+    expect(db.transaction).toHaveBeenCalledOnce();
+    expect(set).toHaveBeenCalledWith({
+      triggerType: 'phase', triggerModuleId: 'module-1', updatedAt: expect.any(Date),
+    });
+    expect(db.delete).not.toHaveBeenCalled();
+  });
   it('registra el pago y su comprobante en una sola transaccion', async () => {
     const { repository, db, values, set } = setup();
     const paidAt = new Date('2026-11-10');

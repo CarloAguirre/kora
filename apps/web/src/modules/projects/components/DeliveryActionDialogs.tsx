@@ -1,4 +1,4 @@
-import type { ProjectModuleDelivery, ProjectTeamMember } from '@kora/contracts';
+import type { ProjectModuleDelivery, ProjectTeamMember, ProjectModuleTask } from '@kora/contracts';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { useUpdateProjectModuleDelivery } from '../api/projects.queries';
@@ -6,9 +6,14 @@ import { deliveryStatusLabel, type DeliveryAction } from '../lib/delivery-status
 import { ReviewActionModal } from './ReviewActionModal';
 import { AssignCollaboratorModal } from './AssignCollaboratorModal';
 import { assignableOptions } from '@/modules/users/lib/assignable-options';
+import { BlockDeliveryFinalizeDialog } from './BlockDeliveryFinalizeDialog';
 
 export interface DeliveryActionTarget {
-  readonly action: DeliveryAction;
+  readonly action: DeliveryAction | 'finalize' | 'reopen';
+  /** Instantánea viva de las tareas ligadas al bloque; se actualiza tras aprobar. */
+  readonly blockTasks?: readonly ProjectModuleTask[];
+  readonly blockName?: string;
+  readonly blockStartDate?: string;
   readonly moduleId: string;
   readonly moduleName: string;
   readonly delivery: ProjectModuleDelivery;
@@ -23,21 +28,21 @@ interface DeliveryActionDialogsProps {
 }
 
 const REVIEW_TITLE = {
-  complete: 'Marcar entrega como terminada',
+  complete: 'Marcar entrega como lista',
   approve: 'Aprobar entrega',
   reject: 'Rechazar entrega',
   revert: 'Revertir aprobación',
+  reopen: 'Revertir entrega',
 } as const;
 
 /** El líder la marca terminada sin que el colaborador la haya enviado: el porqué queda en la bitácora. */
 const ON_BEHALF_PROMPT = {
   label: 'Motivo',
-  placeholder: 'Explica por qué la marcas como terminada sin que el colaborador la haya enviado',
+  placeholder: 'Explica por qué la marcas como lista sin que el colaborador la haya enviado',
   missingMessage: 'Escribe el motivo antes de continuar: queda registrado en la bitácora.',
 };
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL');
-
 /**
  * Modales de gestión de una entrega (marcarla terminada en nombre del colaborador, asignar/reasignar,
  * aprobar, rechazar con motivo, revertir una aprobación) — compartidos entre la bitácora (`BitacoraCard`) y "Entregas del equipo"
@@ -47,7 +52,8 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
   const toast = useToast();
   const updateDelivery = useUpdateProjectModuleDelivery();
   const delivery = target?.delivery;
-  const reviewAction = target && target.action !== 'assign' ? target.action : null;
+  const reviewAction = target && target.action !== 'assign' && target.action !== 'finalize'
+    ? target.action : null;
 
   const summary = delivery
     ? [
@@ -62,8 +68,10 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
   const onConfirmReview = async (reason?: string) => {
     if (!target || !reviewAction) return;
     const input =
-      reviewAction === 'approve'
-        ? { status: 'approved' as const, rejectionReason: null }
+      reviewAction === 'reopen'
+        ? { reopenBlock: true }
+        : reviewAction === 'approve'
+          ? { status: 'approved' as const, rejectionReason: null }
         : reviewAction === 'reject'
           ? { status: 'planned' as const, rejectionReason: reason ?? '' }
           : reviewAction === 'complete'
@@ -72,9 +80,11 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
     try {
       await updateDelivery.mutateAsync({ projectId, moduleId: target.moduleId, deliveryId: target.delivery.id, input });
       toast.success(
-        reviewAction === 'complete'
-          ? 'Entrega marcada como terminada: queda pendiente de aprobación.'
-          : reviewAction === 'approve'
+        reviewAction === 'reopen'
+          ? 'Entrega revertida. El bloque vuelve a quedar abierto; las tareas canceladas conservan su historial.'
+          : reviewAction === 'complete'
+            ? 'Entrega marcada como lista: queda pendiente de aprobación.'
+            : reviewAction === 'approve'
             ? 'Entrega aprobada.'
             : reviewAction === 'reject'
               ? 'Entrega rechazada: vuelve al colaborador.'
@@ -104,12 +114,16 @@ export function DeliveryActionDialogs({ projectId, members, target, onClose }: D
 
   return (
     <>
+      <BlockDeliveryFinalizeDialog projectId={projectId} target={target} onClose={onClose} />
       <ReviewActionModal
         open={reviewAction !== null}
-        action={reviewAction === 'complete' || reviewAction === null ? 'approve' : reviewAction}
+        action={reviewAction === 'complete' || reviewAction === null ? 'approve'
+          : reviewAction === 'reopen' ? 'revert' : reviewAction}
         title={REVIEW_TITLE[reviewAction ?? 'approve']}
         confirmLabel={
-          reviewAction === 'revert' ? 'Revertir aprobación' : reviewAction === 'complete' ? 'Marcar como terminada' : undefined
+          reviewAction === 'reopen' ? 'Revertir entrega'
+            : reviewAction === 'revert' ? 'Revertir aprobación'
+              : reviewAction === 'complete' ? 'Marcar como lista' : undefined
         }
         reasonPrompt={reviewAction === 'complete' ? ON_BEHALF_PROMPT : undefined}
         summary={summary}
