@@ -27,17 +27,17 @@ export function QuotationReferenceTaskModal({
   versionId: string;
   versionNumber: number;
   reference: ReferenceTask;
-  mode?: 'create' | 'edit';
+  mode?: 'create' | 'edit' | 'duplicate';
   onClose: () => void;
 }) {
   const create = useCreateProjectModuleTask();
   const initialTeamId = reference.teamId && project.teams.some((t) =>
     t.teamId === reference.teamId) ? reference.teamId : '';
-  const [name, setName] = useState(reference.name);
+  const [name, setName] = useState(mode === 'duplicate' ? reference.name + ' (copia)' : reference.name);
   const [description, setDescription] = useState(reference.description ?? '');
   const candidateBlocks = project.modules.find((module) => module.id === moduleId)
     ?.segments.filter((segment) => segment.teamId === initialTeamId) ?? [];
-  const initialBlock = mode === 'edit' && candidateBlocks.length === 1 ? candidateBlocks[0] : null;
+  const initialBlock = mode !== 'create' && candidateBlocks.length === 1 ? candidateBlocks[0] : null;
   const [blockId, setBlockId] = useState(initialBlock?.id ?? '');
   const [status, setStatus] = useState<'todo' | 'in_progress'>('todo');
   const [targetModuleId, setTargetModuleId] = useState(moduleId ?? '');
@@ -51,7 +51,7 @@ export function QuotationReferenceTaskModal({
     ? 'qa' : role.includes('ux') || role.includes('diseñ') ? 'diseno'
       : role.includes('pmo') ? 'revision_cliente' : 'desarrollo';
   const [scope, setScope] = useState<ProjectModuleTaskScope | ''>(
-    mode === 'edit' ? suggestedScope : '',
+    mode !== 'create' ? suggestedScope : '',
   );
   const [error, setError] = useState('');
   // La tarea referencial tiene equipo fijo: asignar personas nunca lo cambia.
@@ -62,9 +62,10 @@ export function QuotationReferenceTaskModal({
   const selectedBlock = eligibleBlocks.find((segment) => segment.id === blockId);
   const chosenDatesFitBlock = !selectedBlock ||
     (startDate >= selectedBlock.startDate && date <= selectedBlock.endDate);
-  const sourceMarker = 'Referencia cotización ' + versionId + ' · WBS ' +
+  const sourceMarker = (mode === 'duplicate' ? 'Copia de referencia de cotización ' :
+    'Referencia cotización ') + versionId + ' · WBS ' +
     reference.wbs + ' · ' + reference.role;
-  const formValid = Boolean(targetModuleId && name.trim() && teamId && (mode === 'edit' || assignee) && scope && startDate && date &&
+  const formValid = Boolean(targetModuleId && name.trim() && teamId && (mode !== 'create' || assignee) && scope && startDate && date &&
     startDate <= date && Boolean(selectedBlock) && chosenDatesFitBlock && Number(hours) > 0 &&
     Number.isFinite(Number(hours)) && Number(hours) <= 1_000_000);
   const submit = async () => {
@@ -98,14 +99,15 @@ export function QuotationReferenceTaskModal({
     }
   };
   return (
-    <Modal open title={mode === 'edit' ? 'Editar tarea' : 'Nueva tarea'}
+    <Modal open title={mode === 'edit' ? 'Editar tarea' :
+      mode === 'duplicate' ? 'Duplicar tarea' : 'Nueva tarea'}
       description={'Referencia EDT · v' + versionNumber + ' · ' + reference.wbs}
       onClose={onClose} dismissible={!create.isPending}
       footer={<div className={styles.actions}>
         <Button variant="outline" disabled={create.isPending} onClick={onClose}>Cancelar</Button>
         <Button disabled={!formValid || create.isPending}
           loading={create.isPending} onClick={() => void submit()}>
-          {mode === 'edit' ? 'Guardar cambios' : 'Crear tarea'}
+          {mode === 'edit' ? 'Guardar cambios' : mode === 'duplicate' ? 'Crear copia' : 'Crear tarea'}
         </Button>
       </div>}>
       <div className={styles.fields}>
@@ -133,7 +135,7 @@ export function QuotationReferenceTaskModal({
           }} />
         <p className={styles.help}>Solo aparecen colaboradores activos del equipo
           responsable de esta tarea.
-          {mode === 'edit' && ' Si todavía no hay personas, puedes guardar la tarea por asignar.'}
+          {mode !== 'create' && ' Si todavía no hay personas, puedes guardar la tarea por asignar.'}
         </p>
         {initialTeamId && members.length === 0 && (
           <p className={styles.help}>

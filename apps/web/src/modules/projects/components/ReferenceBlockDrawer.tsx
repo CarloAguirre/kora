@@ -2,7 +2,9 @@ import type { AppliedQuotationPlanning, ProjectDetail, ProjectModule, ProjectMod
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
-import { PencilIcon } from '@/shared/components/icons/Icons';
+import { CopyIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { RoadmapTaskStatusBadges } from './RoadmapTaskStatusBadges';
+import taskStyles from './SegmentDrawer.module.css';
 import styles from './ProjectModulesCard.module.css';
 
 type CommercialModule = AppliedQuotationPlanning['modules'][number];
@@ -14,7 +16,8 @@ type CommercialTask = CommercialModule['tasks'][number];
  * de creación normal con fechas/colaborador y sus validaciones de backend. */
 export function ReferenceBlockDrawer({
   project, module, block, reference, versionId, onClose, onPlan,
-  onCreateReference, onEditTask, onDuplicateTask,
+  onCreateReference, onEditTask, onDuplicateTask, onDeleteTask,
+  onEditReference, onDuplicateReference, onDeleteReference,
 }: {
   project: ProjectDetail;
   module: ProjectModule;
@@ -26,6 +29,10 @@ export function ReferenceBlockDrawer({
   onCreateReference?: (task: CommercialTask) => void;
   onEditTask?: (task: ProjectModuleTask) => void;
   onDuplicateTask?: (task: ProjectModuleTask) => void;
+  onDeleteTask?: (task: ProjectModuleTask) => void;
+  onEditReference?: (task: CommercialTask) => void;
+  onDuplicateReference?: (task: CommercialTask) => void;
+  onDeleteReference?: (task: CommercialTask) => void;
 }) {
   const alreadyStarted = project.status === 'active' && Boolean(project.startDate);
   const team = project.teams.find((entry) => entry.teamId === block.teamId);
@@ -82,34 +89,67 @@ export function ReferenceBlockDrawer({
             : 'Las referencias EDT deben convertirse en tareas con fechas antes de asignarlas.'}</span>
         </div>
       </div>}
-      <div className={styles.drawerSection}>
-        <div className={styles.drawerTaskHeading}>
-          <h4>Tareas ({pending.length + savedTasks.length})</h4>
+      <section className={[styles.drawerSection, taskStyles.tasksSection].join(' ')}
+        aria-label="Tareas del bloque">
+        <div className={taskStyles.tasksHeading}>
+          <h3>Tareas ({pending.length + savedTasks.length})</h3>
           {onCreateReference && pending.length > 0 && <Button variant="outline" size="sm"
-            onClick={() => onCreateReference(pending[0]!)}>Asignar tareas</Button>}
+            onClick={() => onCreateReference(pending[0]!)}>Asignar tareas EDT</Button>}
         </div>
-        <ul className={styles.drawerTaskList}>
-          {savedTasks.map((task) => <li className={styles.drawerTaskRow} key={task.id}>
-            <div><strong>{task.name}</strong>
-              <small>{task.assigneeName ?? 'Sin asignar'} · {task.estimatedHours ?? '—'} HH est.</small>
+        <ul className={taskStyles.taskList}>
+          {savedTasks.map((task) => <li className={taskStyles.taskRow} key={task.id}>
+            <div className={taskStyles.taskInfo}>
+              <strong>{task.name}</strong>
+              <small>{task.assigneeName ?? 'Sin asignar'} · {task.estimatedHours ?? '—'} HH est.
+                {' '} / {task.actualHours ?? '—'} HH reales
+                {' '}· Límite {task.date ? task.date.split('-').reverse().join('-') : '—'}</small>
             </div>
-            {onEditTask && <button type="button" className={styles.taskIconAction}
-              aria-label={'Editar tarea ' + task.name} onClick={() => onEditTask(task)}>
-              <PencilIcon size={15} />
-            </button>}
-            {onDuplicateTask && <Button variant="ghost" size="sm"
-              onClick={() => onDuplicateTask(task)}>Duplicar</Button>}
+            <span className={taskStyles.taskStatusGroup}>
+              <RoadmapTaskStatusBadges status={task.status}
+                assigned={Boolean(task.assigneeUserId)}
+                rejectionReason={task.rejectionReason} />
+            </span>
+            <div className={taskStyles.taskActions}>
+              {onEditTask && <Button variant="ghost" size="icon" title="Editar tarea"
+                aria-label={'Editar tarea ' + task.name} onClick={() => onEditTask(task)}>
+                <PencilIcon size={14} />
+              </Button>}
+              {onDuplicateTask && <Button variant="ghost" size="icon" title="Duplicar tarea"
+                aria-label={'Duplicar tarea ' + task.name} onClick={() => onDuplicateTask(task)}>
+                <CopyIcon size={14} />
+              </Button>}
+              {onDeleteTask && <Button variant="ghost" size="icon" title="Eliminar tarea"
+                aria-label={'Eliminar tarea ' + task.name} onClick={() => onDeleteTask(task)}>
+                <TrashIcon size={14} />
+              </Button>}
+            </div>
           </li>)}
-          {pending.map((task) => <li className={styles.drawerTaskRow}
+          {pending.map((task) => <li className={taskStyles.taskRow}
             key={task.wbs + ':' + task.role}>
-            <div><strong>{task.name}</strong>
+            <div className={taskStyles.taskInfo}>
+              <strong>{task.name}</strong>
               <small>Sin asignar · {task.hours} HH est. · Referencia EDT, sin fechas operativas</small>
             </div>
-            {onCreateReference && <Button size="sm" variant="ghost"
-              onClick={() => onCreateReference(task)}>Asignar tarea</Button>}
+            <span className={taskStyles.taskStatusGroup}>
+              <RoadmapTaskStatusBadges status="todo" assigned={false} />
+            </span>
+            <div className={taskStyles.taskActions}>
+              {onEditReference && <Button variant="ghost" size="icon" title="Editar tarea"
+                aria-label={'Editar tarea ' + task.name} onClick={() => onEditReference(task)}>
+                <PencilIcon size={14} />
+              </Button>}
+              {onDuplicateReference && <Button variant="ghost" size="icon" title="Duplicar tarea"
+                aria-label={'Duplicar tarea ' + task.name} onClick={() => onDuplicateReference(task)}>
+                <CopyIcon size={14} />
+              </Button>}
+              {onDeleteReference && <Button variant="ghost" size="icon" title="Eliminar tarea"
+                aria-label={'Eliminar tarea ' + task.name} onClick={() => onDeleteReference(task)}>
+                <TrashIcon size={14} />
+              </Button>}
+            </div>
           </li>)}
         </ul>
-      </div>
+      </section>
     </div>
   </Modal>;
 }

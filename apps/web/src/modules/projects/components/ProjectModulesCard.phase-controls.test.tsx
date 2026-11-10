@@ -455,11 +455,14 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     expect(screen.getByText('Sin fechas, 120 HH de fase')).toBeInTheDocument();
   });
 
-  it('ofrece planificar mientras no exista un segmento de ese equipo y fase', () => {
+  it('quita Planificar bloque de la fila y lo conserva dentro del panel lateral', () => {
     seedReference();
     show();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
-    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    const drawer = screen.getByRole('dialog', { name: 'Diseño Backend' });
+    expect(within(drawer).getByRole('button', { name: 'Planificar bloque' })).toBeEnabled();
     expect(screen.queryByText('Bloque planificado')).not.toBeInTheDocument();
   });
 
@@ -484,11 +487,53 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     expect(mocks.createSegment).not.toHaveBeenCalled();
   });
 
+  it('la tarea EDT desde el lateral abre edición y duplicación como modales, sin crear al abrir', () => {
+    seedReference();
+    mocks.appliedPlan.modules[0]!.tasks = [{
+      wbs: 'WBS-UX-01', role: 'UX-UI', name: 'Diseñar interfaz',
+      hours: 28, teamId: 'team-1',
+    }];
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    let drawer = screen.getByRole('dialog', { name: 'Diseño Backend' });
+    expect(within(drawer).getByText('Por asignar')).toBeInTheDocument();
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Editar tarea Diseñar interfaz' }));
+    expect(screen.getByRole('dialog', { name: 'Editar tarea' })).toBeInTheDocument();
+    expect(mocks.createTask).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Editar tarea' }))
+      .getByRole('button', { name: 'Cancelar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    drawer = screen.getByRole('dialog', { name: 'Diseño Backend' });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Duplicar tarea Diseñar interfaz' }));
+    expect(screen.getByRole('dialog', { name: 'Duplicar tarea' })).toBeInTheDocument();
+    expect(mocks.createTask).not.toHaveBeenCalled();
+  });
+
+  it('elimina referencia del lateral mediante exclusión y confirmación, no borra la cotización', async () => {
+    seedReference();
+    mocks.appliedPlan.modules[0]!.tasks = [{
+      wbs: 'WBS-UX-01', role: 'UX-UI', name: 'Diseñar interfaz',
+      hours: 28, teamId: 'team-1',
+    }];
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    const drawer = screen.getByRole('dialog', { name: 'Diseño Backend' });
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Eliminar tarea Diseñar interfaz' }));
+    await waitFor(() => expect(mocks.excludeReference).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: { versionId: 'version-1', wbs: 'WBS-UX-01', role: 'UX-UI' },
+    }));
+    expect(mocks.removeTask).not.toHaveBeenCalled();
+  });
+
   it('actualiza el estado a bloque planificado cuando el segmento aparece tras el guardado', () => {
     seedReference();
     const view = show();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
-    expect(screen.getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir bloque Diseño Backend · Desarrollo' }));
+    expect(within(screen.getByRole('dialog', { name: 'Diseño Backend' }))
+      .getByRole('button', { name: 'Planificar bloque' })).toBeInTheDocument();
     view.rerender(
       <ProjectModulesCard project={{
         ...project, modules: [{ ...module, segments: [plannedSegment] }],
