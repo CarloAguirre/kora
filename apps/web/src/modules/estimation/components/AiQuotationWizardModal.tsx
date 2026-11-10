@@ -26,6 +26,17 @@ import styles from './AiQuotationWizardModal.module.css';
 
 const STAGES = ['Análisis', 'Entendimiento', 'Condiciones', 'Aclaraciones', 'Confirmación'] as const;
 
+function PendingModelSummary() {
+  return (
+    <p className={styles.thoughtWaiting} role="status">
+      Esperando respuesta del agente
+      <span className={styles.thoughtDots} aria-hidden="true">
+        <span>.</span><span>.</span><span>.</span>
+      </span>
+    </p>
+  );
+}
+
 function isRealDriveFolderUrl(value: string): boolean {
   try {
     const url = new URL(value);
@@ -1092,43 +1103,32 @@ export function AiQuotationWizardModal({ project, onClose }: {
               )}
             </>
           )}
-          {(sourceStep === 'loading' || sourceStep === 'analyzing' || analysisActivity.length > 0) && (
+          {sourceStep !== 'loading' &&
+            (sourceStep === 'analyzing' || analysisActivity.length > 0) && (
             <details className={[styles.more, styles.thoughtDisclosure].join(' ')} open>
               <summary>Actividad del agente IA en tiempo real</summary>
               <div ref={analysisLogRef} className={styles.thoughtLog} role="log"
                 aria-label="Resúmenes de razonamiento del agente IA"
                 aria-live="polite" aria-relevant="additions text">
-                {sourceStep === 'loading' ? (
-                  <p>Actividad verificada: se están leyendo los documentos autorizados
-                    de Google Drive. el agente IA todavía no ha comenzado el análisis;
-                    sus resúmenes aparecerán cuando se invoque el modelo.</p>
-                ) : (
-                  <>
-                    {analysisActivity.length > 0 ? (
-                      <ol className={styles.thoughtActivity}
-                        aria-label="Actividad verificada del servidor">
-                        {analysisActivity.map((item, index) =>
-                          <li key={index}>
-                            <time className={styles.thoughtTime} dateTime={item.at}>
-                              {new Date(item.at).toLocaleTimeString('es-CL')}
-                            </time>{' '}{item.text}
-                          </li>)}
-                      </ol>
-                    ) : <p>Conectando con el servicio de análisis documental…</p>}
-                    {analysisHeartbeat &&
-                      <p className={styles.thoughtHeartbeat}>{analysisHeartbeat}</p>}
-                    <div className={styles.thoughtModelSummary}>
-                      <strong>Resumen del modelo (opcional)</strong>
-                      <p>{geminiThoughtSummary ||
-                        'El proveedor aún no ha enviado un resumen; los eventos anteriores son actividad de Kora.'}</p>
-                    </div>
-                  </>
-                )}
+                {analysisActivity.length > 0 ? (
+                  <ol className={styles.thoughtActivity}
+                    aria-label="Actividad verificada del servidor">
+                    {analysisActivity.map((item, index) =>
+                      <li key={index}>
+                        <time className={styles.thoughtTime} dateTime={item.at}>
+                          {new Date(item.at).toLocaleTimeString('es-CL')}
+                        </time>{' '}{item.text}
+                      </li>)}
+                  </ol>
+                ) : <p>Conectando con el servicio de análisis documental…</p>}
+                {analysisHeartbeat &&
+                  <p className={styles.thoughtHeartbeat}>{analysisHeartbeat}</p>}
+                {geminiThoughtSummary ? (
+                  <p className={styles.thoughtModelSummary}>{geminiThoughtSummary}</p>
+                ) : sourceStep === 'analyzing' ? (
+                  <PendingModelSummary />
+                ) : null}
               </div>
-              <p className={styles.thoughtFootnote}>
-                La actividad muestra operaciones verificables del servidor;
-                los resúmenes son solo los publicados por el proveedor IA, no su razonamiento interno.
-              </p>
             </details>
           )}
           {saveWarning && <p role="status" className={styles.coverageNote}>{saveWarning}</p>}
@@ -1252,11 +1252,11 @@ export function AiQuotationWizardModal({ project, onClose }: {
               ) : <p>Al generar la estimación, Kora registrará aquí sus operaciones verificables.</p>}
               {proposalHeartbeat &&
                 <p className={styles.thoughtHeartbeat}>{proposalHeartbeat}</p>}
-              <div className={styles.thoughtModelSummary}>
-                <strong>Resumen del modelo (opcional)</strong>
-                <p>{proposalThoughtSummary ||
-                  'Todavía no se ha recibido un resumen del modelo. Las operaciones de Kora se muestran aparte.'}</p>
-              </div>
+              {proposalThoughtSummary ? (
+                <p className={styles.thoughtModelSummary}>{proposalThoughtSummary}</p>
+              ) : generating && (proposalPhase === 'proposal' || proposalPhase === 'edt') ? (
+                <PendingModelSummary />
+              ) : null}
             </div>
             <p className={styles.thoughtFootnote}>
               La cotización se guardará como borrador con revisión IA pendiente.
