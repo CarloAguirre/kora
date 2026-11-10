@@ -141,6 +141,7 @@ export class SharedModule {}
     TeamsModule,
     ProjectsModule,
     ClientsModule,
+    ClientPortalModule,
     HoursModule,
     TicketsModule,
     ForecastModule,
