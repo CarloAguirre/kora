@@ -62,12 +62,6 @@ const NAVIGATION: readonly NavigationItem[] = [
     icon: <FolderOpenIcon size={20} />,
     permission: 'hours:read_own',
   },
-  {
-    to: '/calculadora',
-    label: 'Calculadora',
-    icon: <BarChartIcon size={20} />,
-    permission: 'projects:manage',
-  },
   // Portal de cliente: mismas etiquetas "Proyectos"/"Soporte" que el resto del
   // menú, pero apuntando a las páginas de solo-lectura del propio cliente en
   // vez de a los listados internos — el permiso `own_client` es exclusivo del
