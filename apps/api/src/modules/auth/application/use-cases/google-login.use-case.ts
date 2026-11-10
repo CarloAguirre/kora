@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, UnauthorizedError, ForbiddenError, type ApplicationError, type Result } from '@kora/core';
 import { AUTH_ERROR_CODES } from '@kora/contracts';
 import { Email } from '../../../users/domain/value-objects/email.vo';
+import { ClientPortalLoginAccessService } from '../../infrastructure/client-portal-login-access.service';
 import {
   USER_REPOSITORY,
   type UserRepository,
@@ -47,6 +48,7 @@ export class GoogleLoginUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly sessionIssuer: SessionIssuerService,
     private readonly config: AppConfigService,
+    private readonly portalLoginAccess: ClientPortalLoginAccessService,
   ) {}
 
   async execute(command: GoogleLoginCommand): Promise<Result<LoginOutcome, ApplicationError>> {
@@ -82,17 +84,21 @@ export class GoogleLoginUseCase
     }
     const email = emailResult.value;
 
-    if (!email.belongsToAnyDomain(this.config.auth.allowedEmailDomains)) {
+    const user = await this.users.findByEmail(email);
+    const isExternalContact = user && !user.isDeleted && user.role === 'cliente';
+    const portalEnabled = isExternalContact
+      ? await this.portalLoginAccess.isEnabled(user.id, email.value)
+      : false;
+    if ((!email.belongsToAnyDomain(this.config.auth.allowedEmailDomains) && !portalEnabled) ||
+      (isExternalContact && !portalEnabled)) {
       await this.recordFailure(command, null, email.value, 'domain_not_allowed');
       return err(
         new ForbiddenError(
-          'Este correo no pertenece a un dominio autorizado.',
+          'Este correo no pertenece a un dominio autorizado o su acceso al portal fue revocado.',
           AUTH_ERROR_CODES.EMAIL_DOMAIN_NOT_ALLOWED,
         ),
       );
     }
-
-    const user = await this.users.findByEmail(email);
     if (!user || user.isDeleted) {
       await this.recordFailure(command, null, email.value, 'no_account');
       return err(
