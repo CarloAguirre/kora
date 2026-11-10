@@ -179,7 +179,7 @@ export function ProjectModulesCard({
   const [creatingFromReference, setCreatingFromReference] = useState<{
     moduleId: string | null;
     task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
-    mode?: 'create' | 'edit';
+    mode?: 'create' | 'edit' | 'duplicate';
   } | null>(null);
   const onCreateWorkBlock = async (input: WorkBlockFormInput) => {
     if (!planningBlock) return;
@@ -596,6 +596,14 @@ export function ProjectModulesCard({
           onDuplicateTask={canManage ? (task) => {
             setDuplicatingTask({ moduleId: module.id, task }); close();
           } : undefined}
+          onDeleteTask={canManage ? (task) => { void onRemoveTask(module, task); close(); } : undefined}
+          onEditReference={canManage ? (task) => {
+            setCreatingFromReference({ moduleId: module.id, task, mode: 'edit' }); close();
+          } : undefined}
+          onDuplicateReference={canManage ? (task) => {
+            setCreatingFromReference({ moduleId: module.id, task, mode: 'duplicate' }); close();
+          } : undefined}
+          onDeleteReference={canManage ? (task) => { void onDiscardReference(module, task); } : undefined}
         />
       ) : null;
     }
@@ -748,19 +756,6 @@ export function ProjectModulesCard({
         ) : undefined}
         operationalFooter={canManage && planningMode ? <Button variant="tertiary" size="sm"
           onClick={() => setAddingPhase(true)}>+ Agregar fase</Button> : undefined}
-        onPlanOperationalRow={canManage && planningMode ? (phase, row) => {
-          const module = modulesById.get(phase.id);
-          const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === phase.id)
-            ?.relativeTeamBlocks?.find((block) => block.teamId === row.id);
-          if (module && reference) {
-            setPlanningBlock({
-              moduleId: module.id, teamId: reference.teamId,
-              name: module.name + ' · ' +
-                (teamOptions.find((item) => item.value === reference.teamId)?.label ?? 'Equipo'),
-              estimatedHours: reference.hours,
-            });
-          }
-        } : undefined}
         renderPhaseReferences={renderOperationalContent}
         renderSelectionDetail={renderSelectionDetail}
         renderPhaseHeaderName={renderPhaseHeaderName}
