@@ -56,7 +56,7 @@ vi.mock('@/app/router/paths', () => ({
   projectQuotationPath: () => '/project/quotation',
 }));
 vi.mock('./NewProjectQuotationModal', () => ({
-  NewProjectQuotationModal: () => null,
+  NewProjectQuotationModal: () => <div role="dialog" aria-label="Nueva cotización" />,
 }));
 const project = {
   id:'0777e456-fd76-445e-83f1-afc25061c101',
@@ -75,6 +75,22 @@ beforeEach(() => {
   mocks.remove.mockReset().mockResolvedValue({ deletedVersionId: v1.id });
 });
 describe('Cotizaciones del proyecto', () => {
+  it('deshabilita la creacion de cotizaciones desde el proyecto sin versiones', () => {
+    mocks.versions = [];
+    render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
+    const create = screen.getByRole('button', { name: '+ Nueva cotización' });
+    expect(create).toBeDisabled();
+    fireEvent.click(create);
+    expect(screen.queryByRole('dialog', { name: 'Nueva cotización' })).not.toBeInTheDocument();
+  });
+  it('deshabilita nuevas versiones sin bloquear la consulta de cotizaciones existentes', () => {
+    render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
+    const create = screen.getByRole('button', { name: '+ Nueva versión' });
+    expect(create).toBeDisabled();
+    fireEvent.click(create);
+    expect(screen.queryByRole('dialog', { name: 'Nueva cotización' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Abrir en calculadora' })).toHaveLength(2);
+  });
   it('permite aprobar la versión 1 aun cuando existe la versión 2', async () => {
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
     const approvals = screen.getAllByRole('button',{name:'Registrar aprobación'});
