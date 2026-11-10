@@ -141,7 +141,7 @@ export function BlockDeliveryFinalizeDialog({
     </div>;
 
   return <>
-    <Modal open={Boolean(open && !showForceConfirmation)}
+    <Modal open={Boolean(open && !showForceConfirmation)} wide={warning}
       title={warning ? 'Aún no se puede marcar la entrega' : 'Marcar como entregada'}
       onClose={onClose} dismissible={!busy}
       footer={warning ? <div className={styles.warningFooter}>
@@ -175,7 +175,7 @@ export function BlockDeliveryFinalizeDialog({
         {error && <p className={styles.error} role="alert">{error}</p>}
       </div>
     </Modal>
-    <Modal open={Boolean(showForceConfirmation)} title="Marcar como entregada"
+    <Modal open={Boolean(showForceConfirmation)} wide title="Marcar como entregada"
       onClose={() => setForceConfirm(false)} dismissible={!busy}
       footer={<>
         <Button variant="outline" disabled={busy}
