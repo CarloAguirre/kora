@@ -188,6 +188,23 @@ function EditEntryForm({
     .filter((e) => e.id !== entry.id && e.status !== 'rejected' && !e.isOvertime)
     .reduce((sum, e) => sum + e.hours, 0);
   const nonOvertimeTotal = otherNonOvertimeHours + (block.isOvertime ? 0 : Number(block.hours) || 0);
+  const editableProject = projects.find((project) => project.id === block.projectId);
+  const maxHours = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment) &&
+    editableProject && !editableProject.allowsOvertime && !block.isOvertime
+    ? Math.max(0, Math.round((DAILY_CAP_HOURS - otherNonOvertimeHours) * 100) / 100)
+    : undefined;
+  const updateBlock = (patch: Partial<DailyBlock>) => {
+    setBlock((prev) => {
+      const next = { ...prev, ...patch };
+      const project = projects.find((item) => item.id === next.projectId);
+      if (PROJECT_REQUIRING_ASSIGNMENTS.has(next.assignment) &&
+          project && !project.allowsOvertime && !next.isOvertime) {
+        const max = Math.max(0, Math.round((DAILY_CAP_HOURS - otherNonOvertimeHours) * 100) / 100);
+        if (Number(next.hours) > max) next.hours = max > 0 ? String(max) : '';
+      }
+      return next;
+    });
+  };
   /** Lo que el backend dejará como horas extra al guardar (ver `splitByDailyCap`). */
   const autoOvertimeHours = overflowByBlock(otherNonOvertimeHours, [block.isOvertime ? 0 : Number(block.hours) || 0])[0] ?? 0;
 
@@ -265,7 +282,7 @@ function EditEntryForm({
         onChange={(event) => setDate(event.target.value)}
       />
 
-      {!blockingMessage && autoOvertimeHours > 0 && (
+      {!blockingMessage && autoOvertimeHours > 0 && (!PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment) || editableProject?.allowsOvertime) && (
         <div className={styles.noticeWarning} role="status">
           <AlertIcon size={16} />
           <span>
@@ -292,12 +309,13 @@ function EditEntryForm({
         isCollaborator={ownerRequiresApprover}
         overtimeNeedsApproval={overtimeNeedsApproval}
         exceedsDailyCap={autoOvertimeHours > 0}
+        maxHours={maxHours}
         error={blockError ?? undefined}
         title={blockTitle}
-        onUpdate={(patch) => setBlock((prev) => ({ ...prev, ...patch }))}
+        onUpdate={updateBlock}
         onRemove={() => undefined}
         onToggleExpand={() => setBlock((prev) => ({ ...prev, expanded: !prev.expanded }))}
-        onAdjustHours={(delta) => setBlock((prev) => ({ ...prev, hours: stepBlockHours(prev.hours, delta) }))}
+        onAdjustHours={(delta) => updateBlock({ hours: stepBlockHours(block.hours, delta) })}
         ownerUserId={entry.user.id}
       />
 
