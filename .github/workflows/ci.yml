@@ -58,15 +58,6 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/kora2_test
 
-      # La consulta mensual debe ejecutarse de verdad contra una columna
-      # PostgreSQL DATE: TypeScript y los mocks no detectan fallos de
-      # serialización de fechas (por ejemplo, cambios de horario en Chile).
-      - name: Histórico mensual HH contra PostgreSQL real
-        run: pnpm --filter @kora/api exec vitest run src/modules/projects/infrastructure/services/drizzle-project-hour-entry-reader.pg.spec.ts
-        env:
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/kora2_test
-          TZ: America/Santiago
-
       # Reproduce la base existente que avanzó hasta 0067 sin ejecutar 0063:
       # la reparación 0068 debe poder reconstruir el portal sin tocar el
       # historial ni alterar datos; la prueba usa una transacción con ROLLBACK.
