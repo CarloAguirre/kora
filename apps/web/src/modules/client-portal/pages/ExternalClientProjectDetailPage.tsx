@@ -16,9 +16,9 @@ import {
   TrendingUpIcon,
 } from '@/shared/components/icons/Icons';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
-import { CommittedDeliveriesRoadmap, type CommittedDelivery } from '../components/CommittedDeliveriesRoadmap';
+import { CommittedDeliveriesRoadmap } from '../components/CommittedDeliveriesRoadmap';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
-import { toExternalPhaseRoadmap, externalProjectBitacora } from '../adapters/external-project-presentation.adapter';
+import { toExternalPhaseRoadmap, externalProjectBitacora, deliveriesGroupedByPhase } from '../adapters/external-project-presentation.adapter';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
 import { StatusPill } from '../components/StatusPill';
@@ -156,20 +156,7 @@ export function ExternalClientProjectDetailPage() {
       <Link to="/portal/proyectos">Volver a proyectos</Link></Card>
   </DashboardLayout>;
 
-  // Las entregas pertenecen a su fase; no hay listado global duplicado.
-  // La clave es el identificador de la fase, no el nombre ni su posición.
-  const deliveriesByPhase = new Map<string, CommittedDelivery[]>(project.modules.map((phase) => [
-    phase.id,
-    phase.deliveries.map((delivery) => ({
-      id: delivery.id,
-      name: delivery.name ?? (delivery.teamName ? `Entrega ${delivery.teamName}` : 'Entrega'),
-      phase: phase.name,
-      team: delivery.teamName,
-      estimatedDate: delivery.estimatedDate,
-      status: delivery.status,
-      received: receiptIds.has(delivery.id),
-    })),
-  ]));
+  const deliveriesByPhase = deliveriesGroupedByPhase(project, receiptIds);
   const billing = billingForPortal(project);
   const history = externalProjectBitacora(project, data.receipts, data.activity);
   const nativeRoadmap = toExternalPhaseRoadmap(project);
