@@ -20,6 +20,8 @@ import { CommittedDeliveriesRoadmap } from '../components/CommittedDeliveriesRoa
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { toExternalPhaseRoadmap, externalProjectBitacora, deliveriesGroupedByPhase } from '../adapters/external-project-presentation.adapter';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
+import { ProjectBusinessImpact } from '../components/ProjectBusinessImpact';
+import { toClientBusinessImpact } from '../adapters/business-impact.adapter';
 import { ProjectBitacora } from '../components/ProjectBitacora';
 import { StatusPill } from '../components/StatusPill';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
@@ -193,8 +195,7 @@ export function ExternalClientProjectDetailPage() {
         </p>
         <div className={styles.sectionToggles} data-client-portal-actions role="group" aria-label="Mostrar u ocultar secciones">
           {SECTION_TOGGLES.map(({ key, label, icon: Icon }) => {
-            const available = key === 'impact' ? project.impactBeforeHours != null || project.impactAfterHours != null
-              : key === 'qa' ? project.qaPlannedTests != null : true;
+            const available = key === 'qa' ? project.qaPlannedTests != null : true;
             return (
               <button key={key} type="button" disabled={!available}
                 className={[styles.sectionToggle, visible(key) && available ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
@@ -345,35 +346,7 @@ export function ExternalClientProjectDetailPage() {
           />
         </section>}
 
-        {visible('impact') && (project.impactBeforeHours != null || project.impactAfterHours != null) && (
-          <section className={styles.section}>
-            <h3 className={styles.sectionTitle}>Impacto en el negocio</h3>
-            <div className={[styles.impactCard, detailStyles.impactCard].join(' ')}>
-              <div className={detailStyles.impactColumn}>
-                <strong className={detailStyles.impactTitle}>Antes de automatizar</strong>
-                <div className={detailStyles.impactRow}><span>Tiempo total del proceso</span><strong>{project.impactBeforeHours ?? '—'} horas</strong></div>
-                <div className={detailStyles.impactRow}><span>Personas involucradas</span><strong>{project.impactBeforePeople ?? '—'}</strong></div>
-                <div className={detailStyles.impactRow}><span>Duración calendario</span><strong>{project.impactBeforeDuration ?? '—'}</strong></div>
-                <div className={detailStyles.impactRow}><span>Modalidad</span><strong>{project.impactBeforeModality ?? '—'}</strong></div>
-              </div>
-              <div className={detailStyles.impactColumn}>
-                <strong className={detailStyles.impactTitle}>Después de automatizar</strong>
-                <div className={detailStyles.impactRow}><span>Tiempo total del proceso</span><strong>{project.impactAfterHours ?? '—'} horas</strong></div>
-                <div className={detailStyles.impactRow}><span>Personas involucradas</span><strong>{project.impactAfterPeople ?? '—'}</strong></div>
-                <div className={detailStyles.impactRow}><span>Duración calendario</span><strong>{project.impactAfterDuration ?? '—'}</strong></div>
-                <div className={detailStyles.impactRow}><span>Modalidad</span><strong>{project.impactAfterModality ?? '—'}</strong></div>
-              </div>
-              <div className={detailStyles.impactResult}>
-                {project.impactBeforeHours != null && project.impactBeforeHours > 0 && project.impactAfterHours != null
-                  ? <>
-                      <strong>{Math.round((project.impactAfterHours - project.impactBeforeHours) / project.impactBeforeHours * 100)}%</strong>
-                      <span>variación del tiempo del proceso</span>
-                    </>
-                  : <span>Sin datos suficientes para calcular el impacto</span>}
-              </div>
-            </div>
-          </section>
-        )}
+        {visible('impact') && <ProjectBusinessImpact impact={toClientBusinessImpact(project)} />}
 
         {visible('qa') && project.qaPlannedTests != null && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Métricas de la etapa actual</h3>
@@ -389,10 +362,6 @@ export function ExternalClientProjectDetailPage() {
           <h3 className={styles.sectionTitle}>Bitácora</h3>
           <ProjectBitacora entries={history}/>
         </section>}
-        <footer className={detailStyles.credit}>
-          <span>Diseñado y desarrollado por</span>
-          <KabeliLogo/>
-        </footer>
       </div>
       <Modal open={!!selected} title="Confirmar recepción" onClose={() => setConfirmId(null)}
         dismissible={!receive.isPending}
