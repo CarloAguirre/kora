@@ -8,13 +8,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useStoredState } from '@/shared/hooks/useStoredState';
-import { useAuth } from '@/modules/auth/hooks/useAuth';
-import {
-  BarChartIcon, BuildingIcon, CalendarIcon, ChevronLeftIcon, CircleCheckIcon, ClockIcon,
-  DollarSignIcon, DownloadIcon, EyeIcon, HistoryIcon, LinkIcon, ListIcon,
-  TrendingUpIcon,
-} from '@/shared/components/icons/Icons';
+import { BuildingIcon, ChevronLeftIcon, ClockIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';ns';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
 import { CommittedDeliveriesRoadmap } from '../components/CommittedDeliveriesRoadmap';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
@@ -54,24 +48,6 @@ function billingForPortal(project: PortalProjectDetail): ClientProjectBilling {
   };
 }
 
-/** Misma botonera del diseño y de la Vista Cliente interna. Cada icono controla
- * una sección de la ficha, no la autorización ni los datos del proyecto. */
-type SectionKey = 'info' | 'billing' | 'progress' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
-const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
-  { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
-  { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
-  { key: 'progress', label: 'Avance del proyecto', icon: CircleCheckIcon },
-  { key: 'hours', label: 'Horas y avance', icon: ClockIcon },
-  { key: 'gantt', label: 'Roadmap por fases', icon: CalendarIcon },
-  { key: 'impact', label: 'Impacto en el negocio', icon: TrendingUpIcon },
-  { key: 'qa', label: 'Métricas QA', icon: BarChartIcon },
-  { key: 'bitacora', label: 'Bitácora', icon: HistoryIcon },
-];
-const DEFAULT_PREFS: {
-  sections: Partial<Record<SectionKey, boolean>>;
-  usedHoursVisible: boolean;
-} = { sections: {}, usedHoursVisible: true };
-
 /**
  * Exclusiva del perfil cliente: no reutiliza /projects/:id ni altera
  * ClientProjectDetailPage (la Vista Cliente interna de PMO).
@@ -79,23 +55,11 @@ const DEFAULT_PREFS: {
 export function ExternalClientProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const toast = useToast();
-  const { user } = useAuth();
   const { data, isLoading, isError } = usePortalProject(projectId ?? null);
   const receive = usePortalReceive(projectId ?? '');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [pdfAction, setPdfAction] = useState<'share' | 'download' | null>(null);
   const project = data?.project;
-  const prefsKey = user?.id && project?.client?.id
-    ? `kora:external-portal-ficha:${user.id}:${project.client.id}` : null;
-  const [prefs, setPrefs] = useStoredState(prefsKey, DEFAULT_PREFS);
-  const visible = (key: SectionKey) => prefs.sections[key] !== false;
-  const toggleSection = (key: SectionKey) =>
-    setPrefs((prev) => ({
-      ...prev, sections: { ...prev.sections, [key]: prev.sections[key] === false },
-    }));
-  const usedHoursVisible = prefs.usedHoursVisible !== false;
-  const toggleUsedHours = () =>
-    setPrefs((prev) => ({ ...prev, usedHoursVisible: prev.usedHoursVisible === false }));
   const shareProjectPdf = async () => {
     if (!projectId || pdfAction) return;
     setPdfAction('share');
@@ -193,30 +157,7 @@ export function ExternalClientProjectDetailPage() {
             dateStyle: 'short', timeStyle: 'short',
           })}
         </p>
-        <div className={styles.sectionToggles} data-client-portal-actions role="group" aria-label="Mostrar u ocultar secciones">
-          {SECTION_TOGGLES.map(({ key, label, icon: Icon }) => {
-            const available = key === 'qa' ? project.qaPlannedTests != null : true;
-            return (
-              <button key={key} type="button" disabled={!available}
-                className={[styles.sectionToggle, visible(key) && available ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
-                aria-label={available ? `${visible(key) ? 'Ocultar' : 'Mostrar'} ${label}` : `${label} (sin datos disponibles)`}
-                aria-pressed={available && visible(key)}
-                data-tooltip={available ? label : `${label} (sin datos)`}
-                onClick={() => toggleSection(key)}>
-                <Icon size={16}/>
-              </button>
-            );
-          })}
-          <button type="button" className={[styles.sectionToggle, usedHoursVisible ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
-            aria-pressed={usedHoursVisible}
-            aria-label={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
-            data-tooltip={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
-            onClick={toggleUsedHours}>
-            <EyeIcon size={16}/>
-          </button>
-        </div>
-
-        {visible('info') && <Card className={styles.infoBar}>
+        <Card className={styles.infoBar}>
           <div className={styles.infoClient}>
             <span className={styles.infoLogoPlaceholder}><BuildingIcon size={20}/></span>
             <div className={styles.infoField}>
@@ -240,25 +181,24 @@ export function ExternalClientProjectDetailPage() {
           </div>
         </Card>}
 
-        {pending.length > 0 && (
+</Card>        {pending.length > 0 && (
           <div className={detailStyles.deliveryNotice} role="status">
             <div className={detailStyles.noticeText}>
               <strong>Tienes {pending.length} entrega{pending.length === 1 ? '' : 's'} esperando tu OK.</strong>
               <span className={detailStyles.noticeHint}>Es un respaldo de que la recibiste.</span>
             </div>
             <button type="button" className={detailStyles.noticeButton} onClick={() => {
-              setPrefs((prev) => ({ ...prev, sections: { ...prev.sections, gantt: true } }));
               requestAnimationFrame(() => document.getElementById('entregas-comprometidas')?.scrollIntoView({ behavior: 'smooth' }));
             }}>Revisar entregas</button>
           </div>
         )}
 
-        {visible('billing') && <section className={styles.section}>
+        <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Facturación</h3>
           <ProjectBillingCard billing={billing}/>
         </section>}
 
-        {visible('progress') && <section className={styles.section}>
+</section>        <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
           <ProjectProgressOverview actualPercent={project.progress.actual}
             expectedPercent={project.progress.expected} startDate={dmy(project.startDate)}
@@ -267,7 +207,7 @@ export function ExternalClientProjectDetailPage() {
               (new Date(project.endDate + 'T00:00:00').getTime() - Date.now()) / 86400000)) : 0}/>
         </section>}
 
-        {visible('hours') && <section className={styles.section}>
+</section>        <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Horas y avance</h3>
           <div className={styles.hoursGrid}>
             <Card className={styles.statCard}>
@@ -279,24 +219,22 @@ export function ExternalClientProjectDetailPage() {
               <div className={styles.hoursDeviationRow}>
                 <span className={styles.statLabel}>Horas de exceso</span>
                 <div className={styles.hoursDeviationValueRow}>
-                  {usedHoursVisible && <span className={styles.statSub}>
+                  <span className={styles.statSub}>
                     {Math.max(0, project.usedHours - project.soldHours).toLocaleString('es-CL', { maximumFractionDigits: 2 })}
-                  </span>}
+                  </span>
                   <StatusPill tone={project.usedHours > project.soldHours ? 'warning' : 'success'}>
                     {project.usedHours > project.soldHours ? 'En riesgo' : 'Sin exceso'}
                   </StatusPill>
                 </div>
               </div>
             </Card>
-            {usedHoursVisible && (
-              <Card className={styles.statCard}>
+            <Card className={styles.statCard}>
                 <span className={styles.statLabel}>Horas utilizadas a la fecha</span>
                 <span className={styles.statValue}>
                   {project.usedHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}
                 </span>
                 <span className={styles.statSub}>Actualizado al {dmy(project.usedHoursUpdatedAt)}</span>
               </Card>
-            )}
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Avance real vs. esperado</span>
               {project.progress.actual !== null && project.progress.expected !== null ? <>
@@ -323,7 +261,7 @@ export function ExternalClientProjectDetailPage() {
           </div>
         </section>}
 
-        {visible('gantt') && <section className={styles.section} id="entregas-comprometidas">
+</section>        <section className={styles.section} id="entregas-comprometidas">
           <div className={styles.sectionHeadingRow}>
             <h3 className={styles.sectionTitle}>Roadmap por Fases</h3>
             <span className={styles.sectionCaption}>Vista por semana de diseño, desarrollo, QA y aprobación por fase</span>
@@ -346,9 +284,9 @@ export function ExternalClientProjectDetailPage() {
           />
         </section>}
 
-        {visible('impact') && <ProjectBusinessImpact impact={toClientBusinessImpact(project)} />}
+</section>        <ProjectBusinessImpact impact={toClientBusinessImpact(project)} />
 
-        {visible('qa') && project.qaPlannedTests != null && <section className={styles.section}>
+        {project.qaPlannedTests != null && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Métricas de la etapa actual</h3>
           <Card>
             <p><strong>Módulo:</strong> {project.qaEvaluatedModule ?? 'General'}</p>
@@ -358,11 +296,11 @@ export function ExternalClientProjectDetailPage() {
           </Card>
         </section>}
 
-        {visible('bitacora') && <section className={styles.section}>
+        <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Bitácora</h3>
           <ProjectBitacora entries={history}/>
         </section>}
-      </div>
+</section>      </div>
       <Modal open={!!selected} title="Confirmar recepción" onClose={() => setConfirmId(null)}
         dismissible={!receive.isPending}
         description="Este OK es constancia de recepción y quedará registrado en el historial del proyecto."
