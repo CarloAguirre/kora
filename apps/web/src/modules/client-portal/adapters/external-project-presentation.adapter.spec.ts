@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PortalActivity, PortalProjectDetail, PortalReceipt } from '../api/client-portal.api';
-import { externalProjectBitacora, toExternalPhaseRoadmap } from './external-project-presentation.adapter';
+import { deliveriesGroupedByPhase, externalProjectBitacora, toExternalPhaseRoadmap } from './external-project-presentation.adapter';
 
 const project = {
   id: 'project-1',
@@ -49,6 +49,34 @@ describe('Presentación externa — datos reales del proyecto', () => {
     // El listado es la única sección de detalles; ninguna tarea interna
     // debe transferirse al Gantt externo.
     expect(result.phases[0]?.taskItems).toEqual([]);
+  });
+
+  it('asigna cada entrega a su fase por ID aunque existan fases con nombres iguales', () => {
+    const sameNameDifferentPhase: PortalProjectDetail = {
+      ...project,
+      modules: [
+        project.modules[0]!,
+        {
+          ...project.modules[0]!,
+          id: 'module-2',
+          deliveries: [{
+            id: 'delivery-2', name: 'Otra entrega', teamName: 'QA',
+            status: 'planned', estimatedDate: '2026-12-01',
+            createdAt: '2026-11-11T10:00:00.000Z',
+          }],
+        },
+      ],
+    };
+    const byPhase = deliveriesGroupedByPhase(sameNameDifferentPhase, new Set(['delivery-1']));
+    expect(byPhase.size).toBe(2);
+    expect(byPhase.get('module-1')).toMatchObject([
+      { id: 'delivery-1', phase: 'Diseño y Arquitectura', received: true },
+    ]);
+    expect(byPhase.get('module-2')).toMatchObject([
+      { id: 'delivery-2', phase: 'Diseño y Arquitectura', received: false },
+    ]);
+    expect(byPhase.get('module-1')).toHaveLength(1);
+    expect(byPhase.get('module-2')).toHaveLength(1);
   });
 
   it('muestra los mismos registros de tarea y entrega que PMO y conserva recepción', () => {
