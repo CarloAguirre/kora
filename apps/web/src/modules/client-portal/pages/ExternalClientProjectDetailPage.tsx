@@ -17,19 +17,17 @@ import {
 } from '@/shared/components/icons/Icons';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
 import { CommittedDeliveriesRoadmap, type CommittedDelivery } from '../components/CommittedDeliveriesRoadmap';
+import { PhaseRoadmap } from '../components/PhaseRoadmap';
+import { toExternalPhaseRoadmap, externalProjectBitacora } from '../adapters/external-project-presentation.adapter';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
 import { StatusPill } from '../components/StatusPill';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
-import { clientPortalApi, usePortalProject, usePortalReceive, type PortalProjectDetail, type PortalReceipt } from '../api/client-portal.api';
-import type { ClientBitacoraEntry, ClientProjectBilling } from '../types';
+import { clientPortalApi, usePortalProject, usePortalReceive, type PortalProjectDetail } from '../api/client-portal.api';
+import type { ClientProjectBilling } from '../types';
 
 const dmy = (value: string | null) => value
   ? new Date(`${value.slice(0,10)}T00:00:00`).toLocaleDateString('es-CL') : '—';
-const localTime = (iso: string) => new Date(iso).toLocaleString('es-CL', {
-  dateStyle: 'short', timeStyle: 'short',
-});
-
 function billingForPortal(project: PortalProjectDetail): ClientProjectBilling {
   const rows = project.paymentMilestones;
   const total = project.contractAmount ?? rows.reduce((n, row) => n + row.amount, 0);
@@ -52,26 +50,6 @@ function billingForPortal(project: PortalProjectDetail): ClientProjectBilling {
       paymentDate: row.paidAt ? dmy(row.paidAt) : null,
     })),
   };
-}
-
-function receivedEvents(project: PortalProjectDetail, receipts: PortalReceipt[]): ClientBitacoraEntry[] {
-  const deliveryMap = new Map(project.modules.flatMap((phase, index) =>
-    phase.deliveries.map((delivery) => [delivery.id, { name: delivery.name, phase: `FASE ${index + 1} - ${phase.name}` }] as const)));
-  return receipts.map((receipt) => {
-    const delivery = deliveryMap.get(receipt.deliveryId);
-    return {
-      id: receipt.deliveryId, kind: 'completed' as const,
-      title: `Recepción de entregable: ${delivery?.name ?? 'Entrega'}`,
-      registeredByName: receipt.receivedByName,
-      registeredAt: localTime(receipt.receivedAt),
-      phaseTag: delivery?.phase ?? null,
-      description: 'El contacto del cliente confirmó la recepción del entregable.',
-      secondaryNote: `✓ Recepción confirmada por ${receipt.receivedByName} el ${localTime(receipt.receivedAt)}`,
-      statusLabel: 'Recibida', statusTone: 'success' as const,
-      isIncident: false, isDeliveryOrTask: true,
-      filterDate: receipt.receivedAt.slice(0, 10),
-    };
-  }).sort((a,b) => b.filterDate.localeCompare(a.filterDate));
 }
 
 /** Misma botonera del diseño y de la Vista Cliente interna. Cada icono controla
@@ -190,7 +168,8 @@ export function ExternalClientProjectDetailPage() {
       received: receiptIds.has(delivery.id),
     })));
   const billing = billingForPortal(project);
-  const history = receivedEvents(project, data.receipts);
+  const history = externalProjectBitacora(project, data.receipts, data.activity);
+  const nativeRoadmap = toExternalPhaseRoadmap(project);
   const accessLinks = [
     { label: 'Demostración', href: project.demoLink },
     { label: 'Ambiente de pruebas', href: project.testEnvironmentLink },
@@ -307,39 +286,69 @@ export function ExternalClientProjectDetailPage() {
 
         {visible('hours') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Horas y avance</h3>
-          <div className={detailStyles.hoursGrid}>
-            <div className={detailStyles.hourCard}>
-              <span className={detailStyles.hourLabel}>Horas estimadas</span>
-              <span className={detailStyles.hourValue}>{project.soldHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}</span>
-              <span className={detailStyles.hourFoot}>Horas comprometidas</span>
-              <span className={detailStyles.hourLabel}>Horas de exceso</span>
-              <span className={project.usedHours > project.soldHours ? detailStyles.attentionDeviation : detailStyles.goodDeviation}>
-                {usedHoursVisible ? Math.max(0, project.usedHours - project.soldHours).toLocaleString('es-CL', { maximumFractionDigits: 2 }) : 'Oculto'}
-                {usedHoursVisible && project.usedHours <= project.soldHours ? ' · Sin exceso' : ''}
+          <div className={styles.hoursGrid}>
+            <Card className={styles.statCard}>
+              <span className={styles.statLabel}>Horas estimadas</span>
+              <span className={[styles.statValue, styles.statValueLarge].join(' ')}>
+                {project.soldHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}
               </span>
-            </div>
-            <div className={detailStyles.hourCard}>
-              <span className={detailStyles.hourLabel}>Horas utilizadas a la fecha</span>
-              <span className={detailStyles.hourValue}>{usedHoursVisible
-                ? project.usedHours.toLocaleString('es-CL', { maximumFractionDigits: 2 }) : '•••'}</span>
-              <span className={detailStyles.hourFoot}>Actualizado al {dmy(project.usedHoursUpdatedAt)}</span>
-            </div>
-            <div className={detailStyles.hourCard}>
-              <span className={detailStyles.hourLabel}>Avance real vs. esperado</span>
-              <span className={detailStyles.hourValue}>{project.progress.actual == null ? '—' : String(project.progress.actual) + '%'}</span>
-              <span className={detailStyles.hourFoot}>vs. {project.progress.expected == null ? 'sin plan' : String(project.progress.expected) + '% esperado'}</span>
-            </div>
-            <div className={[detailStyles.hourCard, detailStyles.hourCardHighlight].join(' ')}>
-              <span className={detailStyles.hourLabel}>Fecha fin del proyecto</span>
-              <span className={detailStyles.hourValue}>{dmy(project.endDate)}</span>
-              <span className={detailStyles.hourFoot}>{project.endDate ? 'Fecha de entrega planificada' : 'Sin fecha comprometida'}</span>
-            </div>
+              <span className={styles.statSub}>Horas comprometidas</span>
+              <div className={styles.hoursDeviationRow}>
+                <span className={styles.statLabel}>Horas de exceso</span>
+                <div className={styles.hoursDeviationValueRow}>
+                  {usedHoursVisible && <span className={styles.statSub}>
+                    {Math.max(0, project.usedHours - project.soldHours).toLocaleString('es-CL', { maximumFractionDigits: 2 })}
+                  </span>}
+                  <StatusPill tone={project.usedHours > project.soldHours ? 'warning' : 'success'}>
+                    {project.usedHours > project.soldHours ? 'En riesgo' : 'Sin exceso'}
+                  </StatusPill>
+                </div>
+              </div>
+            </Card>
+            {usedHoursVisible && (
+              <Card className={styles.statCard}>
+                <span className={styles.statLabel}>Horas utilizadas a la fecha</span>
+                <span className={styles.statValue}>
+                  {project.usedHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}
+                </span>
+                <span className={styles.statSub}>Actualizado al {dmy(project.usedHoursUpdatedAt)}</span>
+              </Card>
+            )}
+            <Card className={styles.statCard}>
+              <span className={styles.statLabel}>Avance real vs. esperado</span>
+              {project.progress.actual !== null && project.progress.expected !== null ? <>
+                <div className={styles.progressValueRow}>
+                  <span className={styles.statValue}>{project.progress.actual}%</span>
+                  <span className={styles.deviationBadge}>
+                    {project.progress.actual - project.progress.expected}%
+                  </span>
+                </div>
+                <span className={styles.statSub}>vs. {project.progress.expected}% esperado</span>
+                <div className={styles.progressTrack}>
+                  <div className={styles.progressFill} style={{ width: `${Math.min(100, Math.max(0, project.progress.actual))}%` }}/>
+                  <div className={styles.progressExpectedMarker} style={{ left: `${Math.min(100, Math.max(0, project.progress.expected))}%` }}/>
+                </div>
+              </> : <span className={styles.statSub}>Sin plan cargado</span>}
+            </Card>
+            <Card className={[styles.statCard, styles.statCardDark].join(' ')}>
+              <span className={styles.statLabelDark}>Fecha fin del proyecto</span>
+              <span className={styles.statValueDark}>{dmy(project.endDate)}</span>
+              <span className={styles.statSubDark}>
+                {project.endDate ? 'Fecha de entrega planificada' : 'Sin fecha comprometida'}
+              </span>
+            </Card>
           </div>
         </section>}
 
         {visible('gantt') && <section className={styles.section} id="entregas-comprometidas">
-          <h3 className={styles.sectionTitle}>Roadmap · entregas comprometidas</h3>
-          <CommittedDeliveriesRoadmap deliveries={deliveries} onReview={setConfirmId}/>
+          <div className={styles.sectionHeadingRow}>
+            <h3 className={styles.sectionTitle}>Roadmap por Fases</h3>
+            <span className={styles.sectionCaption}>Vista por semana de diseño, desarrollo, QA y aprobación por fase</span>
+          </div>
+          {/* Las barras y el calendario son el Gantt nativo de Kora. */}
+          <PhaseRoadmap phaseRoadmap={nativeRoadmap}/>
+          <h3 className={styles.sectionTitle}>Entregas comprometidas</h3>
+          <CommittedDeliveriesRoadmap deliveries={deliveries} onReview={setConfirmId} showTimeline={false}/>
         </section>}
 
         {visible('links') && accessLinks.length > 0 && <section className={styles.section}>
@@ -359,7 +368,7 @@ export function ExternalClientProjectDetailPage() {
         {visible('impact') && (project.impactBeforeHours != null || project.impactAfterHours != null) && (
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Impacto en el negocio</h3>
-            <div className={detailStyles.impactCard}>
+            <div className={[styles.impactCard, detailStyles.impactCard].join(' ')}>
               <div className={detailStyles.impactColumn}>
                 <strong className={detailStyles.impactTitle}>Antes de automatizar</strong>
                 <div className={detailStyles.impactRow}><span>Tiempo total del proceso</span><strong>{project.impactBeforeHours ?? '—'} horas</strong></div>
@@ -397,7 +406,7 @@ export function ExternalClientProjectDetailPage() {
         </section>}
 
         {visible('bitacora') && <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Bitácora de recepciones</h3>
+          <h3 className={styles.sectionTitle}>Bitácora</h3>
           <ProjectBitacora entries={history}/>
         </section>}
         <footer className={detailStyles.credit}>
