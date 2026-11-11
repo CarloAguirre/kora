@@ -21,7 +21,7 @@ import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
 import { StatusPill } from '../components/StatusPill';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
-import { usePortalProject, usePortalReceive, type PortalProjectDetail, type PortalReceipt } from '../api/client-portal.api';
+import { clientPortalApi, usePortalProject, usePortalReceive, type PortalProjectDetail, type PortalReceipt } from '../api/client-portal.api';
 import type { ClientBitacoraEntry, ClientProjectBilling } from '../types';
 
 const dmy = (value: string | null) => value
@@ -104,6 +104,7 @@ export function ExternalClientProjectDetailPage() {
   const { data, isLoading, isError } = usePortalProject(projectId ?? null);
   const receive = usePortalReceive(projectId ?? '');
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [pdfAction, setPdfAction] = useState<'share' | 'download' | null>(null);
   const project = data?.project;
   const prefsKey = user?.id && project?.client?.id
     ? `kora:external-portal-ficha:${user.id}:${project.client.id}` : null;
@@ -116,12 +117,43 @@ export function ExternalClientProjectDetailPage() {
   const usedHoursVisible = prefs.usedHoursVisible !== false;
   const toggleUsedHours = () =>
     setPrefs((prev) => ({ ...prev, usedHoursVisible: prev.usedHoursVisible === false }));
-  const shareProjectLink = async () => {
+  const shareProjectPdf = async () => {
+    if (!projectId || pdfAction) return;
+    setPdfAction('share');
     try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.show('Enlace a la ficha copiado. El destinatario necesita acceso al proyecto.', 'success');
-    } catch {
-      toast.show('No se pudo copiar el enlace de la ficha.', 'error');
+      const { url, expiresAt } = await clientPortalApi.sharePdf(projectId);
+      const pdfUrl = new URL(url, window.location.origin).toString();
+      await navigator.clipboard.writeText(pdfUrl);
+      toast.show(`Enlace de descarga del PDF copiado. Caduca el ${new Date(expiresAt).toLocaleString('es-CL')}. Cualquier persona con el enlace podrá descargarlo.`, 'success');
+    } catch (error) {
+      toast.show(error instanceof Error ? error.message : 'No se pudo generar o copiar el enlace de descarga del PDF.', 'error');
+    } finally {
+      setPdfAction(null);
+    }
+  };
+  const downloadProjectPdf = async () => {
+    if (!projectId || pdfAction) return;
+    setPdfAction('download');
+    try {
+      const blob = await clientPortalApi.pdf(projectId);
+      if (blob.type && !blob.type.includes('pdf')) throw new Error('El servidor no entregó un archivo PDF.');
+      const name = (project?.name ?? 'proyecto').normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70);
+      const url = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Kora-${name || 'proyecto'}-seguimiento.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 5_000);
+      }
+    } catch (error) {
+      toast.show(error instanceof Error ? error.message : 'No se pudo descargar el PDF.', 'error');
+    } finally {
+      setPdfAction(null);
     }
   };
   const receiptIds = useMemo(() => new Set((data?.receipts ?? []).map((r) => r.deliveryId)), [data?.receipts]);
@@ -180,10 +212,14 @@ export function ExternalClientProjectDetailPage() {
           <StatusPill tone={project.status === 'active' ? 'success' : 'neutral'}>
             {project.status === 'active' ? 'Activo' : project.status === 'finished' ? 'Finalizado' : 'En seguimiento'}
           </StatusPill>
-          <Button variant="outline" iconLeft={<LinkIcon size={15}/>} onClick={() => void shareProjectLink()}>
+          <Button variant="outline" iconLeft={<LinkIcon size={15}/>}
+            disabled={pdfAction !== null} loading={pdfAction === 'share'}
+            onClick={() => void shareProjectPdf()}>
             Compartir PDF
           </Button>
-          <Button variant="outline" iconLeft={<DownloadIcon size={15}/>} onClick={() => window.print()}>
+          <Button variant="outline" iconLeft={<DownloadIcon size={15}/>}
+            disabled={pdfAction !== null} loading={pdfAction === 'download'}
+            onClick={() => void downloadProjectPdf()}>
             Descargar PDF
           </Button>
         </div>
