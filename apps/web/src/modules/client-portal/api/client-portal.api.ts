@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ClientPortalGrantInput, ProjectModuleTaskScope } from '@kora/contracts';
+import type { ClientPortalGrantInput } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
 /** DTO explícito, nunca reutiliza las respuestas internas /projects o /tickets. */
