@@ -8,6 +8,16 @@
   border-radius: var(--kora-radius-lg);
   box-shadow: var(--kora-shadow-card);
 }
+.cardEmbedded {
+  padding: var(--kora-space-4, 16px) 0 0;
+  margin-top: var(--kora-space-4, 16px);
+  gap: var(--kora-space-3, 12px);
+  border: 0;
+  border-top: 1px solid var(--kora-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
 .topline,.chips,.legend,.dates,.deliveryRow,.help {display:flex;align-items:center}
 .topline{justify-content:space-between;gap:15px;flex-wrap:wrap}
 .chips{gap:8px;flex-wrap:wrap}
@@ -46,7 +56,14 @@
   gap:12px;flex-wrap:wrap;padding:13px 15px;
   background:#fff;border:1px solid #e2e9ef;border-radius:9px;
 }
-.deliveryReceived{background:#f2fbed;border-color:#d8ecc0}
+.deliveryReceived{background:var(--kora-success-surface);border-color:var(--kora-lime-mid)}
+/* Entrega entregada pero aún sin confirmación del cliente: color de Kora,
+   equivalente al hover lima del botón primario, sin pintar las demás filas. */
+.deliveryAwaitingOk{
+  background:var(--kora-lime-hover);
+  border-color:var(--kora-lime-mid);
+}
+.deliveryAwaitingOk:focus-within{outline:2px solid var(--kora-lime-mid);outline-offset:2px}
 .diamond{display:flex;flex-shrink:0}
 .diamond.committed{color:#73869b}.diamond.waiting{color:#efa83b}
 .diamond.received{color:#42a560}.diamond.delayed{color:#d65d58}
