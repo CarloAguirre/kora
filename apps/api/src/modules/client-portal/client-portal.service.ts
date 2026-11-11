@@ -232,6 +232,7 @@ export class ClientPortalService {
       soldHours: project.soldHours, usedHours: project.usedHours,
       usedHoursUpdatedAt: project.usedHoursUpdatedAt, leaderLastActivityAt: project.leaderLastActivityAt,
       progress: project.progress, contractCurrency: project.contractCurrency,
+      contractAmount: project.contractAmount,
       paymentMilestones: project.paymentMilestones.map((m) => ({
         name: m.name, amount: m.amount, percent: m.percent, status: m.status,
         invoiceNumber: m.invoiceNumber, issuedAt: m.issuedAt, paidAt: m.paidAt,
