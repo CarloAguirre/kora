@@ -112,7 +112,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
           <div className={styles.empty}>
             <strong>Este proyecto aún no tiene cotización</strong>
             <p>Créala con el agente IA, en blanco o copiando otra.</p>
-            {eligible ? <Button disabled onClick={() => setNewOpen(true)}>+ Nueva cotización</Button>
+            {eligible ? <Button onClick={() => setNewOpen(true)}>+ Nueva cotización</Button>
               : <span className={styles.helper}>Las nuevas versiones no están disponibles para este proyecto.</span>}
           </div>
         ) : (
@@ -122,7 +122,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                 <h3>Versiones de la cotización</h3>
                 <p>Las versiones enviadas o aprobadas son históricas y no se editan.</p>
               </div>
-              {eligible && <Button size="sm" disabled onClick={() => setNewOpen(true)}>+ Nueva versión</Button>}
+              {eligible && <Button size="sm" onClick={() => setNewOpen(true)}>+ Nueva versión</Button>}
             </div>
             {closed ? (
               <p className={styles.closedNotice}>Cotización aprobada y traspasada a la ficha del proyecto. Historial cerrado: no se pueden crear nuevas versiones.</p>
