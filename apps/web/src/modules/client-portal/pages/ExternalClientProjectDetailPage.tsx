@@ -159,7 +159,6 @@ export function ExternalClientProjectDetailPage() {
     })));
   const billing = billingForPortal(project);
   const history = receivedEvents(project, data.receipts);
-  const hoursDeviation = Math.max(0, project.usedHours - project.soldHours);
   const accessLinks = [
     { label: 'Demostración', href: project.demoLink },
     { label: 'Ambiente de pruebas', href: project.testEnvironmentLink },
