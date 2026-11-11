@@ -6,6 +6,7 @@ import type {
   PortalActivity, PortalObservation, PortalProjectDetail, PortalReceipt,
 } from '../api/client-portal.api';
 import { roleFromTeamName } from './project-detail.adapter';
+import type { CommittedDelivery } from '../components/CommittedDeliveriesRoadmap';
 
 const SCOPE: Readonly<Record<PhaseRoadmapRole, PhaseRoadmapTaskScope>> = {
   pmo: 'desarrollo', ux: 'diseno', qa: 'qa',
@@ -32,6 +33,29 @@ function shortDate(value: string) {
   const iso = dateOnly(value);
   const [yyyy, mm, dd] = iso.split('-');
   return yyyy && mm && dd ? `${dd}-${mm}-${yyyy}` : value;
+}
+
+/**
+ * Agrupa entregas por ID real de la fase. No usar posición ni nombre:
+ * pueden existir fases con el mismo nombre o fases sin entregas.
+ * La agrupación respeta la autorización del endpoint externo.
+ */
+export function deliveriesGroupedByPhase(
+  project: Pick<PortalProjectDetail, 'modules'>,
+  receivedIds: ReadonlySet<string>,
+): Map<string, CommittedDelivery[]> {
+  return new Map(project.modules.map((phase) => [
+    phase.id,
+    phase.deliveries.map((delivery) => ({
+      id: delivery.id,
+      name: delivery.name ?? (delivery.teamName ? `Entrega ${delivery.teamName}` : 'Entrega'),
+      phase: phase.name,
+      team: delivery.teamName,
+      estimatedDate: delivery.estimatedDate,
+      status: delivery.status,
+      received: receivedIds.has(delivery.id),
+    })),
+  ]));
 }
 
 /**
