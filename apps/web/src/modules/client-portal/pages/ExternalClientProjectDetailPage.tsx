@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import styles from './ClientProjectDetailPage.module.css';
+import detailStyles from './ExternalClientProjectDetailPage.module.css';
 import './ExternalClientProjectPrint.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
@@ -10,85 +11,24 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { useStoredState } from '@/shared/hooks/useStoredState';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import {
-  BarChartIcon, CalendarIcon, ChevronLeftIcon, CircleCheckIcon, ClockIcon,
+  BarChartIcon, BuildingIcon, CalendarIcon, ChevronLeftIcon, CircleCheckIcon, ClockIcon,
   DollarSignIcon, DownloadIcon, EyeIcon, HistoryIcon, LinkIcon, ListIcon,
   TrendingUpIcon,
 } from '@/shared/components/icons/Icons';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
-import { PhaseRoadmap } from '../components/PhaseRoadmap';
+import { CommittedDeliveriesRoadmap, type CommittedDelivery } from '../components/CommittedDeliveriesRoadmap';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBitacora } from '../components/ProjectBitacora';
 import { StatusPill } from '../components/StatusPill';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
-import { roleFromTeamName } from '../adapters/project-detail.adapter';
 import { usePortalProject, usePortalReceive, type PortalProjectDetail, type PortalReceipt } from '../api/client-portal.api';
-import type { ClientBitacoraEntry, ClientProjectBilling, ProjectPhaseRoadmap, PhaseRoadmapTaskScope } from '../types';
+import type { ClientBitacoraEntry, ClientProjectBilling } from '../types';
 
 const dmy = (value: string | null) => value
   ? new Date(`${value.slice(0,10)}T00:00:00`).toLocaleDateString('es-CL') : '—';
 const localTime = (iso: string) => new Date(iso).toLocaleString('es-CL', {
   dateStyle: 'short', timeStyle: 'short',
 });
-
-const scopeForTeam = (name: string | null): PhaseRoadmapTaskScope => {
-  const role = roleFromTeamName(name);
-  return role === 'qa' ? 'qa' : role === 'ux' ? 'diseno' : 'desarrollo';
-};
-
-/** Proyección para el Roadmap Kora, sin pedir módulos/tareas internos al navegador. */
-function roadmapForPortal(project: PortalProjectDetail): ProjectPhaseRoadmap {
-  const dates = project.modules.flatMap((phase) => [
-    ...phase.segments.flatMap((segment) => [segment.startDate, segment.endDate]),
-    ...phase.tasks.map((task) => task.date),
-    ...phase.deliveries.map((delivery) => delivery.estimatedDate),
-  ]).filter(Boolean).sort();
-  const today = new Date().toISOString().slice(0, 10);
-  const shift = (iso: string, days: number) => {
-    const date = new Date(`${iso}T12:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-  };
-  return {
-    phaseCount: project.modules.length,
-    teamSegmentCount: project.modules.reduce((sum, phase) => sum + phase.segments.length, 0),
-    plannedDeliveryCount: project.modules.reduce((sum, phase) => sum + phase.deliveries.length, 0),
-    // Evita rango de longitud cero cuando todavía no hay tareas/entregas.
-    rangeStartDate: shift(dates[0] ?? project.startDate ?? today, -7),
-    rangeEndDate: shift(dates.at(-1) ?? project.endDate ?? today, 7),
-    phases: project.modules.map((phase, index) => ({
-      id: phase.id,
-      badge: `FASE ${index + 1}`,
-      name: phase.name,
-      status: phase.currentStage === 'closed' ? 'finished'
-        : phase.tasks.some((t) => (t.startDate ?? t.date) <= today) ? 'in_progress' : 'upcoming',
-      alertLabel: phase.blockerCount > 0 ? `${phase.blockerCount} incidente(s)` : null,
-      tasks: phase.segments.map((segment) => ({
-        id: segment.id,
-        role: roleFromTeamName(segment.teamName),
-        scope: scopeForTeam(segment.teamName),
-        label: segment.name,
-        startDate: segment.startDate,
-        endDate: segment.endDate,
-      })),
-      deliveries: phase.deliveries.map((delivery) => ({
-        id: delivery.id,
-        label: delivery.name ?? (delivery.teamName ? `Entrega ${delivery.teamName}` : 'Entrega'),
-        date: delivery.estimatedDate,
-        state: delivery.status === 'approved' ? 'delivered'
-          : delivery.estimatedDate < today ? 'delayed' : 'committed',
-      })),
-      taskItems: phase.tasks.map((task) => ({
-        id: task.id,
-        label: task.name,
-        date: task.date,
-        state: task.status === 'done' ? 'done' : task.date < today ? 'delayed' : 'upcoming',
-        scope: task.scope,
-      })),
-      scopeProgress: phase.progress.scopes as Record<PhaseRoadmapTaskScope, number | null>,
-      relatedBitacora: [],
-    })),
-  };
-}
 
 function billingForPortal(project: PortalProjectDetail): ClientProjectBilling {
   const rows = project.paymentMilestones;
@@ -207,7 +147,16 @@ export function ExternalClientProjectDetailPage() {
       <Link to="/portal/proyectos">Volver a proyectos</Link></Card>
   </DashboardLayout>;
 
-  const roadmap = roadmapForPortal(project);
+  const deliveries: CommittedDelivery[] = project.modules.flatMap((phase) =>
+    phase.deliveries.map((delivery) => ({
+      id: delivery.id,
+      name: delivery.name ?? (delivery.teamName ? `Entrega ${delivery.teamName}` : 'Entrega'),
+      phase: phase.name,
+      team: delivery.teamName,
+      estimatedDate: delivery.estimatedDate,
+      status: delivery.status,
+      received: receiptIds.has(delivery.id),
+    })));
   const billing = billingForPortal(project);
   const history = receivedEvents(project, data.receipts);
   const hoursDeviation = Math.max(0, project.usedHours - project.soldHours);
