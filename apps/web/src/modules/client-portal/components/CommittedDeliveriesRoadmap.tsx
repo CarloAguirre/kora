@@ -42,11 +42,14 @@ export function CommittedDeliveriesRoadmap({
   deliveries,
   onReview,
   showTimeline = true,
+  embedded = false,
 }: {
   readonly deliveries: readonly CommittedDelivery[];
   readonly onReview: (deliveryId: string) => void;
-  /** El portal externo presenta primero el Gantt nativo y luego solo esta lista. */
+  /** Si está integrado en una fase, el Gantt nativo ya muestra el calendario. */
   readonly showTimeline?: boolean;
+  /** Muestra las entregas dentro de su fase, sin tarjeta ni resumen duplicados. */
+  readonly embedded?: boolean;
 }) {
   const sorted = useMemo(() =>
     [...deliveries].sort((a, b) => a.estimatedDate.localeCompare(b.estimatedDate) || a.name.localeCompare(b.name)),
@@ -84,15 +87,15 @@ export function CommittedDeliveriesRoadmap({
   }
 
   return (
-    <div className={styles.card}>
-      <div className={styles.topline}>
+    <div className={[styles.card, embedded ? styles.cardEmbedded : ''].filter(Boolean).join(' ')}>
+      {!embedded && <div className={styles.topline}>
         <div className={styles.chips}>
           <span>{sorted.length} entregas comprometidas</span>
           <span>{awaiting} esperando OK</span>
           <span>{received} recibidas</span>
         </div>
         <span className={styles.caption}>Fechas de entrega acordadas y recepción del cliente</span>
-      </div>
+      </div>}
       {showTimeline && (<>
       <div className={styles.legend}>
         <span><i className={styles.committedKey}/> Comprometida</span>
@@ -136,12 +139,18 @@ export function CommittedDeliveriesRoadmap({
       </div>
 
       </>)}
-      <div className={styles.deliveriesTitle}>Entregas comprometidas</div>
+      <div className={styles.deliveriesTitle}>
+        {embedded ? 'Entregas de la fase' : 'Entregas comprometidas'}
+      </div>
       <div className={styles.deliveries}>
         {sorted.map((delivery) => {
           const state = deliveryState(delivery, today);
           return (
-            <div key={delivery.id} className={[styles.deliveryRow, delivery.received ? styles.deliveryReceived : ''].join(' ')}>
+            <div key={delivery.id} className={[
+              styles.deliveryRow,
+              delivery.received ? styles.deliveryReceived : '',
+              delivery.status === 'approved' && !delivery.received ? styles.deliveryAwaitingOk : '',
+            ].filter(Boolean).join(' ')}>
               <span className={[styles.diamond, state.className].join(' ')}><DiamondIcon size={17}/></span>
               <div className={styles.deliveryText}>
                 <strong>{delivery.name}</strong>
@@ -158,8 +167,8 @@ export function CommittedDeliveriesRoadmap({
           );
         })}
       </div>
-      <p className={styles.help}><CalendarIcon size={14}/> Las fechas se mantienen según lo planificado.
-        El OK acredita recepción, no reemplaza la aprobación técnica interna.</p>
+      {!embedded && <p className={styles.help}><CalendarIcon size={14}/> Las fechas se mantienen según lo planificado.
+        El OK acredita recepción, no reemplaza la aprobación técnica interna.</p>}
     </div>
   );
 }
