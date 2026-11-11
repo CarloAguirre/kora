@@ -31,10 +31,42 @@ describe('ClientPortalPdfService: enlace seguro de descarga', () => {
   it('no copia una URL de la vista, sino un enlace PDF firmado con caducidad', async () => {
     const { service, portal } = setup();
     const link = await service.createShare(actor, PROJECT);
-    expect(link.url).toMatch(/^\/api\/portal\/shared-pdfs\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+    expect(link.url).toMatch(/^\/api\/portal\/shared-pdfs\/[A-Za-z0-9_-]{91}$/);
+    const token = link.url.split('/').at(-1)!;
+    // Fastify limita a 100 caracteres el parámetro de ruta; el token
+    // anterior superaba ese máximo y provocaba FST_ERR_MAX_PARAM_LENGTH.
+    expect(token).toHaveLength(91);
+    expect(token.length).toBeLessThanOrEqual(100);
     expect(link.url).not.toContain('/portal/proyectos/');
     expect(new Date(link.expiresAt).getTime()).toBeGreaterThan(Date.now());
     expect(portal.getProject).toHaveBeenCalledExactlyOnceWith(actor, PROJECT);
+  });
+
+
+  it('descarga con un enlace compacto válido y vuelve a autorizar al emisor', async () => {
+    const ctx = setup();
+    const link = await ctx.service.createShare(actor, PROJECT);
+    const pdf = Buffer.from('%PDF-1.4\\n%%EOF');
+    const download = vi.spyOn(ctx.service, 'download').mockResolvedValue({
+      filename: 'Kora-proyecto-seguimiento.pdf', content: pdf,
+    });
+    const result = await ctx.service.downloadShared(link.url.split('/').at(-1)!);
+    expect(ctx.db.select).toHaveBeenCalledOnce();
+    expect(download).toHaveBeenCalledExactlyOnceWith(actor, PROJECT);
+    expect(result.content).toEqual(pdf);
+  });
+
+  it('rechaza automáticamente el enlace cuando pasan las 48 horas', async () => {
+    const ctx = setup();
+    const link = await ctx.service.createShare(actor, PROJECT);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(new Date(link.expiresAt).getTime() + 5_000);
+    try {
+      await expect(ctx.service.downloadShared(link.url.split('/').at(-1)!))
+        .rejects.toBeInstanceOf(NotFoundException);
+      expect(ctx.db.select).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it('rechaza un enlace alterado sin consultar datos del usuario', async () => {
