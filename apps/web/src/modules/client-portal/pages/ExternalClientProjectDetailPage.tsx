@@ -137,7 +137,7 @@ export function ExternalClientProjectDetailPage() {
     try {
       const blob = await clientPortalApi.pdf(projectId);
       if (blob.type && !blob.type.includes('pdf')) throw new Error('El servidor no entregó un archivo PDF.');
-      const name = (project?.name ?? 'proyecto').normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '')
+      const name = (project?.name ?? 'proyecto').normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70);
       const url = URL.createObjectURL(blob);
       try {
