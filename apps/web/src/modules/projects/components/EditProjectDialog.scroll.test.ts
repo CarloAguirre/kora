@@ -9,8 +9,8 @@ const layoutCss = readFileSync(resolve(src, 'shared/components/layout/DashboardL
 const modalCss = readFileSync(resolve(src, 'shared/components/ui/Modal.module.css'), 'utf8');
 
 describe('Editar proyecto: solo el cuerpo del modal puede desplazarse', () => {
-  it('oculta el scrollbar de la raíz mientras algún diálogo nativo esté abierto', () => {
-    expect(globalCss).toMatch(/html:has\(dialog\[open\]\),\s*body:has\(dialog\[open\]\)\s*\{[^}]*overflow:\s*hidden;/s);
+  it('oculta el scrollbar de html mientras algún diálogo nativo esté abierto (sin crear scroll en body)', () => {
+    expect(globalCss).toMatch(/html:has\(dialog\[open\]\)\s*\{[^}]*overflow:\s*hidden;/s);
   });
 
   it('oculta el scroll de la vista principal y lo restablece sin mutar estilos inline', () => {
