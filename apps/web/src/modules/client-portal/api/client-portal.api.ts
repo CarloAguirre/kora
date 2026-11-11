@@ -56,10 +56,6 @@ export interface PortalProjectDetail extends PortalProject {
     deliveries: PortalDelivery[];
   }>;
   observations: PortalObservation[];
-  demoLink: string | null;
-  testEnvironmentLink: string | null;
-  figmaLink: string | null;
-  documentationLink: string | null;
   impactBeforeHours: number | null;
   impactBeforePeople: string | null;
   impactBeforeDuration: string | null;
