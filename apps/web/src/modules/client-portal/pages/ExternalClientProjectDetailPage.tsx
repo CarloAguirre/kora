@@ -6,7 +6,13 @@ import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { useToast } from '@/shared/components/ui/Toast';
-import { ChevronLeftIcon, CircleCheckIcon } from '@/shared/components/icons/Icons';
+import { useStoredState } from '@/shared/hooks/useStoredState';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
+import {
+  BarChartIcon, CalendarIcon, ChevronLeftIcon, CircleCheckIcon, ClockIcon,
+  DollarSignIcon, DownloadIcon, EyeIcon, HistoryIcon, LinkIcon, ListIcon,
+  TrendingUpIcon,
+} from '@/shared/components/icons/Icons';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
@@ -127,6 +133,25 @@ function receivedEvents(project: PortalProjectDetail, receipts: PortalReceipt[])
   }).sort((a,b) => b.filterDate.localeCompare(a.filterDate));
 }
 
+/** Misma botonera del diseño y de la Vista Cliente interna. Cada icono controla
+ * una sección de la ficha, no la autorización ni los datos del proyecto. */
+type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
+const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
+  { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
+  { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
+  { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
+  { key: 'progress', label: 'Avance del proyecto', icon: CircleCheckIcon },
+  { key: 'hours', label: 'Horas y avance', icon: ClockIcon },
+  { key: 'gantt', label: 'Roadmap por fases', icon: CalendarIcon },
+  { key: 'impact', label: 'Impacto en el negocio', icon: TrendingUpIcon },
+  { key: 'qa', label: 'Métricas QA', icon: BarChartIcon },
+  { key: 'bitacora', label: 'Bitácora', icon: HistoryIcon },
+];
+const DEFAULT_PREFS: {
+  sections: Partial<Record<SectionKey, boolean>>;
+  usedHoursVisible: boolean;
+} = { sections: {}, usedHoursVisible: true };
+
 /**
  * Exclusiva del perfil cliente: no reutiliza /projects/:id ni altera
  * ClientProjectDetailPage (la Vista Cliente interna de PMO).
@@ -134,10 +159,30 @@ function receivedEvents(project: PortalProjectDetail, receipts: PortalReceipt[])
 export function ExternalClientProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const toast = useToast();
+  const { user } = useAuth();
   const { data, isLoading, isError } = usePortalProject(projectId ?? null);
   const receive = usePortalReceive(projectId ?? '');
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const project = data?.project;
+  const prefsKey = user?.id && project?.client?.id
+    ? `kora:external-portal-ficha:${user.id}:${project.client.id}` : null;
+  const [prefs, setPrefs] = useStoredState(prefsKey, DEFAULT_PREFS);
+  const visible = (key: SectionKey) => prefs.sections[key] !== false;
+  const toggleSection = (key: SectionKey) =>
+    setPrefs((prev) => ({
+      ...prev, sections: { ...prev.sections, [key]: prev.sections[key] === false },
+    }));
+  const usedHoursVisible = prefs.usedHoursVisible !== false;
+  const toggleUsedHours = () =>
+    setPrefs((prev) => ({ ...prev, usedHoursVisible: prev.usedHoursVisible === false }));
+  const shareProjectLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      toast.show('Enlace a la ficha copiado. El destinatario necesita acceso al proyecto.', 'success');
+    } catch {
+      toast.show('No se pudo copiar el enlace de la ficha.', 'error');
+    }
+  };
   const receiptIds = useMemo(() => new Set((data?.receipts ?? []).map((r) => r.deliveryId)), [data?.receipts]);
   const pending = useMemo(() => project?.modules.flatMap((phase) =>
     phase.deliveries.filter((delivery) => delivery.status === 'approved' && !receiptIds.has(delivery.id))
@@ -181,13 +226,47 @@ export function ExternalClientProjectDetailPage() {
             <h2 className={styles.title}>{project.name}</h2>
             <KabeliLogo className={styles.brandLogo}/>
           </div>
-          <p>Vista cliente · Seguimiento del proyecto</p>
         </div>
         <div className={styles.statusActionsRow}>
           <StatusPill tone={project.status === 'active' ? 'success' : 'neutral'}>
             {project.status === 'active' ? 'Activo' : project.status === 'finished' ? 'Finalizado' : 'En seguimiento'}
           </StatusPill>
-          <Button variant="outline" onClick={() => window.print()}>Guardar como PDF</Button>
+          <Button variant="outline" iconLeft={<LinkIcon size={15}/>} onClick={() => void shareProjectLink()}>
+            Compartir PDF
+          </Button>
+          <Button variant="outline" iconLeft={<DownloadIcon size={15}/>} onClick={() => window.print()}>
+            Descargar PDF
+          </Button>
+        </div>
+        <p className={styles.lastUpdated}>
+          <ClockIcon size={14}/>
+          Última actualización: {new Date(project.updatedAt).toLocaleString('es-CL', {
+            dateStyle: 'short', timeStyle: 'short',
+          })}
+        </p>
+        <div className={styles.sectionToggles} role="group" aria-label="Mostrar u ocultar secciones">
+          {SECTION_TOGGLES.map(({ key, label, icon: Icon }) => {
+            const available = key === 'links' ? accessLinks.length > 0
+              : key === 'impact' ? project.impactBeforeHours != null || project.impactAfterHours != null
+              : key === 'qa' ? project.qaPlannedTests != null : true;
+            return (
+              <button key={key} type="button" disabled={!available}
+                className={[styles.sectionToggle, visible(key) && available ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
+                aria-label={available ? `${visible(key) ? 'Ocultar' : 'Mostrar'} ${label}` : `${label} (sin datos disponibles)`}
+                aria-pressed={available && visible(key)}
+                data-tooltip={available ? label : `${label} (sin datos)`}
+                onClick={() => toggleSection(key)}>
+                <Icon size={16}/>
+              </button>
+            );
+          })}
+          <button type="button" className={[styles.sectionToggle, usedHoursVisible ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
+            aria-pressed={usedHoursVisible}
+            aria-label={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
+            data-tooltip={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
+            onClick={toggleUsedHours}>
+            <EyeIcon size={16}/>
+          </button>
         </div>
         {pending.length > 0 && (
           <Card>
@@ -206,40 +285,40 @@ export function ExternalClientProjectDetailPage() {
             ))}
           </Card>
         )}
-        <Card className={styles.infoBar}>
+        {visible('info') && <Card className={styles.infoBar}>
           <div><strong>Cliente</strong><p>{project.client?.companyName ?? '—'}</p></div>
           <div><strong>Responsable Kabeli</strong><p>{project.commercialManager?.fullName ?? project.leader?.fullName ?? '—'}</p></div>
           <div><strong>Contacto cliente</strong><p>{project.primaryContact?.name ?? '—'}</p></div>
           <div><strong>Inicio – Fin</strong><p>{dmy(project.startDate)} – {dmy(project.endDate)}</p></div>
-        </Card>
-        <section className={styles.section}>
+        </Card>}
+        {visible('progress') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
           <ProjectProgressOverview actualPercent={project.progress.actual}
             expectedPercent={project.progress.expected} startDate={dmy(project.startDate)}
             endDate={dmy(project.endDate)}
             daysRemaining={project.endDate ? Math.max(0, Math.ceil(
               (new Date(`${project.endDate}T00:00:00`).getTime() - Date.now()) / 86400000)) : 0}/>
-        </section>
-        <section className={styles.section}>
+        </section>}
+        {visible('hours') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Horas y avance</h3>
           <Card>
             <p><strong>HH estimadas:</strong> {project.soldHours.toLocaleString('es-CL')}</p>
-            <p><strong>HH utilizadas:</strong> {project.usedHours.toLocaleString('es-CL')}</p>
-            <p><strong>Desviación:</strong> {hoursDeviation.toLocaleString('es-CL')} HH</p>
+            {usedHoursVisible && <p><strong>HH utilizadas:</strong> {project.usedHours.toLocaleString('es-CL')}</p>}
+            {usedHoursVisible && <p><strong>Desviación:</strong> {hoursDeviation.toLocaleString('es-CL')} HH</p>}
           </Card>
-        </section>
-        <section className={styles.section}>
+        </section>}
+        {visible('billing') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Facturación</h3>
           <ProjectBillingCard billing={billing}/>
-        </section>
-        {accessLinks.length > 0 && <section className={styles.section}>
+        </section>}
+        {visible('links') && accessLinks.length > 0 && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Accesos y enlaces</h3>
           <Card><div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
             {accessLinks.map((link) => <a key={link.label} href={link.href}
               target="_blank" rel="noopener noreferrer">{link.label}</a>)}
           </div></Card>
         </section>}
-        {(project.impactBeforeHours != null || project.impactAfterHours != null) && (
+        {visible('impact') && (project.impactBeforeHours != null || project.impactAfterHours != null) && (
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Impacto en el negocio</h3>
             <Card>
@@ -248,7 +327,7 @@ export function ExternalClientProjectDetailPage() {
             </Card>
           </section>
         )}
-        {project.qaPlannedTests != null && <section className={styles.section}>
+        {visible('qa') && project.qaPlannedTests != null && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Métricas QA</h3>
           <Card>
             <p><strong>Módulo:</strong> {project.qaEvaluatedModule ?? 'General'}</p>
@@ -257,10 +336,10 @@ export function ExternalClientProjectDetailPage() {
             <p><strong>Pruebas con error:</strong> {project.qaFailedTests ?? 0}</p>
           </Card>
         </section>}
-        <section className={styles.section}>
+        {visible('gantt') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Roadmap por fases</h3>
           <PhaseRoadmap phaseRoadmap={roadmap}/>
-        </section>
+        </section>}
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Recepción de entregables</h3>
           {project.modules.flatMap((phase) => phase.deliveries.map((delivery) => (
@@ -274,10 +353,10 @@ export function ExternalClientProjectDetailPage() {
             </Card>
           )))}
         </section>
-        <section className={styles.section}>
+        {visible('bitacora') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Bitácora de recepciones</h3>
           <ProjectBitacora entries={history}/>
-        </section>
+        </section>}
       </div>
       <Modal open={!!selected} title="Confirmar recepción" onClose={() => setConfirmId(null)}
         dismissible={!receive.isPending}
