@@ -75,20 +75,20 @@ beforeEach(() => {
   mocks.remove.mockReset().mockResolvedValue({ deletedVersionId: v1.id });
 });
 describe('Cotizaciones del proyecto', () => {
-  it('deshabilita la creacion de cotizaciones desde el proyecto sin versiones', () => {
+  it('permite crear una cotizacion desde el proyecto sin versiones', () => {
     mocks.versions = [];
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
     const create = screen.getByRole('button', { name: '+ Nueva cotización' });
-    expect(create).toBeDisabled();
+    expect(create).toBeEnabled();
     fireEvent.click(create);
-    expect(screen.queryByRole('dialog', { name: 'Nueva cotización' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Nueva cotización' })).toBeInTheDocument();
   });
-  it('deshabilita nuevas versiones sin bloquear la consulta de cotizaciones existentes', () => {
+  it('permite crear versiones nuevas sin bloquear la consulta de cotizaciones existentes', () => {
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
     const create = screen.getByRole('button', { name: '+ Nueva versión' });
-    expect(create).toBeDisabled();
+    expect(create).toBeEnabled();
     fireEvent.click(create);
-    expect(screen.queryByRole('dialog', { name: 'Nueva cotización' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Nueva cotización' })).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Abrir en calculadora' })).toHaveLength(2);
   });
   it('permite aprobar la versión 1 aun cuando existe la versión 2', async () => {
