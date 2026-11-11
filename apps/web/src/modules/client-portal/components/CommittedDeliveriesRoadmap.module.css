@@ -1,0 +1,68 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e3e9ef;
+  border-radius: 14px;
+  box-shadow: 0 5px 15px rgba(15, 41, 66, .09);
+}
+.topline,.chips,.legend,.dates,.deliveryRow,.help {display:flex;align-items:center}
+.topline{justify-content:space-between;gap:15px;flex-wrap:wrap}
+.chips{gap:8px;flex-wrap:wrap}
+.chips span {
+  background:#f5f7fa;border:1px solid #e3e9ef;border-radius:9px;
+  padding:8px 11px;color:#243a51;font-size:12px;font-weight:600
+}
+.caption,.legend,.help {color:#788899;font-size:12px}
+.legend{flex-wrap:wrap;gap:10px 20px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.committedKey{background:#73869b}.waitingKey{background:#f0a52e}
+.receivedKey{background:#42a560}.delayedKey{background:#d65d58}
+.scroll{overflow-x:auto;border:1px solid #e3e9ef;border-radius:10px;padding:12px 16px 5px;scrollbar-width:thin}
+.scroll:focus-visible{outline:2px solid #87c632;outline-offset:2px}
+.timeline{position:relative;min-height:220px}
+.axis{position:relative;height:32px;border-bottom:1px solid #dce3ea}
+.tick{position:absolute;bottom:7px;transform:translateX(-50%);white-space:nowrap;font-size:11px;color:#8795a4;text-transform:capitalize}
+.track{height:150px;position:relative;border-bottom:1px solid #dce3ea;background:repeating-linear-gradient(180deg,transparent,transparent 49px,#f3f6f9 50px)}
+.gridLine{position:absolute;top:0;bottom:0;border-left:1px solid #edf1f6}
+.today{position:absolute;z-index:3;top:0;bottom:0;border-left:2px solid #e36361}
+.today span{position:absolute;bottom:0;transform:translateX(-50%);font-size:10px;color:#c74c49;background:#fff}
+.marker{
+  position:absolute;display:flex;align-items:center;gap:5px;
+  width:max-content;max-width:150px;transform:translateX(-8px);
+  font-size:11px;font-weight:600;color:#0f2a44;z-index:2
+}
+.marker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+.marker svg{flex-shrink:0}
+.marker.committed{color:#77899b}.marker.waiting{color:#ed9b26}
+.marker.received{color:#31a35b}.marker.delayed{color:#d25752}
+.dates{justify-content:space-between;color:#8a98a7;font-size:11px;padding-top:8px}
+.deliveriesTitle{font-size:12px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:#8697a7}
+.deliveries{display:flex;flex-direction:column;gap:8px}
+.deliveryRow{
+  gap:12px;flex-wrap:wrap;padding:13px 15px;
+  background:#fff;border:1px solid #e2e9ef;border-radius:9px;
+}
+.deliveryReceived{background:#f2fbed;border-color:#d8ecc0}
+.diamond{display:flex;flex-shrink:0}
+.diamond.committed{color:#73869b}.diamond.waiting{color:#efa83b}
+.diamond.received{color:#42a560}.diamond.delayed{color:#d65d58}
+.deliveryText{display:flex;flex-direction:column;gap:3px;flex:1 1 230px;min-width:0}
+.deliveryText strong{font-size:13px;color:#17354d;overflow-wrap:anywhere}
+.deliveryText>span{font-size:11px;color:#8793a2}
+.help{gap:7px;line-height:1.5;margin:0;align-items:flex-start}
+.help svg{flex-shrink:0}
+.empty{padding:25px;border-radius:14px;background:#fff;border:1px solid #e2e9ef;color:#687c8c;font-size:13px}
+@media(max-width:760px){
+  .card{padding:14px;gap:13px}
+  .deliveryRow{align-items:flex-start}
+  .deliveryRow>button{margin-left:25px}
+}
+@media print {
+  .scroll{overflow:visible}
+  .timeline{min-width:0!important}
+  .marker span{max-width:100px}
+}
