@@ -237,19 +237,14 @@ export class ClientPortalService {
         name: m.name, amount: m.amount, percent: m.percent, status: m.status,
         invoiceNumber: m.invoiceNumber, issuedAt: m.issuedAt, paidAt: m.paidAt,
       })),
+      // El cliente solo recibe entregas comprometidas. La planificación
+      // operativa interna (segmentos, tareas, HH, bloqueos) no forma parte
+      // del contrato de este portal, ni siquiera como datos ocultos.
       modules: project.modules.map((m) => ({
-        id: m.id, name: m.name, currentStage: m.currentStage,
-        estimatedStartDate: m.estimatedStartDate, estimatedEndDate: m.estimatedEndDate,
-        blockerCount: m.blockerCount, progress: { scopes: m.progress.scopes },
-        segments: m.segments.map((s) => ({
-          id: s.id, teamName: s.teamName, name: s.name, startDate: s.startDate, endDate: s.endDate,
-        })),
-        tasks: m.tasks.map((t) => ({
-          id: t.id, name: t.name, startDate: t.startDate, date: t.date, scope: t.scope, status: t.status,
-        })),
+        id: m.id, name: m.name,
         deliveries: m.deliveries.map((d) => ({
-          id: d.id, name: d.name, teamName: d.teamName, estimatedDate: d.estimatedDate,
-          // 'delivered' se mantiene en revisión interna: NO equivale a entregado al cliente.
+          id: d.id, name: d.name, teamName: d.teamName,
+          estimatedDate: d.estimatedDate,
           status: d.status === 'approved' ? 'approved' : 'planned',
         })),
       })),
