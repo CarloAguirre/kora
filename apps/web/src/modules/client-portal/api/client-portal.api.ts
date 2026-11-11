@@ -18,7 +18,23 @@ export interface PortalProject {
 }
 export interface PortalDelivery {
   id: string; name: string | null; teamName: string | null;
-  estimatedDate: string; status: 'planned' | 'approved';
+  estimatedDate: string; createdAt: string; status: 'planned' | 'approved';
+}
+export interface PortalTimelineSegment {
+  id: string; name: string; teamName: string;
+  startDate: string; endDate: string; closedAt: string | null;
+}
+export interface PortalObservation {
+  id: string; type: string; title: string | null; message: string;
+  date: string; createdAt: string; authorName: string;
+  moduleId: string | null; moduleName: string | null;
+  deliveryId: string | null; taskId: string | null; status: string | null;
+}
+export interface PortalActivity {
+  id: string; date: string; createdAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  category: string; userName: string; moduleName: string | null;
+  hasBlocker: boolean;
 }
 export interface PortalProjectDetail extends PortalProject {
   updatedAt: string;
@@ -35,9 +51,11 @@ export interface PortalProjectDetail extends PortalProject {
     invoiceNumber: string | null; issuedAt: string | null; paidAt: string | null;
   }>;
   modules: Array<{
-    id: string; name: string;
+    id: string; name: string; currentStage: string;
+    timelineSegments: PortalTimelineSegment[];
     deliveries: PortalDelivery[];
   }>;
+  observations: PortalObservation[];
   demoLink: string | null;
   testEnvironmentLink: string | null;
   figmaLink: string | null;
@@ -59,6 +77,11 @@ export interface PortalReceipt {
   deliveryId: string;
   receivedAt: string;
   receivedByName: string;
+}
+export interface PortalProjectResponse {
+  project: PortalProjectDetail;
+  receipts: PortalReceipt[];
+  activity: PortalActivity[];
 }
 export interface PortalPlan {
   id: string; slug: string | null; name: string; status: string;
@@ -90,7 +113,7 @@ export const clientPortalApi = {
   me: () => api.get<{ company: PortalCompany }>('/portal/me'),
   projects: () => api.get<PortalProject[]>('/portal/projects'),
   project: (id: string) =>
-    api.get<{ project: PortalProjectDetail; receipts: PortalReceipt[] }>(
+    api.get<PortalProjectResponse>(
       `/portal/projects/${encodeURIComponent(id)}`),
   receive: (projectId: string, deliveryId: string) =>
     api.post<{ deliveryId: string; received: true }>(
