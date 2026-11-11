@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import styles from './ClientProjectDetailPage.module.css';
+import './ExternalClientProjectPrint.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
@@ -219,15 +220,15 @@ export function ExternalClientProjectDetailPage() {
     !!link.href && /^https?:\/\//i.test(link.href));
   return (
     <DashboardLayout title="Proyectos">
-      <div className={styles.page}>
-        <Link className={styles.breadcrumb} to="/portal/proyectos"><ChevronLeftIcon size={16}/> Volver a mis proyectos</Link>
+      <div className={styles.page} data-client-portal-print>
+        <Link data-client-portal-nav className={styles.breadcrumb} to="/portal/proyectos"><ChevronLeftIcon size={16}/> Volver a mis proyectos</Link>
         <div className={styles.headerBlock}>
           <div className={styles.titleRow}>
             <h2 className={styles.title}>{project.name}</h2>
             <KabeliLogo className={styles.brandLogo}/>
           </div>
         </div>
-        <div className={styles.statusActionsRow}>
+        <div className={styles.statusActionsRow} data-client-portal-actions>
           <StatusPill tone={project.status === 'active' ? 'success' : 'neutral'}>
             {project.status === 'active' ? 'Activo' : project.status === 'finished' ? 'Finalizado' : 'En seguimiento'}
           </StatusPill>
@@ -244,7 +245,7 @@ export function ExternalClientProjectDetailPage() {
             dateStyle: 'short', timeStyle: 'short',
           })}
         </p>
-        <div className={styles.sectionToggles} role="group" aria-label="Mostrar u ocultar secciones">
+        <div className={styles.sectionToggles} data-client-portal-actions role="group" aria-label="Mostrar u ocultar secciones">
           {SECTION_TOGGLES.map(({ key, label, icon: Icon }) => {
             const available = key === 'links' ? accessLinks.length > 0
               : key === 'impact' ? project.impactBeforeHours != null || project.impactAfterHours != null
@@ -268,6 +269,12 @@ export function ExternalClientProjectDetailPage() {
             <EyeIcon size={16}/>
           </button>
         </div>
+        {visible('info') && <Card className={styles.infoBar}>
+          <div><strong>Cliente</strong><p>{project.client?.companyName ?? '—'}</p></div>
+          <div><strong>Responsable Kabeli</strong><p>{project.commercialManager?.fullName ?? project.leader?.fullName ?? '—'}</p></div>
+          <div><strong>Contacto cliente</strong><p>{project.primaryContact?.name ?? '—'}</p></div>
+          <div><strong>Inicio – Fin</strong><p>{dmy(project.startDate)} – {dmy(project.endDate)}</p></div>
+        </Card>}
         {pending.length > 0 && (
           <Card>
             <h3>Tienes {pending.length} entrega{pending.length !== 1 ? 's' : ''} esperando tu OK</h3>
@@ -285,12 +292,6 @@ export function ExternalClientProjectDetailPage() {
             ))}
           </Card>
         )}
-        {visible('info') && <Card className={styles.infoBar}>
-          <div><strong>Cliente</strong><p>{project.client?.companyName ?? '—'}</p></div>
-          <div><strong>Responsable Kabeli</strong><p>{project.commercialManager?.fullName ?? project.leader?.fullName ?? '—'}</p></div>
-          <div><strong>Contacto cliente</strong><p>{project.primaryContact?.name ?? '—'}</p></div>
-          <div><strong>Inicio – Fin</strong><p>{dmy(project.startDate)} – {dmy(project.endDate)}</p></div>
-        </Card>}
         {visible('progress') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
           <ProjectProgressOverview actualPercent={project.progress.actual}
