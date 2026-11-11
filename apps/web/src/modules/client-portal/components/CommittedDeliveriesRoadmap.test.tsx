@@ -17,9 +17,9 @@ describe('CommittedDeliveriesRoadmap — vista externa', () => {
     expect(screen.getByText('3 entregas comprometidas')).toBeInTheDocument();
     expect(screen.getByText('1 esperando OK')).toBeInTheDocument();
     expect(screen.getByText('1 recibidas')).toBeInTheDocument();
-    expect(screen.getByText('Modelo comercial')).toBeInTheDocument();
-    expect(screen.getByText('Tablero de seguimiento')).toBeInTheDocument();
-    expect(screen.getByText('Marcha blanca')).toBeInTheDocument();
+    expect(screen.getAllByText('Modelo comercial')).toHaveLength(2);
+    expect(screen.getAllByText('Tablero de seguimiento')).toHaveLength(2);
+    expect(screen.getAllByText('Marcha blanca')).toHaveLength(2);
     expect(screen.queryByText('Tareas operativas')).not.toBeInTheDocument();
   });
 
