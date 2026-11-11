@@ -74,6 +74,7 @@ export interface ProjectDetailSource {
   readonly leaderLastActivityAt: Date | null;
   /** Horas aprobadas con fecha anterior al día del Hito 0 — ver `GetProjectUseCase`. */
   readonly prospectPhaseHours: number;
+  readonly approvedMonthlyHours: readonly { readonly month: string; readonly preactivationHours: number; readonly executionHours: number }[];
   readonly actorUserId: string;
   /** Líder de este proyecto, PMO o admin: puede editar cualquier entrada de bitácora y resolver pendientes. */
   readonly canManagePendings: boolean;
@@ -315,6 +316,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     usedHoursUpdatedAt: source.usedHoursUpdatedAt?.toISOString().slice(0, 10) ?? null,
     leaderLastActivityAt: source.leaderLastActivityAt?.toISOString() ?? null,
     prospectPhaseHours: source.prospectPhaseHours,
+    approvedMonthlyHours: [...source.approvedMonthlyHours],
     contractAmount: snapshot.contractAmount,
     contractCurrency: snapshot.contractCurrency,
     pendingManagementApproval: source.project.pendingManagementApproval,
