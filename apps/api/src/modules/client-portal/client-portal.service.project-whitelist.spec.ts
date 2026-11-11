@@ -9,7 +9,7 @@ import type { UserCredentialRepository } from '../users/domain/repositories/user
 import { ClientPortalService } from './client-portal.service';
 
 describe('ClientPortalService — DTO exclusivamente externo', () => {
-  it('publica entregas, pero jamás segmentos ni tareas operativas internas', () => {
+  it('publica la geometría del Gantt y las entregas, sin HH, miembros ni tareas operativas', () => {
     const service = new ClientPortalService(
       {} as Database,
       {} as GetProjectUseCase,
@@ -29,13 +29,18 @@ describe('ClientPortalService — DTO exclusivamente externo', () => {
       paymentMilestones: [],
       modules: [{
         id: 'fase-1', name: 'Planificación', currentStage: 'in_progress', blockerCount: 1,
-        segments: [{ id: 'segmento-privado', name: 'HH INTERNAS: no divulgar', startDate: '2026-10-01', endDate: '2026-11-01' }],
+        segments: [{
+          id: 'segmento-1', teamName: 'DEV', name: 'Desarrollo',
+          startDate: '2026-10-01', endDate: '2026-11-01',
+          closedAt: null, estimatedHours: 90, members: [{ fullName: 'Persona interna' }],
+        }],
         tasks: [{ id: 'tarea-privada', name: 'TAREA INTERNA SECRET', date: '2026-10-04' }],
         deliveries: [
           { id: 'entrega-1', name: 'Informe comprometido', teamName: 'DEV',
-            estimatedDate: '2026-11-18', status: 'approved' },
+            estimatedDate: '2026-11-18', createdAt: '2026-10-12T12:00:00.000Z', status: 'approved' },
         ],
       }],
+      observations: [],
     } as unknown as ProjectDetail;
     const external = (
       service as unknown as {
@@ -45,14 +50,20 @@ describe('ClientPortalService — DTO exclusivamente externo', () => {
       }
     ).publicProject(detail);
     expect(external.modules).toEqual([{
-      id: 'fase-1',
-      name: 'Planificación',
+      id: 'fase-1', name: 'Planificación', currentStage: 'in_progress',
+      timelineSegments: [{
+        id: 'segmento-1', teamName: 'DEV', name: 'Desarrollo',
+        startDate: '2026-10-01', endDate: '2026-11-01', closedAt: null,
+      }],
       deliveries: [{ id: 'entrega-1', name: 'Informe comprometido',
-        teamName: 'DEV', estimatedDate: '2026-11-18', status: 'approved' }],
+        teamName: 'DEV', estimatedDate: '2026-11-18',
+        createdAt: '2026-10-12T12:00:00.000Z', status: 'approved' }],
     }]);
-    expect(JSON.stringify(external)).not.toContain('segmento-privado');
-    expect(JSON.stringify(external)).not.toContain('tarea-privada');
-    expect(JSON.stringify(external)).not.toContain('TAREA INTERNA');
+    const externalJson = JSON.stringify(external);
+    expect(externalJson).not.toContain('tarea-privada');
+    expect(externalJson).not.toContain('TAREA INTERNA');
+    expect(externalJson).not.toContain('Persona interna');
+    expect(externalJson).not.toContain('estimatedHours');
     expect(external).toHaveProperty('contractAmount', 180);
   });
 });
