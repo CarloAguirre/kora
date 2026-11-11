@@ -63,22 +63,6 @@
   gap: var(--kora-space-3);
 }
 
-.portalHint {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-2);
-  padding: var(--kora-space-3);
-  border: 1px solid var(--kora-border);
-  border-radius: var(--kora-radius-sm);
-  background: var(--kora-surface);
-  color: var(--kora-text);
-  font-size: var(--kora-text-sm);
-}
-
-.portalHint span {
-  color: var(--kora-text-muted);
-}
-
 .deleteButton {
   margin-right: auto;
 }
