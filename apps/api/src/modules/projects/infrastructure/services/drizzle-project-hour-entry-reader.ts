@@ -80,16 +80,19 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
   async approvedMonthlyHoursForProject(
     projectId: string, beforeDate: Date | null,
   ): Promise<readonly ProjectApprovedMonthHours[]> {
-    const month = sql<string>`to_char(${hourEntries.date}, 'YYYY-MM')`;
-    const before = beforeDate
-      ? sql`${hourEntries.date} < ${beforeDate}`
-      : sql`true`;
+    // Los interpolados de Date en SQL crudo no usan el encoder DATE de
+    // Drizzle. Al ejecutar la consulta pueden serializarse con el huso local
+    // ("Sun Mar 29 ... GMT-0300") en lugar del día ISO requerido por PostgreSQL.
+    // lt/gte sí usan el encoder de hourEntries.date y evitan ese problema.
+    const month = sql<string>`to_char(${hourEntries.date}::timestamp, 'YYYY-MM')`;
+    const before = beforeDate ? lt(hourEntries.date, beforeDate) : sql`true`;
+    const onOrAfter = beforeDate ? gte(hourEntries.date, beforeDate) : sql`false`;
 
     const rows = await this.database
       .select({
         month,
         preactivationHours: sql<string>`coalesce(sum(case when ${before} then ${hourEntries.hours} else 0 end), 0)`,
-        executionHours: sql<string>`coalesce(sum(case when not (${before}) then ${hourEntries.hours} else 0 end), 0)`,
+        executionHours: sql<string>`coalesce(sum(case when ${onOrAfter} then ${hourEntries.hours} else 0 end), 0)`,
       })
       .from(hourEntries)
       .where(and(eq(hourEntries.projectId, projectId), eq(hourEntries.status, 'approved')))
