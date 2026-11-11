@@ -35,18 +35,7 @@ export interface PortalProjectDetail extends PortalProject {
     invoiceNumber: string | null; issuedAt: string | null; paidAt: string | null;
   }>;
   modules: Array<{
-    id: string; name: string; currentStage: string;
-    estimatedStartDate: string | null; estimatedEndDate: string | null;
-    blockerCount: number;
-    progress: { scopes: Record<string, number | null> };
-    segments: Array<{
-      id: string; teamName: string | null; name: string;
-      startDate: string; endDate: string;
-    }>;
-    tasks: Array<{
-      id: string; name: string; startDate: string | null; date: string;
-      scope: ProjectModuleTaskScope; status: string;
-    }>;
+    id: string; name: string;
     deliveries: PortalDelivery[];
   }>;
   demoLink: string | null;
