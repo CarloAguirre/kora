@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   and, clientContacts, clientPortalAccounts, clientPortalDeliveryReceipts,
-  clientPortalProjectGrants, clientPortalSupportGrants, clients, eq, inArray,
+  clientPortalProjectGrants, clientPortalSupportGrants, clients, desc, eq, hourEntries, inArray,
   isNull, projectModuleDeliveries, projectModules, projects, roles, sql,
   supportPlans, tickets, users, type Database,
 } from '@kora/db';
@@ -11,6 +11,8 @@ import { unwrapOrThrow } from '../../shared/presentation/unwrap-result';
 import { GetProjectUseCase } from '../projects/application/use-cases/get-project.use-case';
 import { GetSupportPlanUseCase } from '../tickets/application/use-cases/get-support-plan.use-case';
 import { CreateUserUseCase } from '../users/application/use-cases/create-user.use-case';
+import { GrantUserAccessUseCase } from '../users/application/use-cases/grant-user-access.use-case';
+import { USER_CREDENTIAL_REPOSITORY, type UserCredentialRepository } from '../users/domain/repositories/user-credential.repository';
 import type { RequestUser } from '../../shared/presentation/decorators/current-user.decorator';
 
 export interface ClientPortalGrantInput {
@@ -29,6 +31,8 @@ export class ClientPortalService {
     private readonly getProjectUseCase: GetProjectUseCase,
     private readonly getSupportPlanUseCase: GetSupportPlanUseCase,
     private readonly createUser: CreateUserUseCase,
+    private readonly grantUserAccess: GrantUserAccessUseCase,
+    @Inject(USER_CREDENTIAL_REPOSITORY) private readonly credentials: UserCredentialRepository,
   ) {}
 
   private async requireAccount(actor: PortalActor): Promise<PortalAccount> {
@@ -71,7 +75,7 @@ export class ClientPortalService {
       })
       .from(clientPortalAccounts)
       .innerJoin(users, eq(users.id, clientPortalAccounts.userId))
-      .where(eq(clientPortalAccounts.clientId, clientId));
+      .where(and(eq(clientPortalAccounts.clientId, clientId), isNull(users.deletedAt)));
     return Promise.all(rows.map(async (row) => {
       const [projectGrants, planGrants] = await Promise.all([
         this.db.select({ id: clientPortalProjectGrants.projectId })
@@ -126,6 +130,7 @@ export class ClientPortalService {
 
     let userId = existing?.id;
     let invitationSent = false;
+    let invitationAttempted = false;
     if (!userId) {
       const [firstName, ...lastName] = contact.name.trim().split(/\s+/);
       const created = unwrapOrThrow(await this.createUser.execute({
@@ -134,6 +139,7 @@ export class ClientPortalService {
         actor: { userId: actor.id, email: actor.email },
       }));
       userId = created.userId;
+      invitationAttempted = true;
       invitationSent = created.invitationSent;
     }
 
@@ -152,7 +158,20 @@ export class ClientPortalService {
       if (input.enabled && uniquePlans.length)
         await tx.insert(clientPortalSupportGrants).values(uniquePlans.map((planId) => ({ userId, planId })));
     });
-    return { userId, invitationSent, enabled: input.enabled, projectIds: input.enabled ? uniqueProjects : [],
+    // Una invitación inicial pudo no llegar (por ejemplo, fallo del proveedor
+    // de correo). Si la cuenta existente todavía no tiene contraseña válida,
+    // permitir reintentar guardando "Configurar acceso" sin crear otro usuario.
+    // Nunca se reenvía si la cuenta ya tiene contraseña, ni al revocarla.
+    if (input.enabled && existing && !(await this.credentials.hasUsablePassword(userId))) {
+      invitationAttempted = true;
+      const invitation = unwrapOrThrow(await this.grantUserAccess.execute({
+        userId, actor: { userId: actor.id, email: actor.email },
+      }));
+      invitationSent = invitation.invitationSent;
+    }
+
+    return { userId, invitationSent, invitationAttempted, enabled: input.enabled,
+      projectIds: input.enabled ? uniqueProjects : [],
       supportPlanIds: input.enabled ? uniquePlans : [] };
   }
 
@@ -202,6 +221,7 @@ export class ClientPortalService {
     // auditoría, facturas adjuntas ni motivos de rechazo de líderes.
     return {
       id: project.id, slug: project.slug, name: project.name, status: project.status,
+      updatedAt: project.updatedAt,
       salesStage: project.salesStage, phase: project.phase, startDate: project.startDate,
       endDate: project.endDate, client: project.client,
       primaryContact: project.primaryContact ? {
@@ -212,30 +232,36 @@ export class ClientPortalService {
       soldHours: project.soldHours, usedHours: project.usedHours,
       usedHoursUpdatedAt: project.usedHoursUpdatedAt, leaderLastActivityAt: project.leaderLastActivityAt,
       progress: project.progress, contractCurrency: project.contractCurrency,
+      contractAmount: project.contractAmount,
       paymentMilestones: project.paymentMilestones.map((m) => ({
         name: m.name, amount: m.amount, percent: m.percent, status: m.status,
         invoiceNumber: m.invoiceNumber, issuedAt: m.issuedAt, paidAt: m.paidAt,
       })),
+      // El cliente solo recibe entregas comprometidas. La planificación
+      // operativa interna (segmentos, tareas, HH, bloqueos) no forma parte
+      // del contrato de este portal, ni siquiera como datos ocultos.
+      // Solo geometría y nombres de los bloques para reutilizar el Gantt
+      // nativo de Kora. No se publican HH, miembros, asignaciones ni notas.
       modules: project.modules.map((m) => ({
         id: m.id, name: m.name, currentStage: m.currentStage,
-        estimatedStartDate: m.estimatedStartDate, estimatedEndDate: m.estimatedEndDate,
-        blockerCount: m.blockerCount, progress: { scopes: m.progress.scopes },
-        segments: m.segments.map((s) => ({
-          id: s.id, teamName: s.teamName, name: s.name, startDate: s.startDate, endDate: s.endDate,
-        })),
-        tasks: m.tasks.map((t) => ({
-          id: t.id, name: t.name, startDate: t.startDate, date: t.date, scope: t.scope, status: t.status,
+        timelineSegments: m.segments.map((s) => ({
+          id: s.id, teamName: s.teamName, name: s.name,
+          startDate: s.startDate, endDate: s.endDate, closedAt: s.closedAt ?? null,
         })),
         deliveries: m.deliveries.map((d) => ({
-          id: d.id, name: d.name, teamName: d.teamName, estimatedDate: d.estimatedDate,
-          // 'delivered' se mantiene en revisión interna: NO equivale a entregado al cliente.
+          id: d.id, name: d.name, teamName: d.teamName,
+          estimatedDate: d.estimatedDate, createdAt: d.createdAt,
           status: d.status === 'approved' ? 'approved' : 'planned',
         })),
       })),
-      // Ningún comentario/hora interna se divulga por defecto.
-      observations: [],
-      demoLink: project.demoLink, testEnvironmentLink: project.testEnvironmentLink,
-      figmaLink: project.figmaLink, documentationLink: project.documentationLink,
+      // Misma fuente de bitácora que PMO: registros del proyecto, incluidos
+      // cambios de tareas y entregas. Proyección explícita de lectura externa.
+      observations: project.observations.map((o) => ({
+        id: o.id, type: o.type, title: o.title, message: o.message,
+        date: o.date, createdAt: o.createdAt, authorName: o.authorName,
+        moduleId: o.moduleId, moduleName: o.moduleName,
+        deliveryId: o.deliveryId, taskId: o.taskId, status: o.status,
+      })),
       impactBeforeHours: project.impactBeforeHours,
       impactBeforePeople: project.impactBeforePeople,
       impactBeforeDuration: project.impactBeforeDuration,
@@ -276,7 +302,32 @@ export class ClientPortalService {
     }).from(clientPortalDeliveryReceipts)
       .innerJoin(users, eq(users.id, clientPortalDeliveryReceipts.receivedByUserId))
       .where(eq(clientPortalDeliveryReceipts.projectId, projectId));
-    return { project, receipts: receipts.map((r) => ({ ...r, receivedAt: r.receivedAt.toISOString() })) };
+    // PMO muestra además la actividad de horas. Traer un resumen limitado y
+    // de solo lectura: nunca compartir cantidad de HH, motivo de rechazo,
+    // aprobadores ni comentarios de bloqueo en el contrato externo.
+    const activity = await this.db.select({
+      id: hourEntries.id, date: hourEntries.date, createdAt: hourEntries.createdAt,
+      status: hourEntries.status, category: hourEntries.category,
+      firstName: users.firstName, lastName: users.lastName,
+      moduleName: projectModules.name, hasBlocker: hourEntries.hasBlocker,
+    }).from(hourEntries)
+      .innerJoin(users, eq(users.id, hourEntries.userId))
+      .leftJoin(projectModules, eq(projectModules.id, hourEntries.moduleId))
+      .where(eq(hourEntries.projectId, projectId))
+      .orderBy(desc(hourEntries.createdAt))
+      .limit(100);
+    return {
+      project,
+      receipts: receipts.map((r) => ({ ...r, receivedAt: r.receivedAt.toISOString() })),
+      activity: activity.map((entry) => ({
+        id: entry.id,
+        date: entry.date.toISOString().slice(0, 10),
+        createdAt: entry.createdAt.toISOString(),
+        status: entry.status, category: entry.category,
+        userName: [entry.firstName, entry.lastName].filter(Boolean).join(' ') || 'Colaborador',
+        moduleName: entry.moduleName, hasBlocker: entry.hasBlocker,
+      })),
+    };
   }
 
   async receiveDelivery(actor: PortalActor, idOrSlug: string, deliveryId: string) {

@@ -9,7 +9,6 @@ import {
   FolderOpenIcon,
   TicketIcon,
   TrendingUpIcon,
-  HelpCircleIcon,
   BarChartIcon,
 } from '../icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -61,22 +60,13 @@ const NAVIGATION: readonly NavigationItem[] = [
     icon: <FolderOpenIcon size={20} />,
     permission: 'hours:read_own',
   },
-  // Portal de cliente: mismas etiquetas "Proyectos"/"Soporte" que el resto del
-  // menú, pero apuntando a las páginas de solo-lectura del propio cliente en
-  // vez de a los listados internos — el permiso `own_client` es exclusivo del
-  // rol `cliente`, así que nunca coinciden para un mismo usuario con las
-  // entradas de arriba/abajo. Ver docs/DECISION-PORTAL-CLIENTE.md.
+  // Portal externo: un solo punto de navegación, "Proyectos".
+  // El permiso own_client es exclusivo del rol cliente.
   {
     to: '/portal/proyectos',
     label: 'Proyectos',
     icon: <FolderOpenIcon size={20} />,
     permission: 'projects:read_own_client',
-  },
-  {
-    to: '/portal/soporte',
-    label: 'Soporte',
-    icon: <HelpCircleIcon size={20} />,
-    permission: 'tickets:read_own_client',
   },
   {
     to: '/equipos',

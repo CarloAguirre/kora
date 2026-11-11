@@ -19,6 +19,7 @@ import {
 } from '@/modules/projects/lib/bitacora-row';
 import { entryTitle, EVENT_STATUS_LABEL } from '@/modules/projects/lib/hour-entry-log';
 import { projectHealth } from './portal-list.adapter';
+import { toClientBusinessImpact } from './business-impact.adapter';
 import type {
   ClientBitacoraEntry,
   ClientBitacoraEntryKind,
@@ -445,33 +446,6 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
     ? Math.max(0, Math.round((toDate(project.endDate).getTime() - startOfToday().getTime()) / DAY_MS))
     : 0;
 
-  const impactBefore = {
-    totalProcessHours: project.impactBeforeHours ?? 0,
-    peopleInvolved: 0,
-    cycleDays: 0,
-    modality: project.impactBeforeModality ?? '',
-  };
-  const impactAfter = {
-    totalProcessHours: project.impactAfterHours ?? 0,
-    peopleInvolved: 0,
-    cycleDays: 0,
-    modality: project.impactAfterModality ?? '',
-  };
-  // "Personas involucradas" / "Duración calendario" viajan como texto libre en el contrato
-  // (`impactBeforePeople`, no un número) — se muestran tal cual en vez de forzarlas a `number`.
-  const parseLeadingNumber = (value: string | null): number => {
-    const match = value?.match(/\d+(?:[.,]\d+)?/);
-    return match ? Number(match[0].replace(',', '.')) : 0;
-  };
-  impactBefore.peopleInvolved = parseLeadingNumber(project.impactBeforePeople);
-  impactBefore.cycleDays = parseLeadingNumber(project.impactBeforeDuration);
-  impactAfter.peopleInvolved = parseLeadingNumber(project.impactAfterPeople);
-  impactAfter.cycleDays = parseLeadingNumber(project.impactAfterDuration);
-  const reductionPercent =
-    impactBefore.totalProcessHours > 0
-      ? Math.round((1 - impactAfter.totalProcessHours / impactBefore.totalProcessHours) * 100)
-      : 0;
-
   const moduleBadgeByModuleId = new Map(project.modules.map((module, index) => [module.id, `FASE ${index + 1}`]));
 
   return {
@@ -513,7 +487,7 @@ export function toClientProjectDetail(project: ProjectDetail, hourEntries: reado
       figma: project.figmaLink,
       documentation: project.documentationLink,
     },
-    businessImpact: { before: impactBefore, after: impactAfter, reductionPercent },
+    businessImpact: toClientBusinessImpact(project),
     qaMetrics:
       project.qaPlannedTests != null
         ? {

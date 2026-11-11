@@ -66,7 +66,7 @@ describe('CreateUserUseCase', () => {
       unitOfWork,
       new FixedClock(),
       new SequentialIdGenerator('user'),
-      { provision: provisionPortal },
+      { provision: provisionPortal, detachUser: vi.fn().mockResolvedValue(undefined) },
     );
   });
 

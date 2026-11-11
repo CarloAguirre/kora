@@ -106,7 +106,7 @@ export function ExternalClientPortalPage() {
   const isError = identityError || (supportTab ? supportError : projectError);
 
   return (
-    <DashboardLayout title={supportTab ? 'Soporte' : 'Proyectos'}>
+    <DashboardLayout title={supportTab ? 'Soporte' : 'Mis proyectos'}>
       <div className={styles.page}>
         {identity && <ClientCompanyHeader company={identity.company} contractLabel="Contacto" />}
         <Tabs tabs={[{ id: 'projects', label: 'Proyectos Desarrollo' }, { id: 'support', label: 'Soporte' }]}

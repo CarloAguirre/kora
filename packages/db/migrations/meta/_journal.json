@@ -484,6 +484,13 @@
       "when": 1794343201000,
       "tag": "0068_repair_client_portal_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1794420000000,
+      "tag": "0069_cleanup_deleted_portal_accounts",
+      "breakpoints": true
     }
   ]
 }

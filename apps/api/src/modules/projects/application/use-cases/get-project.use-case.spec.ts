@@ -206,3 +206,125 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
     expect(modules.listForProject).toHaveBeenCalledTimes(2);
   });
 });
+
+
+/**
+ * Regresión de App Walvy: un proyecto activo heredado puede tener fecha de
+ * inicio y HH históricas, pero carecer de Hito 0. La fecha de inicio funciona
+ * como corte temporal provisional sin escribir en la BD ni generar el hito.
+ */
+describe('GetProjectUseCase — corte provisional de HH', () => {
+  const projectId = '11111111-1111-4111-8111-111111111141';
+
+  function buildCutoffScenario({
+    status = 'active',
+    startDate = new Date('2026-03-30T00:00:00.000Z'),
+    hito0At = null,
+    hoursBeforeCutoff = 0,
+  }: {
+    status?: 'active' | 'draft';
+    startDate?: Date | null;
+    hito0At?: Date | null;
+    hoursBeforeCutoff?: number;
+  } = {}) {
+    const snapshot = {
+      id: projectId, name: 'App Walvy', slug: 'app-walvy',
+      type: 'development', salesStage: 'approved', status,
+      phase: 'development', soldHours: 2489, usedHours: 5143.75,
+      leaderUserId: null, developerUserId: null,
+      commercialManagerUserId: null, primaryContactId: null, clientId: null,
+      startDate, hito0At,
+      createdAt: new Date('2026-03-01T12:00:00.000Z'),
+      updatedAt: new Date('2026-11-10T12:00:00.000Z'),
+    };
+    const projects = {
+      findById: vi.fn().mockResolvedValue({
+        id: projectId, isDeleted: false, pendingManagementApproval: false,
+        toSnapshot: () => snapshot,
+      }),
+      isProjectLeaderOrTeamLeaderOfMember: vi.fn().mockResolvedValue(false),
+    };
+    const hourEntries = {
+      maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
+      sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(hoursBeforeCutoff),
+    };
+    const ensure = vi.fn().mockResolvedValue(false);
+    const useCase = new GetProjectUseCase(
+      projects as unknown as ProjectRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamMemberRepository,
+      { findByProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectObservationRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectModuleRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectPaymentMilestoneRepository,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectUserReader,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectClientReader,
+      { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectContactReader,
+      hourEntries as unknown as ProjectHourEntryReader,
+      { lastActivityAtByUser: vi.fn().mockResolvedValue(null) } as unknown as ProjectActivityReader,
+      new FixedClock(),
+      { promoteAndNotify: vi.fn().mockResolvedValue(undefined) } as unknown as PaymentMilestoneTriggerService,
+      { ensure },
+      { recalculate: vi.fn() } as unknown as ProjectProgressRecalculator,
+    );
+    return { useCase, hourEntries, ensure };
+  }
+
+  const read = (useCase: GetProjectUseCase) =>
+    useCase.execute({ projectId, actorUserId: 'pmo-1', actorPermissions: ['projects:read'] });
+
+  it('usa startDate para un proyecto activo sin Hito 0, conservando las HH históricas', async () => {
+    const { useCase, hourEntries } = buildCutoffScenario();
+    const result = await read(useCase);
+    expect(result.isOk()).toBe(true);
+    expect(hourEntries.sumApprovedHoursBeforeDateForProject)
+      .toHaveBeenCalledWith(projectId, new Date('2026-03-30T00:00:00.000Z'));
+    if (result.isOk()) {
+      expect(result.value.prospectPhaseHours).toBe(0);
+      expect(result.value.usedHours).toBe(5143.75);
+      expect(result.value.hito0At).toBeNull();
+      expect(result.value.startDate).toBe('2026-03-30');
+    }
+  });
+
+  it('prioriza siempre el Hito 0 registrado frente a startDate', async () => {
+    const { useCase, hourEntries } = buildCutoffScenario({
+      hito0At: new Date('2026-06-01T15:30:00.000Z'), hoursBeforeCutoff: 1244.2,
+    });
+    const result = await read(useCase);
+    expect(hourEntries.sumApprovedHoursBeforeDateForProject)
+      .toHaveBeenCalledWith(projectId, new Date('2026-06-01T00:00:00.000Z'));
+    if (result.isOk()) expect(result.value.prospectPhaseHours).toBe(1244.2);
+    else throw new Error('La lectura del proyecto falló');
+  });
+
+  it('sin Hito 0 ni fecha inicial conserva todo el consumo como Prospecto/Cotización', async () => {
+    const { useCase, hourEntries } = buildCutoffScenario({ startDate: null });
+    const result = await read(useCase);
+    expect(hourEntries.sumApprovedHoursBeforeDateForProject).not.toHaveBeenCalled();
+    if (result.isOk()) expect(result.value.prospectPhaseHours).toBe(5143.75);
+    else throw new Error('La lectura del proyecto falló');
+  });
+
+  it('no aplica el inicio planificado a un proyecto aún No iniciado', async () => {
+    const { useCase, hourEntries } = buildCutoffScenario({ status: 'draft' });
+    const result = await read(useCase);
+    expect(hourEntries.sumApprovedHoursBeforeDateForProject).not.toHaveBeenCalled();
+    if (result.isOk()) expect(result.value.prospectPhaseHours).toBe(5143.75);
+    else throw new Error('La lectura del proyecto falló');
+  });
+
+  it('admite un inicio futuro como corte, sin crear Hito 0 y manteniendo las HH', async () => {
+    const { useCase, hourEntries } = buildCutoffScenario({
+      startDate: new Date('2026-12-01T00:00:00.000Z'),
+      hoursBeforeCutoff: 5143.75,
+    });
+    const result = await read(useCase);
+    expect(hourEntries.sumApprovedHoursBeforeDateForProject)
+      .toHaveBeenCalledWith(projectId, new Date('2026-12-01T00:00:00.000Z'));
+    if (result.isOk()) {
+      expect(result.value.prospectPhaseHours).toBe(5143.75);
+      expect(result.value.usedHours).toBe(5143.75);
+      expect(result.value.hito0At).toBeNull();
+    } else throw new Error('La lectura del proyecto falló');
+  });
+});

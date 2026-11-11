@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ClientPortalGrantInput, ProjectModuleTaskScope } from '@kora/contracts';
+import type { ClientPortalGrantInput } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
 /** DTO explícito, nunca reutiliza las respuestas internas /projects o /tickets. */
@@ -18,9 +18,26 @@ export interface PortalProject {
 }
 export interface PortalDelivery {
   id: string; name: string | null; teamName: string | null;
-  estimatedDate: string; status: 'planned' | 'approved';
+  estimatedDate: string; createdAt: string; status: 'planned' | 'approved';
+}
+export interface PortalTimelineSegment {
+  id: string; name: string; teamName: string;
+  startDate: string; endDate: string; closedAt: string | null;
+}
+export interface PortalObservation {
+  id: string; type: string; title: string | null; message: string;
+  date: string; createdAt: string; authorName: string;
+  moduleId: string | null; moduleName: string | null;
+  deliveryId: string | null; taskId: string | null; status: string | null;
+}
+export interface PortalActivity {
+  id: string; date: string; createdAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  category: string; userName: string; moduleName: string | null;
+  hasBlocker: boolean;
 }
 export interface PortalProjectDetail extends PortalProject {
+  updatedAt: string;
   client: { id: string; companyName: string } | null;
   primaryContact: { name: string; position: string | null } | null;
   commercialManager: { fullName: string } | null;
@@ -28,31 +45,25 @@ export interface PortalProjectDetail extends PortalProject {
   usedHoursUpdatedAt: string | null;
   leaderLastActivityAt: string | null;
   contractCurrency: 'UF' | 'CLP' | 'USD';
+  contractAmount: number | null;
   paymentMilestones: Array<{
     name: string; amount: number; percent: number | null; status: string;
     invoiceNumber: string | null; issuedAt: string | null; paidAt: string | null;
   }>;
   modules: Array<{
     id: string; name: string; currentStage: string;
-    estimatedStartDate: string | null; estimatedEndDate: string | null;
-    blockerCount: number;
-    progress: { scopes: Record<string, number | null> };
-    segments: Array<{
-      id: string; teamName: string | null; name: string;
-      startDate: string; endDate: string;
-    }>;
-    tasks: Array<{
-      id: string; name: string; startDate: string | null; date: string;
-      scope: ProjectModuleTaskScope; status: string;
-    }>;
+    timelineSegments: PortalTimelineSegment[];
     deliveries: PortalDelivery[];
   }>;
-  demoLink: string | null;
-  testEnvironmentLink: string | null;
-  figmaLink: string | null;
-  documentationLink: string | null;
+  observations: PortalObservation[];
   impactBeforeHours: number | null;
+  impactBeforePeople: string | null;
+  impactBeforeDuration: string | null;
+  impactBeforeModality: string | null;
   impactAfterHours: number | null;
+  impactAfterPeople: string | null;
+  impactAfterDuration: string | null;
+  impactAfterModality: string | null;
   qaPlannedTests: number | null;
   qaExecutedTests: number | null;
   qaFailedTests: number | null;
@@ -62,6 +73,11 @@ export interface PortalReceipt {
   deliveryId: string;
   receivedAt: string;
   receivedByName: string;
+}
+export interface PortalProjectResponse {
+  project: PortalProjectDetail;
+  receipts: PortalReceipt[];
+  activity: PortalActivity[];
 }
 export interface PortalPlan {
   id: string; slug: string | null; name: string; status: string;
@@ -93,11 +109,16 @@ export const clientPortalApi = {
   me: () => api.get<{ company: PortalCompany }>('/portal/me'),
   projects: () => api.get<PortalProject[]>('/portal/projects'),
   project: (id: string) =>
-    api.get<{ project: PortalProjectDetail; receipts: PortalReceipt[] }>(
+    api.get<PortalProjectResponse>(
       `/portal/projects/${encodeURIComponent(id)}`),
   receive: (projectId: string, deliveryId: string) =>
     api.post<{ deliveryId: string; received: true }>(
       `/portal/projects/${encodeURIComponent(projectId)}/deliveries/${encodeURIComponent(deliveryId)}/receive`),
+  pdf: (projectId: string) =>
+    api.getBlob(`/portal/projects/${encodeURIComponent(projectId)}/pdf`),
+  sharePdf: (projectId: string) =>
+    api.post<{ url: string; expiresAt: string }>(
+      `/portal/projects/${encodeURIComponent(projectId)}/share-pdf`),
   support: () => api.get<PortalPlan[]>('/portal/support'),
   contract: (id: string) =>
     api.get<{ plan: PortalPlan; tickets: PortalTicket[] }>(
@@ -105,7 +126,7 @@ export const clientPortalApi = {
   grants: (clientId: string) =>
     api.get<PortalContactGrant[]>(`/clients/${encodeURIComponent(clientId)}/portal-access`),
   setGrant: (clientId: string, contactId: string, input: ClientPortalGrantInput) =>
-    api.patch<{ userId: string; invitationSent: boolean; enabled: boolean }>(
+    api.patch<{ userId: string; invitationSent: boolean; invitationAttempted: boolean; enabled: boolean }>(
       `/clients/${encodeURIComponent(clientId)}/portal-access/contacts/${encodeURIComponent(contactId)}`, input),
 };
 

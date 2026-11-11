@@ -1,0 +1,29 @@
+/* Ajustes exclusivos de la vista externa; la vista previa interna no cambia. */
+.deliveryNotice {
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:14px 20px;border:1px solid #b6d873;border-radius:11px;
+  background:#f1fbd7;color:#17334d;font-size:13px;flex-wrap:wrap
+}
+.noticeText{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.noticeText strong{font-weight:750}
+.noticeHint{color:#718096}
+.noticeButton {
+  background:#112440;color:#fff;border:0;border-radius:8px;
+  padding:10px 13px;font:inherit;font-weight:650;cursor:pointer;
+}
+.noticeButton:focus-visible{outline:3px solid #a2d447}
+.hoursGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+.hourCard{border:1px solid #e3eaf0;border-radius:11px;background:#fff;padding:18px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.hourCardHighlight{background:#112e50;color:#fff}
+.hourLabel{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#8090a2;font-weight:700}
+.hourCardHighlight .hourLabel{color:#d4e3ed}
+.hourValue{font-size:24px;font-weight:780;line-height:1.15;word-break:break-word;color:#122d48}
+.hourCardHighlight .hourValue{color:#fff}
+.hourFoot{font-size:11px;color:#7d8c9d}
+.hourCardHighlight .hourFoot{color:#a6e061}
+.goodDeviation{color:#299556;font-weight:700}
+.attentionDeviation{color:#bb594a;font-weight:700}
+@media print{
+  .deliveryNotice{background:#f4fcdf!important}
+  .hoursGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}

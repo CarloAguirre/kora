@@ -53,10 +53,14 @@ export function ClientPortalAccessManager({ client, projects, supportPlans }: {
     };
     try {
       const result = await save.mutateAsync({ contactId: contact.id, grant });
-      toast.show(result.invitationSent
-        ? 'Se invitó al contacto y se configuraron sus accesos.'
-        : enabled ? 'Accesos actualizados.' : 'Acceso al portal revocado.',
-      'success');
+      if (result.invitationAttempted && !result.invitationSent) {
+        toast.show('Acceso guardado, pero no se pudo enviar la invitación. Revisa el correo y vuelve a guardar para reintentar.', 'error');
+      } else {
+        toast.show(result.invitationSent
+          ? 'Se invitó al contacto para definir su contraseña y se configuraron sus accesos.'
+          : enabled ? 'Accesos actualizados.' : 'Acceso al portal revocado.',
+        'success');
+      }
       setContactId(null);
     } catch (error) {
       toast.show(error instanceof Error ? error.message : 'No se pudo modificar el acceso.', 'error');
