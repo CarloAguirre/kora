@@ -157,6 +157,10 @@ export function WeeklyEntryForm({
     return overflowByBlock(existingRegular, [Number(value) || 0])[0] ?? 0;
   });
   const overflowDays = dayOverflow.flatMap((hours, index) => (hours > 0 ? [{ label: WEEKDAY_LABELS[index]!, hours }] : []));
+  // Mantener la misma regla del registro diario: mostrar el excedente,
+  // pero no permitir enviarlo si el proyecto no autoriza horas extras.
+  const unauthorizedOvertime = Boolean(needsProject && overtimeDisabled &&
+    (isOvertime || overflowDays.length > 0));
   // Horas de proyecto se aprueban por acceso al proyecto, no por aprobador
   // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
   // Sin proyecto, las horas extra (marcadas o por exceso) exigen aprobador,
@@ -213,7 +217,7 @@ export function WeeklyEntryForm({
     if (needsProject && segmentId && availableTasks.length > 0 && !taskId)
       return 'Selecciona una tarea o «Otro trabajo del bloque».';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
-    if (needsProject && isOvertime && overtimeDisabled) return 'Este proyecto no tiene autorizadas horas extra.';
+    if (unauthorizedOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
     if (!category.trim()) return 'Indica la actividad realizada.';
     if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
       return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
@@ -400,7 +404,7 @@ export function WeeklyEntryForm({
           <span className={styles.stepperLabel}>Horas Extra</span>
           <label
             className={styles.overtimeToggleRow}
-            title={overtimeDisabled ? 'Este proyecto no tiene autorizadas horas extra.' : undefined}
+            title={overtimeDisabled ? 'El proyecto no tiene aprobada horas extras' : undefined}
           >
             <input
               type="checkbox"
@@ -483,9 +487,13 @@ export function WeeklyEntryForm({
         <Button variant="outline" type="button" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="button" disabled={!canSubmit} loading={submitting} loadingText="Guardando…" onClick={() => void onSubmit()}>
-          Guardar semana y enviar para aprobación
-        </Button>
+        <span title={unauthorizedOvertime ? 'El proyecto no tiene aprobada horas extras' : undefined}>
+          <Button type="button" disabled={!canSubmit} loading={submitting} loadingText="Guardando…"
+            title={unauthorizedOvertime ? 'El proyecto no tiene aprobada horas extras' : undefined}
+            onClick={() => void onSubmit()}>
+            Guardar semana y enviar para aprobación
+          </Button>
+        </span>
       </div>
     </div>
   );

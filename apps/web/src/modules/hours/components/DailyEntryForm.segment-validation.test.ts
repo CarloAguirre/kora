@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectSummary, ProjectPhaseOption } from '@kora/contracts';
-import { type DailyBlock, matchesTaskHourTarget, remainingRegularHoursForBlock, selectAttributableTasks, validateDailyBlock } from './DailyEntryForm';
+import { type DailyBlock, matchesTaskHourTarget, overflowByBlock, remainingRegularHoursForBlock, selectAttributableTasks, stepBlockHours, validateDailyBlock } from './DailyEntryForm';
 
 const base: DailyBlock = {
   key: 'hh-1', expanded: true, assignment: 'Proyecto', projectId: 'project-1',
@@ -18,6 +18,19 @@ describe('jornada diaria y horas extra autorizadas', () => {
   const withoutOvertime = {
     ...context, projects: [{ id: 'project-1', allowsOvertime: false } as unknown as ProjectSummary],
   };
+  it('permite declarar 9,25 HH sin recortarlas a 8, pero bloquea el guardado si el proyecto no las autoriza', () => {
+    const hours = stepBlockHours('8', 1.25);
+    expect(hours).toBe('9.25');
+    const overflow = overflowByBlock(0, [Number(hours)]);
+    expect(overflow).toEqual([1.25]);
+    expect(validateDailyBlock({ ...base, hours }, {
+      ...withoutOvertime, exceedsDailyCap: overflow[0]! > 0,
+    })).toBe('Este proyecto no tiene autorizadas horas extra.');
+    expect(validateDailyBlock({ ...base, hours }, {
+      ...context, exceedsDailyCap: overflow[0]! > 0,
+    })).toBeNull();
+  });
+
   it('rechaza el excedente automático aunque el switch de extra esté desmarcado', () => {
     expect(validateDailyBlock({ ...base, hours: '9.25' }, {
       ...withoutOvertime, exceedsDailyCap: true,
