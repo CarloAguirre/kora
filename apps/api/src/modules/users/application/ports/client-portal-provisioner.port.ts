@@ -14,6 +14,13 @@ export interface ClientPortalProvisioner {
     readonly actorUserId: string;
     readonly enabled: boolean;
   }, context: TransactionContext): Promise<void>;
+
+  /**
+   * Al eliminar lógicamente una cuenta, libera el contacto y revoca los grants
+   * del portal en la MISMA transacción. No elimina la ficha del contacto,
+   * porque puede seguir siendo referencia comercial en otros módulos.
+   */
+  detachUser(userId: string, context: TransactionContext): Promise<void>;
 }
 
 export const CLIENT_PORTAL_PROVISIONER = Symbol('ClientPortalProvisioner');
