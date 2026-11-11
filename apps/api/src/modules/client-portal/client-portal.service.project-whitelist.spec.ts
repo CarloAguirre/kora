@@ -64,6 +64,10 @@ describe('ClientPortalService — DTO exclusivamente externo', () => {
     expect(externalJson).not.toContain('TAREA INTERNA');
     expect(externalJson).not.toContain('Persona interna');
     expect(externalJson).not.toContain('estimatedHours');
+    expect(external).not.toHaveProperty('demoLink');
+    expect(external).not.toHaveProperty('testEnvironmentLink');
+    expect(external).not.toHaveProperty('figmaLink');
+    expect(external).not.toHaveProperty('documentationLink');
     expect(external).toHaveProperty('contractAmount', 180);
   });
 });
