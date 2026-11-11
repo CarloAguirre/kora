@@ -218,67 +218,141 @@ export function ExternalClientProjectDetailPage() {
             <EyeIcon size={16}/>
           </button>
         </div>
+
         {visible('info') && <Card className={styles.infoBar}>
-          <div><strong>Cliente</strong><p>{project.client?.companyName ?? '—'}</p></div>
-          <div><strong>Responsable Kabeli</strong><p>{project.commercialManager?.fullName ?? project.leader?.fullName ?? '—'}</p></div>
-          <div><strong>Contacto cliente</strong><p>{project.primaryContact?.name ?? '—'}</p></div>
-          <div><strong>Inicio – Fin</strong><p>{dmy(project.startDate)} – {dmy(project.endDate)}</p></div>
+          <div className={styles.infoClient}>
+            <span className={styles.infoLogoPlaceholder}><BuildingIcon size={20}/></span>
+            <div className={styles.infoField}>
+              <span className={styles.infoLabel}>Cliente</span>
+              <span className={styles.infoValue}>{project.client?.companyName ?? '—'}</span>
+            </div>
+          </div>
+          <div className={styles.infoField}>
+            <span className={styles.infoLabel}>Responsable Kabeli</span>
+            <span className={styles.infoValue}>{project.commercialManager?.fullName ?? project.leader?.fullName ?? '—'}</span>
+          </div>
+          <div className={styles.infoField}>
+            <span className={styles.infoLabel}>Responsable cliente</span>
+            <span className={styles.infoValue}>{project.primaryContact?.name ?? '—'}</span>
+            {project.primaryContact?.position && <span className={styles.infoValueSub}>{project.primaryContact.position}</span>}
+          </div>
+          <div className={styles.infoField}>
+            <span className={styles.infoLabel}>Fecha de inicio - fin</span>
+            <span className={styles.infoValue}>{dmy(project.startDate)}</span>
+            <span className={styles.infoValue}>{dmy(project.endDate)}</span>
+          </div>
         </Card>}
+
         {pending.length > 0 && (
-          <Card>
-            <h3>Tienes {pending.length} entrega{pending.length !== 1 ? 's' : ''} esperando tu OK</h3>
-            <p>El OK deja constancia de recepción; no sustituye la aprobación técnica interna.</p>
-            {pending.map((delivery) => (
-              <div key={delivery.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                gap: 12, padding: '10px 0', borderBottom: '1px solid var(--color-border, #e5e7eb)' }}>
-                <div><strong>{delivery.name ?? 'Entregable'}</strong>
-                  <div>{delivery.phase} · Entregado para revisión · {dmy(delivery.estimatedDate)}</div>
-                </div>
-                <Button size="sm" onClick={() => setConfirmId(delivery.id)} iconLeft={<CircleCheckIcon size={15}/>}>
-                  Dar OK
-                </Button>
-              </div>
-            ))}
-          </Card>
+          <div className={detailStyles.deliveryNotice} role="status">
+            <div className={detailStyles.noticeText}>
+              <strong>Tienes {pending.length} entrega{pending.length === 1 ? '' : 's'} esperando tu OK.</strong>
+              <span className={detailStyles.noticeHint}>Es un respaldo de que la recibiste.</span>
+            </div>
+            <button type="button" className={detailStyles.noticeButton} onClick={() => {
+              setPrefs((prev) => ({ ...prev, sections: { ...prev.sections, gantt: true } }));
+              requestAnimationFrame(() => document.getElementById('entregas-comprometidas')?.scrollIntoView({ behavior: 'smooth' }));
+            }}>Revisar entregas</button>
+          </div>
         )}
+
+        {visible('billing') && <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Facturación</h3>
+          <ProjectBillingCard billing={billing}/>
+        </section>}
+
         {visible('progress') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
           <ProjectProgressOverview actualPercent={project.progress.actual}
             expectedPercent={project.progress.expected} startDate={dmy(project.startDate)}
             endDate={dmy(project.endDate)}
             daysRemaining={project.endDate ? Math.max(0, Math.ceil(
-              (new Date(`${project.endDate}T00:00:00`).getTime() - Date.now()) / 86400000)) : 0}/>
+              (new Date(project.endDate + 'T00:00:00').getTime() - Date.now()) / 86400000)) : 0}/>
         </section>}
+
         {visible('hours') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Horas y avance</h3>
-          <Card>
-            <p><strong>HH estimadas:</strong> {project.soldHours.toLocaleString('es-CL')}</p>
-            {usedHoursVisible && <p><strong>HH utilizadas:</strong> {project.usedHours.toLocaleString('es-CL')}</p>}
-            {usedHoursVisible && <p><strong>Desviación:</strong> {hoursDeviation.toLocaleString('es-CL')} HH</p>}
-          </Card>
+          <div className={detailStyles.hoursGrid}>
+            <div className={detailStyles.hourCard}>
+              <span className={detailStyles.hourLabel}>Horas estimadas</span>
+              <span className={detailStyles.hourValue}>{project.soldHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}</span>
+              <span className={detailStyles.hourFoot}>Horas comprometidas</span>
+              <span className={detailStyles.hourLabel}>Horas de exceso</span>
+              <span className={project.usedHours > project.soldHours ? detailStyles.attentionDeviation : detailStyles.goodDeviation}>
+                {usedHoursVisible ? Math.max(0, project.usedHours - project.soldHours).toLocaleString('es-CL', { maximumFractionDigits: 2 }) : 'Oculto'}
+                {usedHoursVisible && project.usedHours <= project.soldHours ? ' · Sin exceso' : ''}
+              </span>
+            </div>
+            <div className={detailStyles.hourCard}>
+              <span className={detailStyles.hourLabel}>Horas utilizadas a la fecha</span>
+              <span className={detailStyles.hourValue}>{usedHoursVisible
+                ? project.usedHours.toLocaleString('es-CL', { maximumFractionDigits: 2 }) : '•••'}</span>
+              <span className={detailStyles.hourFoot}>Actualizado al {dmy(project.usedHoursUpdatedAt)}</span>
+            </div>
+            <div className={detailStyles.hourCard}>
+              <span className={detailStyles.hourLabel}>Avance real vs. esperado</span>
+              <span className={detailStyles.hourValue}>{project.progress.actual == null ? '—' : String(project.progress.actual) + '%'}</span>
+              <span className={detailStyles.hourFoot}>vs. {project.progress.expected == null ? 'sin plan' : String(project.progress.expected) + '% esperado'}</span>
+            </div>
+            <div className={[detailStyles.hourCard, detailStyles.hourCardHighlight].join(' ')}>
+              <span className={detailStyles.hourLabel}>Fecha fin del proyecto</span>
+              <span className={detailStyles.hourValue}>{dmy(project.endDate)}</span>
+              <span className={detailStyles.hourFoot}>{project.endDate ? 'Fecha de entrega planificada' : 'Sin fecha comprometida'}</span>
+            </div>
+          </div>
         </section>}
-        {visible('billing') && <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Facturación</h3>
-          <ProjectBillingCard billing={billing}/>
+
+        {visible('gantt') && <section className={styles.section} id="entregas-comprometidas">
+          <h3 className={styles.sectionTitle}>Roadmap · entregas comprometidas</h3>
+          <CommittedDeliveriesRoadmap deliveries={deliveries} onReview={setConfirmId}/>
         </section>}
+
         {visible('links') && accessLinks.length > 0 && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Accesos y enlaces</h3>
-          <Card><div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+          <div className={styles.linksRow}>
             {accessLinks.map((link) => <a key={link.label} href={link.href}
-              target="_blank" rel="noopener noreferrer">{link.label}</a>)}
-          </div></Card>
+              target="_blank" rel="noopener noreferrer" className={styles.linkCard}>
+              <LinkIcon size={16} className={styles.linkIcon}/>
+              <span className={styles.linkText}>
+                <span className={styles.linkTitle}>{link.label}</span>
+                <span className={styles.linkSubtitle}>Abrir enlace autorizado</span>
+              </span>
+            </a>)}
+          </div>
         </section>}
+
         {visible('impact') && (project.impactBeforeHours != null || project.impactAfterHours != null) && (
           <section className={styles.section}>
             <h3 className={styles.sectionTitle}>Impacto en el negocio</h3>
-            <Card>
-              <p><strong>Antes:</strong> {project.impactBeforeHours ?? '—'} horas por proceso</p>
-              <p><strong>Después:</strong> {project.impactAfterHours ?? '—'} horas por proceso</p>
-            </Card>
+            <div className={detailStyles.impactCard}>
+              <div className={detailStyles.impactColumn}>
+                <strong className={detailStyles.impactTitle}>Antes de automatizar</strong>
+                <div className={detailStyles.impactRow}><span>Tiempo total del proceso</span><strong>{project.impactBeforeHours ?? '—'} horas</strong></div>
+                <div className={detailStyles.impactRow}><span>Personas involucradas</span><strong>{project.impactBeforePeople ?? '—'}</strong></div>
+                <div className={detailStyles.impactRow}><span>Duración calendario</span><strong>{project.impactBeforeDuration ?? '—'}</strong></div>
+                <div className={detailStyles.impactRow}><span>Modalidad</span><strong>{project.impactBeforeModality ?? '—'}</strong></div>
+              </div>
+              <div className={detailStyles.impactColumn}>
+                <strong className={detailStyles.impactTitle}>Después de automatizar</strong>
+                <div className={detailStyles.impactRow}><span>Tiempo total del proceso</span><strong>{project.impactAfterHours ?? '—'} horas</strong></div>
+                <div className={detailStyles.impactRow}><span>Personas involucradas</span><strong>{project.impactAfterPeople ?? '—'}</strong></div>
+                <div className={detailStyles.impactRow}><span>Duración calendario</span><strong>{project.impactAfterDuration ?? '—'}</strong></div>
+                <div className={detailStyles.impactRow}><span>Modalidad</span><strong>{project.impactAfterModality ?? '—'}</strong></div>
+              </div>
+              <div className={detailStyles.impactResult}>
+                {project.impactBeforeHours != null && project.impactBeforeHours > 0 && project.impactAfterHours != null
+                  ? <>
+                      <strong>{Math.round((project.impactAfterHours - project.impactBeforeHours) / project.impactBeforeHours * 100)}%</strong>
+                      <span>variación del tiempo del proceso</span>
+                    </>
+                  : <span>Sin datos suficientes para calcular el impacto</span>}
+              </div>
+            </div>
           </section>
         )}
+
         {visible('qa') && project.qaPlannedTests != null && <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Métricas QA</h3>
+          <h3 className={styles.sectionTitle}>Métricas de la etapa actual</h3>
           <Card>
             <p><strong>Módulo:</strong> {project.qaEvaluatedModule ?? 'General'}</p>
             <p><strong>Pruebas planificadas:</strong> {project.qaPlannedTests}</p>
@@ -286,23 +360,7 @@ export function ExternalClientProjectDetailPage() {
             <p><strong>Pruebas con error:</strong> {project.qaFailedTests ?? 0}</p>
           </Card>
         </section>}
-        {visible('gantt') && <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Roadmap por fases</h3>
-          <PhaseRoadmap phaseRoadmap={roadmap}/>
-        </section>}
-        <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Recepción de entregables</h3>
-          {project.modules.flatMap((phase) => phase.deliveries.map((delivery) => (
-            <Card key={delivery.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-                <span>{phase.name} · {delivery.name ?? 'Entrega'} ({dmy(delivery.estimatedDate)})</span>
-                <StatusPill tone={receiptIds.has(delivery.id) ? 'success' : 'neutral'}>
-                  {receiptIds.has(delivery.id) ? 'OK recibido' : delivery.status === 'approved' ? 'Esperando tu OK' : 'Programada'}
-                </StatusPill>
-              </div>
-            </Card>
-          )))}
-        </section>
+
         {visible('bitacora') && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Bitácora de recepciones</h3>
           <ProjectBitacora entries={history}/>
