@@ -20,10 +20,17 @@ const monthLabel = (month: string) =>
     .toLocaleDateString('es-CL', { month: 'short', year: '2-digit', timeZone: 'UTC' });
 
 /** Solo representación; nunca crea fases, mueve HH ni influye en el avance del plan. */
-export function buildHistoricalMonths(rows: readonly MonthHours[]): MonthHours[] {
+export function buildHistoricalMonths(
+  rows: readonly MonthHours[], anchorMonth?: string | null,
+): MonthHours[] {
   if (rows.length === 0) return [];
   const data = new Map(rows.map((row) => [row.month, row]));
-  const ordinals = rows.map((row) => monthOrdinal(row.month));
+  // Incluye también el mes del corte aunque todavía no haya horas en él:
+  // así un proyecto iniciado en marzo con HH desde mayo mantiene el eje real.
+  const ordinals = [
+    ...rows.map((row) => monthOrdinal(row.month)),
+    ...(anchorMonth ? [monthOrdinal(anchorMonth)] : []),
+  ];
   const min = Math.min(...ordinals);
   const max = Math.max(...ordinals);
   const result: MonthHours[] = [];
@@ -35,9 +42,11 @@ export function buildHistoricalMonths(rows: readonly MonthHours[]): MonthHours[]
 }
 
 export function ProjectHoursHistory({ project }: { readonly project: HistoryProject }) {
+  const cutoffDate = project.hito0At?.slice(0, 10) ??
+    (project.status === 'active' ? project.startDate : null);
   const months = useMemo(
-    () => buildHistoricalMonths(project.approvedMonthlyHours ?? []),
-    [project.approvedMonthlyHours],
+    () => buildHistoricalMonths(project.approvedMonthlyHours ?? [], cutoffDate?.slice(0, 7)),
+    [project.approvedMonthlyHours, cutoffDate],
   );
   if (months.length === 0) return null;
 
@@ -48,8 +57,6 @@ export function ProjectHoursHistory({ project }: { readonly project: HistoryProj
     (total, item) => total + item.preactivationHours + item.executionHours, 0,
   );
   const preactivationTotal = months.reduce((total, item) => total + item.preactivationHours, 0);
-  const cutoffDate = project.hito0At?.slice(0, 10) ??
-    (project.status === 'active' ? project.startDate : null);
   const cutoffLabel = project.hito0At ? 'Hito 0 oficial' : 'Inicio provisional';
 
   return (
