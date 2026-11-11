@@ -75,7 +75,7 @@ export class ClientPortalService {
       })
       .from(clientPortalAccounts)
       .innerJoin(users, eq(users.id, clientPortalAccounts.userId))
-      .where(eq(clientPortalAccounts.clientId, clientId));
+      .where(and(eq(clientPortalAccounts.clientId, clientId), isNull(users.deletedAt)));
     return Promise.all(rows.map(async (row) => {
       const [projectGrants, planGrants] = await Promise.all([
         this.db.select({ id: clientPortalProjectGrants.projectId })
