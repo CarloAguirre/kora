@@ -141,8 +141,8 @@ export function ExternalClientProjectDetailPage() {
     }
   };
 
-  if (isLoading) return <DashboardLayout title="Proyectos"><Card>Cargando proyecto…</Card></DashboardLayout>;
-  if (isError || !project) return <DashboardLayout title="Proyectos">
+  if (isLoading) return <DashboardLayout title="Mis proyectos"><Card>Cargando proyecto…</Card></DashboardLayout>;
+  if (isError || !project) return <DashboardLayout title="Mis proyectos">
     <Card role="alert"><p>No tienes acceso a este proyecto o no está disponible.</p>
       <Link to="/portal/proyectos">Volver a proyectos</Link></Card>
   </DashboardLayout>;
@@ -168,7 +168,7 @@ export function ExternalClientProjectDetailPage() {
   ].filter((link): link is { label: string; href: string } =>
     !!link.href && /^https?:\/\//i.test(link.href));
   return (
-    <DashboardLayout title="Proyectos">
+    <DashboardLayout title="Mis proyectos">
       <div className={styles.page} data-client-portal-print>
         <Link data-client-portal-nav className={styles.breadcrumb} to="/portal/proyectos"><ChevronLeftIcon size={16}/> Volver a mis proyectos</Link>
         <div className={styles.headerBlock}>
