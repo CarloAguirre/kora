@@ -887,16 +887,6 @@ export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: 
    * es igual a `usedHours` completo.
    */
   prospectPhaseHours: z.number(),
-  /**
-   * Histórico de HH aprobadas, agrupadas por el mes REAL trabajado.
-   * Fuera de la planificación operativa: no representa porcentaje de avance.
-   * `preactivationHours` usa Hito 0 oficial o inicio provisional, sin reubicar HH.
-   */
-  approvedMonthlyHours: z.array(z.object({
-    month: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/),
-    preactivationHours: z.number().nonnegative(),
-    executionHours: z.number().nonnegative(),
-  })).optional(),
   /** Monto total del contrato — base del % de cada tramo. */
   contractAmount: z.number().nullable(),
   /** Moneda de todos los tramos de pago del proyecto. */
