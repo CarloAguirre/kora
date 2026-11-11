@@ -4,9 +4,9 @@
   gap: 16px;
   padding: 20px;
   background: #fff;
-  border: 1px solid #e3e9ef;
-  border-radius: 14px;
-  box-shadow: 0 5px 15px rgba(15, 41, 66, .09);
+  border: 1px solid var(--kora-blue-200);
+  border-radius: var(--kora-radius-lg);
+  box-shadow: var(--kora-shadow-card);
 }
 .topline,.chips,.legend,.dates,.deliveryRow,.help {display:flex;align-items:center}
 .topline{justify-content:space-between;gap:15px;flex-wrap:wrap}
