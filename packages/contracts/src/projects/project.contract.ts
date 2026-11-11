@@ -893,7 +893,7 @@ export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: 
    * `preactivationHours` usa Hito 0 oficial o inicio provisional, sin reubicar HH.
    */
   approvedMonthlyHours: z.array(z.object({
-    month: z.string().regex(/^\\d{4}-(0[1-9]|1[0-2])$/),
+    month: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/),
     preactivationHours: z.number().nonnegative(),
     executionHours: z.number().nonnegative(),
   })).optional(),
