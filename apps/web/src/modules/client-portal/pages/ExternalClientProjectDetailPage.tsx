@@ -190,7 +190,7 @@ export function ExternalClientProjectDetailPage() {
         </div>
         <p className={styles.lastUpdated}>
           <ClockIcon size={14}/>
-          Última actualización: {new Date(project.updatedAt).toLocaleString('es-CL', {
+          Última actualización: {new Date(project.leaderLastActivityAt ?? project.updatedAt).toLocaleString('es-CL', {
             dateStyle: 'short', timeStyle: 'short',
           })}
         </p>
@@ -365,6 +365,10 @@ export function ExternalClientProjectDetailPage() {
           <h3 className={styles.sectionTitle}>Bitácora de recepciones</h3>
           <ProjectBitacora entries={history}/>
         </section>}
+        <footer className={detailStyles.credit}>
+          <span>Diseñado y desarrollado por</span>
+          <KabeliLogo/>
+        </footer>
       </div>
       <Modal open={!!selected} title="Confirmar recepción" onClose={() => setConfirmId(null)}
         dismissible={!receive.isPending}
