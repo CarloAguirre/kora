@@ -262,8 +262,6 @@ export class ClientPortalService {
         moduleId: o.moduleId, moduleName: o.moduleName,
         deliveryId: o.deliveryId, taskId: o.taskId, status: o.status,
       })),
-      demoLink: project.demoLink, testEnvironmentLink: project.testEnvironmentLink,
-      figmaLink: project.figmaLink, documentationLink: project.documentationLink,
       impactBeforeHours: project.impactBeforeHours,
       impactBeforePeople: project.impactBeforePeople,
       impactBeforeDuration: project.impactBeforeDuration,
