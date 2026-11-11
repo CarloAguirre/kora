@@ -32,7 +32,7 @@ const localTime = (iso: string) => new Date(iso).toLocaleString('es-CL', {
 
 function billingForPortal(project: PortalProjectDetail): ClientProjectBilling {
   const rows = project.paymentMilestones;
-  const total = rows.reduce((n, row) => n + row.amount, 0);
+  const total = project.contractAmount ?? rows.reduce((n, row) => n + row.amount, 0);
   const sum = (status: string) => rows.filter((m) => m.status === status)
     .reduce((n, row) => n + row.amount, 0);
   const percent = (amount: number) => total > 0 ? Math.round(amount / total * 100) : 0;
