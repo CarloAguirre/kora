@@ -125,7 +125,6 @@ describe('GetProjectUseCase — lectura del líder de un equipo aprobado', () =>
       {
         maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
         sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(0),
-        approvedMonthlyHoursForProject: vi.fn().mockResolvedValue([]),
       } as unknown as ProjectHourEntryReader,
       { lastActivityAtByUser: vi.fn().mockResolvedValue(null) } as unknown as ProjectActivityReader,
       new FixedClock(),
@@ -188,7 +187,6 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
       { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectContactReader,
       { maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
         sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(0),
-        approvedMonthlyHoursForProject: vi.fn().mockResolvedValue([]),
       } as unknown as ProjectHourEntryReader,
       { lastActivityAtByUser: vi.fn().mockResolvedValue(null) } as unknown as ProjectActivityReader,
       new FixedClock(),
@@ -249,10 +247,6 @@ describe('GetProjectUseCase — corte provisional de HH', () => {
     const hourEntries = {
       maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
       sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(hoursBeforeCutoff),
-      approvedMonthlyHoursForProject: vi.fn().mockResolvedValue([
-        { month: '2026-05', preactivationHours: 0, executionHours: 1244.2 },
-        { month: '2026-06', preactivationHours: 0, executionHours: 996.5 },
-      ]),
     };
     const ensure = vi.fn().mockResolvedValue(false);
     const useCase = new GetProjectUseCase(
@@ -284,17 +278,11 @@ describe('GetProjectUseCase — corte provisional de HH', () => {
     expect(result.isOk()).toBe(true);
     expect(hourEntries.sumApprovedHoursBeforeDateForProject)
       .toHaveBeenCalledWith(projectId, new Date('2026-03-30T00:00:00.000Z'));
-    expect(hourEntries.approvedMonthlyHoursForProject)
-      .toHaveBeenCalledWith(projectId, new Date('2026-03-30T00:00:00.000Z'));
     if (result.isOk()) {
       expect(result.value.prospectPhaseHours).toBe(0);
       expect(result.value.usedHours).toBe(5143.75);
       expect(result.value.hito0At).toBeNull();
       expect(result.value.startDate).toBe('2026-03-30');
-      expect(result.value.approvedMonthlyHours).toHaveLength(2);
-      expect(result.value.approvedMonthlyHours?.[0]).toEqual({
-        month: '2026-05', preactivationHours: 0, executionHours: 1244.2,
-      });
     }
   });
 
