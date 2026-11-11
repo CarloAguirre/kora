@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import {
-  and, clientContacts, clientPortalAccounts, clients, eq, isNull, sql,
+  and, clientContacts, clientPortalAccounts, clients, eq, isNull, sql, users,
   type Database,
 } from '@kora/db';
 import type { TransactionContext } from '@kora/core';
@@ -45,10 +45,21 @@ export class DrizzleClientPortalProvisioner implements ClientPortalProvisioner {
     }
     let contactId = existingContacts[0]?.id;
     if (contactId) {
-      const [linked] = await db.select({ userId: clientPortalAccounts.userId })
-        .from(clientPortalAccounts).where(eq(clientPortalAccounts.contactId, contactId)).limit(1);
+      const [linked] = await db.select({
+        userId: clientPortalAccounts.userId,
+        deletedAt: users.deletedAt,
+      }).from(clientPortalAccounts)
+        .innerJoin(users, eq(users.id, clientPortalAccounts.userId))
+        .where(eq(clientPortalAccounts.contactId, contactId)).limit(1);
       if (linked && linked.userId !== input.userId) {
-        throw new ConflictException('Este contacto ya está vinculado a otra cuenta del portal.');
+        if (!linked.deletedAt) {
+          throw new ConflictException('Este contacto ya está vinculado a otra cuenta activa del portal.');
+        }
+        // Compatibilidad con usuarios eliminados ANTES de esta corrección:
+        // su fila histórica sigue en users, pero el vínculo/grants deben
+        // liberarse para que el contacto pueda recibir una nueva cuenta.
+        await db.delete(clientPortalAccounts)
+          .where(eq(clientPortalAccounts.userId, linked.userId));
       }
     } else {
       const [inserted] = await db.insert(clientContacts)
@@ -71,5 +82,12 @@ export class DrizzleClientPortalProvisioner implements ClientPortalProvisioner {
       enabled: input.enabled,
       updatedBy: input.actorUserId,
     });
+  }
+
+  async detachUser(userId: string, context: TransactionContext): Promise<void> {
+    // El FK cascade revoca ambos tipos de grants sin tocar los recibos de
+    // recepción históricos, que referencian users directamente.
+    const db = resolveDb(this.database, context);
+    await db.delete(clientPortalAccounts).where(eq(clientPortalAccounts.userId, userId));
   }
 }
