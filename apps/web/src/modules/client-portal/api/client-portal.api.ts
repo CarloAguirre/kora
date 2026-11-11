@@ -95,6 +95,11 @@ export const clientPortalApi = {
   receive: (projectId: string, deliveryId: string) =>
     api.post<{ deliveryId: string; received: true }>(
       `/portal/projects/${encodeURIComponent(projectId)}/deliveries/${encodeURIComponent(deliveryId)}/receive`),
+  pdf: (projectId: string) =>
+    api.getBlob(`/portal/projects/${encodeURIComponent(projectId)}/pdf`),
+  sharePdf: (projectId: string) =>
+    api.post<{ url: string; expiresAt: string }>(
+      `/portal/projects/${encodeURIComponent(projectId)}/share-pdf`),
   support: () => api.get<PortalPlan[]>('/portal/support'),
   contract: (id: string) =>
     api.get<{ plan: PortalPlan; tickets: PortalTicket[] }>(
