@@ -48,7 +48,10 @@ export function CommittedDeliveriesRoadmap({
   const sorted = useMemo(() =>
     [...deliveries].sort((a, b) => a.estimatedDate.localeCompare(b.estimatedDate) || a.name.localeCompare(b.name)),
   [deliveries]);
-  const today = new Date().toISOString().slice(0, 10);
+  // Fecha local: en Chile UTC adelanta el día a partir de las 21:00.
+  const now = new Date();
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
   const awaiting = sorted.filter((entry) => entry.status === 'approved' && !entry.received).length;
   const received = sorted.filter((entry) => entry.received).length;
 
