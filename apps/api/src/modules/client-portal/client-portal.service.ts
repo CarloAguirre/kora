@@ -221,6 +221,7 @@ export class ClientPortalService {
     // auditoría, facturas adjuntas ni motivos de rechazo de líderes.
     return {
       id: project.id, slug: project.slug, name: project.name, status: project.status,
+      updatedAt: project.updatedAt,
       salesStage: project.salesStage, phase: project.phase, startDate: project.startDate,
       endDate: project.endDate, client: project.client,
       primaryContact: project.primaryContact ? {
