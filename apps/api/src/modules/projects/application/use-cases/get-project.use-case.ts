@@ -117,16 +117,22 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       ownPrimaryContact ?? (client?.primaryContactId ? await this.contacts.findById(client.primaryContactId) : null);
 
     /**
-     * Fase "Prospecto/Cotización": horas aprobadas con fecha anterior al
-     * DÍA del Hito 0 (no al instante exacto — una hora cargada el mismo día
-     * en que se facturó ya es del proyecto, ver el documento de Leslie
-     * "Corte por fecha"). Sin Hito 0 todavía, el proyecto nunca se activó:
-     * todo lo consumido es de esta fase.
+     * Corte de HH preactivación (Prospecto/Cotización):
+     * 1. Hito 0 oficial, si existe; tiene siempre prioridad.
+     * 2. Fecha de inicio como referencia PROVISIONAL únicamente en proyectos
+     *    activos heredados sin Hito 0 (ej. App Walvy).
+     * 3. Sin corte, conservar todo el consumo en Prospecto/Cotización.
+     *
+     * Se comparan días completos: las HH del mismo día del corte pertenecen
+     * a ejecución. No se modifican los registros históricos ni se crea
+     * artificialmente un Hito 0 en la base de datos.
      */
-    const prospectPhaseHours = snapshot.hito0At
+    const hoursCutoff = snapshot.hito0At ??
+      (snapshot.status === 'active' ? snapshot.startDate : null);
+    const prospectPhaseHours = hoursCutoff
       ? await this.hourEntries.sumApprovedHoursBeforeDateForProject(
           project.id,
-          new Date(snapshot.hito0At.toISOString().slice(0, 10)),
+          new Date(hoursCutoff.toISOString().slice(0, 10)),
         )
       : snapshot.usedHours;
 
