@@ -65,6 +65,6 @@ import { DrizzleClientPortalProvisioner } from './infrastructure/persistence/dri
   // consulta usuarios, credenciales y permisos). Los casos de uso NO se
   // exportan: quien quiera operar sobre usuarios lo hace por HTTP o pidiendo
   // aquí un caso de uso nuevo, no llamando por dentro a los ajenos.
-  exports: [CreateUserUseCase, USER_REPOSITORY, USER_CREDENTIAL_REPOSITORY, PERMISSION_READER, INVITATION_REPOSITORY],
+  exports: [CreateUserUseCase, GrantUserAccessUseCase, USER_REPOSITORY, USER_CREDENTIAL_REPOSITORY, PERMISSION_READER, INVITATION_REPOSITORY],
 })
 export class UsersModule {}
