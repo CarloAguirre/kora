@@ -228,7 +228,7 @@ export function ExternalClientProjectDetailPage() {
             <KabeliLogo className={styles.brandLogo}/>
           </div>
         </div>
-        <div className={styles.statusActionsRow} data-client-portal-actions>
+        <div className={styles.statusActionsRow}>
           <StatusPill tone={project.status === 'active' ? 'success' : 'neutral'}>
             {project.status === 'active' ? 'Activo' : project.status === 'finished' ? 'Finalizado' : 'En seguimiento'}
           </StatusPill>
