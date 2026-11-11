@@ -65,6 +65,7 @@ jobs:
         run: pnpm --filter @kora/api exec vitest run src/modules/projects/infrastructure/services/drizzle-project-hour-entry-reader.pg.spec.ts
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/kora2_test
+          TZ: America/Santiago
 
       # Reproduce la base existente que avanzó hasta 0067 sin ejecutar 0063:
       # la reparación 0068 debe poder reconstruir el portal sin tocar el
