@@ -73,7 +73,7 @@ describe('Presentación externa — datos reales del proyecto', () => {
     expect(result.find((row) => row.title === 'Entrega de hito cierre')).toMatchObject({
       isDeliveryOrTask: true, registeredByName: 'Eduardo Aranda',
     });
-    expect(result.find((row) => row.title === 'Tarea Diseño de interfaz aprobada'))
-      ?.phaseTag).toContain('Diseño y Arquitectura');
+    expect(result.find((row) => row.title === 'Tarea Diseño de interfaz aprobada')?.phaseTag)
+      .toContain('Diseño y Arquitectura');
   });
 });
