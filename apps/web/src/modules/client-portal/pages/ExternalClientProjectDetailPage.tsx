@@ -54,11 +54,10 @@ function billingForPortal(project: PortalProjectDetail): ClientProjectBilling {
 
 /** Misma botonera del diseño y de la Vista Cliente interna. Cada icono controla
  * una sección de la ficha, no la autorización ni los datos del proyecto. */
-type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
+type SectionKey = 'info' | 'billing' | 'progress' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
 const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
   { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
   { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
-  { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
   { key: 'progress', label: 'Avance del proyecto', icon: CircleCheckIcon },
   { key: 'hours', label: 'Horas y avance', icon: ClockIcon },
   { key: 'gantt', label: 'Roadmap por fases', icon: CalendarIcon },
@@ -170,13 +169,6 @@ export function ExternalClientProjectDetailPage() {
   const billing = billingForPortal(project);
   const history = externalProjectBitacora(project, data.receipts, data.activity);
   const nativeRoadmap = toExternalPhaseRoadmap(project);
-  const accessLinks = [
-    { label: 'Demostración', href: project.demoLink },
-    { label: 'Ambiente de pruebas', href: project.testEnvironmentLink },
-    { label: 'Diseño en Figma', href: project.figmaLink },
-    { label: 'Documentación', href: project.documentationLink },
-  ].filter((link): link is { label: string; href: string } =>
-    !!link.href && /^https?:\/\//i.test(link.href));
   return (
     <DashboardLayout title="Mis proyectos">
       <div className={styles.page} data-client-portal-print>
@@ -210,8 +202,7 @@ export function ExternalClientProjectDetailPage() {
         </p>
         <div className={styles.sectionToggles} data-client-portal-actions role="group" aria-label="Mostrar u ocultar secciones">
           {SECTION_TOGGLES.map(({ key, label, icon: Icon }) => {
-            const available = key === 'links' ? accessLinks.length > 0
-              : key === 'impact' ? project.impactBeforeHours != null || project.impactAfterHours != null
+            const available = key === 'impact' ? project.impactBeforeHours != null || project.impactAfterHours != null
               : key === 'qa' ? project.qaPlannedTests != null : true;
             return (
               <button key={key} type="button" disabled={!available}
@@ -349,20 +340,6 @@ export function ExternalClientProjectDetailPage() {
           <PhaseRoadmap phaseRoadmap={nativeRoadmap}/>
           <h3 className={styles.sectionTitle}>Entregas comprometidas</h3>
           <CommittedDeliveriesRoadmap deliveries={deliveries} onReview={setConfirmId} showTimeline={false}/>
-        </section>}
-
-        {visible('links') && accessLinks.length > 0 && <section className={styles.section}>
-          <h3 className={styles.sectionTitle}>Accesos y enlaces</h3>
-          <div className={styles.linksRow}>
-            {accessLinks.map((link) => <a key={link.label} href={link.href}
-              target="_blank" rel="noopener noreferrer" className={styles.linkCard}>
-              <LinkIcon size={16} className={styles.linkIcon}/>
-              <span className={styles.linkText}>
-                <span className={styles.linkTitle}>{link.label}</span>
-                <span className={styles.linkSubtitle}>Abrir enlace autorizado</span>
-              </span>
-            </a>)}
-          </div>
         </section>}
 
         {visible('impact') && (project.impactBeforeHours != null || project.impactAfterHours != null) && (
