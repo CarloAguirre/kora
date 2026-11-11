@@ -13,6 +13,16 @@ describe('ProjectHoursHistory — eje mensual fiel a las fechas de trabajo', () 
     ]);
   });
 
+  it('incluye el mes de inicio del proyecto aunque las primeras HH sean posteriores', () => {
+    expect(buildHistoricalMonths([
+      { month: '2026-05', preactivationHours: 0, executionHours: 10 },
+    ], '2026-03')).toEqual([
+      { month: '2026-03', preactivationHours: 0, executionHours: 0 },
+      { month: '2026-04', preactivationHours: 0, executionHours: 0 },
+      { month: '2026-05', preactivationHours: 0, executionHours: 10 },
+    ]);
+  });
+
   it('no altera el reparto preactivación/ejecución dentro del mismo mes', () => {
     expect(buildHistoricalMonths([
       { month: '2026-05', preactivationHours: 30, executionHours: 60 },
