@@ -31,7 +31,13 @@ function scenario({
     ...(accountExists ? [[{ clientId: CLIENT_ID, contactId: CONTACT_ID }]] : []),
   ];
   // Drizzle chain stub: each select ends with a limit(1) in this use case.
-  const chain = {
+  type QueryChain = {
+    from: () => QueryChain;
+    innerJoin: () => QueryChain;
+    where: () => QueryChain;
+    limit: (max: number) => Promise<unknown[]>;
+  };
+  const chain: QueryChain = {
     from: () => chain,
     innerJoin: () => chain,
     where: () => chain,
