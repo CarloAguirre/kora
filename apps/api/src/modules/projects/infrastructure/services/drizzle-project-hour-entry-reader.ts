@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gte, hourEntries, inArray, lt, lte, projectModules, sql, users, type Database } from '@kora/db';
-import type { ProjectHourEntryReader } from '../../application/ports/project-hour-entry-reader.port';
+import type { ProjectApprovedMonthHours, ProjectHourEntryReader } from '../../application/ports/project-hour-entry-reader.port';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 
 @Injectable()
@@ -68,4 +68,39 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
 
     return Number(rows[0]?.total ?? 0);
   }
+
+  /**
+   * Agrega HH aprobadas por el MES en que se trabajaron. La condición
+   * preactivación se calcula POR REGISTRO antes de sumar, por lo que un corte
+   * a mitad de mes reparte correctamente las HH entre ambas categorías.
+   *
+   * El histórico es independiente de la paginación de GET /hours; no se
+   * crean ni reubican registros ni bloques del Roadmap.
+   */
+  async approvedMonthlyHoursForProject(
+    projectId: string, beforeDate: Date | null,
+  ): Promise<readonly ProjectApprovedMonthHours[]> {
+    const month = sql<string>`to_char(${hourEntries.date}, 'YYYY-MM')`;
+    const before = beforeDate
+      ? sql`${hourEntries.date} < ${beforeDate}`
+      : sql`true`;
+
+    const rows = await this.database
+      .select({
+        month,
+        preactivationHours: sql<string>`coalesce(sum(case when ${before} then ${hourEntries.hours} else 0 end), 0)`,
+        executionHours: sql<string>`coalesce(sum(case when not (${before}) then ${hourEntries.hours} else 0 end), 0)`,
+      })
+      .from(hourEntries)
+      .where(and(eq(hourEntries.projectId, projectId), eq(hourEntries.status, 'approved')))
+      .groupBy(month)
+      .orderBy(month);
+
+    return rows.map((row) => ({
+      month: row.month,
+      preactivationHours: Number(row.preactivationHours),
+      executionHours: Number(row.executionHours),
+    }));
+  }
+
 }
