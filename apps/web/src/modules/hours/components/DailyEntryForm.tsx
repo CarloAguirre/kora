@@ -298,14 +298,10 @@ export function DailyEntryForm({
   const updateBlock = (key: string, patch: Partial<DailyBlock>) => {
     setBlocks((prev) => prev.map((block) => {
       if (block.key !== key) return block;
-      const next = { ...block, ...patch };
-      const project = (projects?.items ?? []).find((item) => item.id === next.projectId);
-      if (PROJECT_REQUIRING_ASSIGNMENTS.has(next.assignment as HourEntryAssignment) &&
-          project && !project.allowsOvertime && !next.isOvertime) {
-        const max = remainingRegularHoursForBlock(existingNonOvertimeHoursForDate, prev, key);
-        if (Number(next.hours) > max) next.hours = max > 0 ? String(max) : '';
-      }
-      return next;
+      // El usuario puede declarar las HH reales incluso cuando el proyecto
+      // no autoriza extras. Validación/guardado se bloquean por separado,
+      // sin alterar el valor introducido ni impedir mostrar la advertencia.
+      return { ...block, ...patch };
     }));
   };
 
@@ -331,11 +327,12 @@ export function DailyEntryForm({
   );
   const overflowByKey = new Map(blocks.map((block, index) => [block.key, blockOverflow[index] ?? 0]));
   const autoOvertimeHours = blockOverflow.reduce((sum, hours) => sum + hours, 0);
-  const authorizedAutoOvertimeHours = blocks.reduce((total, block, index) => {
+  const unauthorizedOvertime = blocks.some((block, index) => {
+    if (!PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment) || !block.projectId) return false;
     const project = (projects?.items ?? []).find((item) => item.id === block.projectId);
-    const isProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
-    return total + (!isProject || project?.allowsOvertime ? (blockOverflow[index] ?? 0) : 0);
-  }, 0);
+    return Boolean(project && !project.allowsOvertime &&
+      (block.isOvertime || (blockOverflow[index] ?? 0) > 0));
+  });
 
   useEffect(() => {
     onTotalChange?.(totalWithExisting);
@@ -442,13 +439,14 @@ export function DailyEntryForm({
         </div>
       )}
 
-      {!blockingMessage && authorizedAutoOvertimeHours > 0 && (
+      {!blockingMessage && autoOvertimeHours > 0 && (
         <div className={styles.noticeWarning} role="status">
           <AlertIcon size={16} />
           <span>
             Superas la jornada de {DAILY_CAP_HOURS}h ({totalWithExisting.toLocaleString('es-CL', { maximumFractionDigits: 1 })}h en
-            total ese día): {authorizedAutoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas extra
+            total ese día): {autoOvertimeHours.toLocaleString('es-CL', { maximumFractionDigits: 2 })}h quedarán como horas extra
             {overtimeNeedsApproval ? ', pendientes de aprobación.' : '.'}
+            {unauthorizedOvertime && ' El proyecto no tiene aprobadas horas extras; no podrás guardar hasta que se autoricen.'}
           </span>
         </div>
       )}
@@ -471,13 +469,7 @@ export function DailyEntryForm({
           isCollaborator={user?.role === 'collaborator'}
           overtimeNeedsApproval={overtimeNeedsApproval}
           exceedsDailyCap={(overflowByKey.get(block.key) ?? 0) > 0}
-          maxHours={(() => {
-            const project = (projects?.items ?? []).find((item) => item.id === block.projectId);
-            return PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment) &&
-              project && !project.allowsOvertime && !block.isOvertime
-              ? remainingRegularHoursForBlock(existingNonOvertimeHoursForDate, blocks, block.key)
-              : undefined;
-          })()}
+          maxHours={24}
           error={blockErrors[block.key]}
           title={blockTitle(block, index)}
           onUpdate={(patch) => updateBlock(block.key, patch)}
@@ -500,9 +492,13 @@ export function DailyEntryForm({
         <Button variant="outline" type="button" onClick={onClose}>
           Cancelar
         </Button>
-        <Button type="button" disabled={!canSubmit} loading={submitting} loadingText="Guardando…" onClick={() => void onSubmit()}>
-          Guardar y enviar para aprobación
-        </Button>
+        <span title={unauthorizedOvertime ? 'El proyecto no tiene aprobada horas extras' : undefined}>
+          <Button type="button" disabled={!canSubmit} loading={submitting} loadingText="Guardando…"
+            title={unauthorizedOvertime ? 'El proyecto no tiene aprobada horas extras' : undefined}
+            onClick={() => void onSubmit()}>
+            Guardar y enviar para aprobación
+          </Button>
+        </span>
       </div>
     </div>
   );
@@ -818,7 +814,7 @@ export function DailyEntryBlockFields({
               <span className={styles.stepperLabel}>Horas Extra</span>
               <label
                 className={styles.overtimeToggleRow}
-                title={overtimeDisabled ? 'Este proyecto no tiene autorizadas horas extra.' : undefined}
+                title={overtimeDisabled ? 'El proyecto no tiene aprobada horas extras' : undefined}
               >
                 <input
                   type="checkbox"
