@@ -66,8 +66,8 @@ describe('Presentación externa — datos reales del proyecto', () => {
     expect(result.map((row) => row.title)).toEqual([
       'Recepción de entregable: Hito cierre',
       'Entrega de hito cierre',
-      'Tarea Diseño de interfaz aprobada',
       'Hito cierre',
+      'Tarea Diseño de interfaz aprobada',
       'Registro de actividad: Diseño',
     ]);
     expect(result.find((row) => row.title === 'Entrega de hito cierre')).toMatchObject({
