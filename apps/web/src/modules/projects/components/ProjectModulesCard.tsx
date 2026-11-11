@@ -38,7 +38,6 @@ import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
 import { ProjectPhaseTasksTable } from './ProjectPhaseTasksTable';
-import { ProjectHoursHistory } from './ProjectHoursHistory';
 import { phaseHeaderMeta } from '../lib/phase-header-meta';
 import {
   ProjectRoadmapTaskDetail, DetailPanel, Facts, Fact, Description,
@@ -678,7 +677,6 @@ export function ProjectModulesCard({
           </details>
         </Card>
       )}
-      <ProjectHoursHistory project={project} />
       {project.modules.length === 0 ? (
         <section className={styles.emptyRoadmap} aria-label="Roadmap sin fases">
           <header className={styles.emptyRoadmapTop}>
