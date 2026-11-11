@@ -16,15 +16,6 @@ export interface CollaboratorProjectEventRecord {
   readonly hasBlocker: boolean;
   readonly blockerDescription: string | null;
 }
-/** Histórico agregado por mes, sin paginar ni inventar rangos de actividad.
- * El corte clasifica cada HH aprobada por su FECHA REAL, no por fecha de carga.
- */
-export interface ProjectApprovedMonthHours {
-  readonly month: string; // YYYY-MM
-  readonly preactivationHours: number;
-  readonly executionHours: number;
-}
-
 export interface ProjectHourEntryReader {
   weeklyHoursByProjectForUser(
     userId: string, projectIds: readonly string[], from: Date, through: Date,
@@ -43,10 +34,6 @@ export interface ProjectHourEntryReader {
    * del corte ya corresponden a ejecución. No altera filas de horas.
    */
   sumApprovedHoursBeforeDateForProject(projectId: string, beforeDate: Date): Promise<number>;
-  /** Para la banda histórica del Roadmap interno. Sin corte: todo es preactivación. */
-  approvedMonthlyHoursForProject(
-    projectId: string, beforeDate: Date | null,
-  ): Promise<readonly ProjectApprovedMonthHours[]>;
 }
 
 export const PROJECT_HOUR_ENTRY_READER = Symbol('ProjectHourEntryReader');
