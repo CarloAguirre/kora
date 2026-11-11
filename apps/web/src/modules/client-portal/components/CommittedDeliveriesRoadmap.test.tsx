@@ -31,6 +31,28 @@ describe('CommittedDeliveriesRoadmap — vista externa', () => {
     expect(review).toHaveBeenCalledExactlyOnceWith('entrega-b');
   });
 
+  it('integra la lista debajo del Gantt de una fase y resalta solo las pendientes de OK', () => {
+    const review = vi.fn();
+    const { container } = render(
+      <CommittedDeliveriesRoadmap
+        deliveries={fixtures.filter((delivery) => delivery.phase === 'Planificación')}
+        onReview={review}
+        showTimeline={false}
+        embedded
+      />,
+    );
+    expect(screen.getByText('Entregas de la fase')).toBeInTheDocument();
+    expect(screen.queryByText('2 entregas comprometidas')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Tablero de seguimiento')).toHaveLength(1);
+    expect(screen.queryByLabelText('Calendario cronológico de entregas comprometidas')).not.toBeInTheDocument();
+    const waitingRow = container.querySelector('[class*="deliveryAwaitingOk"]');
+    expect(waitingRow).toHaveTextContent('Tablero de seguimiento');
+    expect(waitingRow).not.toHaveTextContent('Modelo comercial');
+    expect(screen.getByText('Modelo comercial').closest('[class*="deliveryAwaitingOk"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Dar OK' }));
+    expect(review).toHaveBeenCalledExactlyOnceWith('entrega-b');
+  });
+
   it('sin entregas no inventa fases ni hitos', () => {
     render(<CommittedDeliveriesRoadmap deliveries={[]} onReview={vi.fn()}/>);
     expect(screen.getByText(/Todavía no existen entregas comprometidas/)).toBeInTheDocument();
