@@ -41,7 +41,7 @@ describe('ClientPortalPdfService: enlace seguro de descarga', () => {
     const ctx = setup();
     const link = await ctx.service.createShare(actor, PROJECT);
     const changed = link.url.split('/').at(-1)!;
-    const tampered = changed.slice(0, -1) + (changed.endsWith('X') ? 'Y' : 'X');
+    const tampered = (changed.startsWith('A') ? 'B' : 'A') + changed.slice(1);
     await expect(ctx.service.downloadShared(tampered)).rejects.toBeInstanceOf(NotFoundException);
     expect(ctx.db.select).not.toHaveBeenCalled();
   });
