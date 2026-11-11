@@ -11,6 +11,8 @@ import { unwrapOrThrow } from '../../shared/presentation/unwrap-result';
 import { GetProjectUseCase } from '../projects/application/use-cases/get-project.use-case';
 import { GetSupportPlanUseCase } from '../tickets/application/use-cases/get-support-plan.use-case';
 import { CreateUserUseCase } from '../users/application/use-cases/create-user.use-case';
+import { GrantUserAccessUseCase } from '../users/application/use-cases/grant-user-access.use-case';
+import { USER_CREDENTIAL_REPOSITORY, type UserCredentialRepository } from '../users/domain/repositories/user-credential.repository';
 import type { RequestUser } from '../../shared/presentation/decorators/current-user.decorator';
 
 export interface ClientPortalGrantInput {
@@ -29,6 +31,8 @@ export class ClientPortalService {
     private readonly getProjectUseCase: GetProjectUseCase,
     private readonly getSupportPlanUseCase: GetSupportPlanUseCase,
     private readonly createUser: CreateUserUseCase,
+    private readonly grantUserAccess: GrantUserAccessUseCase,
+    @Inject(USER_CREDENTIAL_REPOSITORY) private readonly credentials: UserCredentialRepository,
   ) {}
 
   private async requireAccount(actor: PortalActor): Promise<PortalAccount> {
@@ -126,6 +130,7 @@ export class ClientPortalService {
 
     let userId = existing?.id;
     let invitationSent = false;
+    let invitationAttempted = false;
     if (!userId) {
       const [firstName, ...lastName] = contact.name.trim().split(/\s+/);
       const created = unwrapOrThrow(await this.createUser.execute({
@@ -134,6 +139,7 @@ export class ClientPortalService {
         actor: { userId: actor.id, email: actor.email },
       }));
       userId = created.userId;
+      invitationAttempted = true;
       invitationSent = created.invitationSent;
     }
 
@@ -152,7 +158,20 @@ export class ClientPortalService {
       if (input.enabled && uniquePlans.length)
         await tx.insert(clientPortalSupportGrants).values(uniquePlans.map((planId) => ({ userId, planId })));
     });
-    return { userId, invitationSent, enabled: input.enabled, projectIds: input.enabled ? uniqueProjects : [],
+    // Una invitación inicial pudo no llegar (por ejemplo, fallo del proveedor
+    // de correo). Si la cuenta existente todavía no tiene contraseña válida,
+    // permitir reintentar guardando "Configurar acceso" sin crear otro usuario.
+    // Nunca se reenvía si la cuenta ya tiene contraseña, ni al revocarla.
+    if (input.enabled && existing && !(await this.credentials.hasUsablePassword(userId))) {
+      invitationAttempted = true;
+      const invitation = unwrapOrThrow(await this.grantUserAccess.execute({
+        userId, actor: { userId: actor.id, email: actor.email },
+      }));
+      invitationSent = invitation.invitationSent;
+    }
+
+    return { userId, invitationSent, invitationAttempted, enabled: input.enabled,
+      projectIds: input.enabled ? uniqueProjects : [],
       supportPlanIds: input.enabled ? uniquePlans : [] };
   }
 
