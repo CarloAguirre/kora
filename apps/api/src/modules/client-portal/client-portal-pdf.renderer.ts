@@ -129,12 +129,13 @@ class PdfPageWriter {
   }
 
   title(title: string, subtitle?: string): void {
-    this.ensure(subtitle ? 67 : 47);
-    this.text(38, this.y, truncate(title, 130), 20, true);
-    this.y += 31;
-    if (subtitle) {
-      this.paragraph(truncate(subtitle), 519, 9, MUTED);
+    const lines = this.wrap(title, 510, 19);
+    this.ensure(lines.length * 26 + (subtitle ? 30 : 9));
+    for (const line of lines) {
+      this.text(38, this.y, line, 19, true);
+      this.y += 26;
     }
+    if (subtitle) this.paragraph(subtitle, 519, 9, MUTED);
     this.y += 5;
   }
 
