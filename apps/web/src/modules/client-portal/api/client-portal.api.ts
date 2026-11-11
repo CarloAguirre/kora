@@ -53,11 +53,11 @@ export interface PortalProjectDetail extends PortalProject {
   figmaLink: string | null;
   documentationLink: string | null;
   impactBeforeHours: number | null;
-  impactBeforePeople: number | null;
+  impactBeforePeople: string | null;
   impactBeforeDuration: string | null;
   impactBeforeModality: string | null;
   impactAfterHours: number | null;
-  impactAfterPeople: number | null;
+  impactAfterPeople: string | null;
   impactAfterDuration: string | null;
   impactAfterModality: string | null;
   qaPlannedTests: number | null;
