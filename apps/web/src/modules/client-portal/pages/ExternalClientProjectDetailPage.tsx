@@ -156,7 +156,10 @@ export function ExternalClientProjectDetailPage() {
       <Link to="/portal/proyectos">Volver a proyectos</Link></Card>
   </DashboardLayout>;
 
-  const deliveries: CommittedDelivery[] = project.modules.flatMap((phase) =>
+  // Las entregas pertenecen a su fase; no hay listado global duplicado.
+  // La clave es el identificador de la fase, no el nombre ni su posición.
+  const deliveriesByPhase = new Map<string, CommittedDelivery[]>(project.modules.map((phase) => [
+    phase.id,
     phase.deliveries.map((delivery) => ({
       id: delivery.id,
       name: delivery.name ?? (delivery.teamName ? `Entrega ${delivery.teamName}` : 'Entrega'),
@@ -165,7 +168,8 @@ export function ExternalClientProjectDetailPage() {
       estimatedDate: delivery.estimatedDate,
       status: delivery.status,
       received: receiptIds.has(delivery.id),
-    })));
+    })),
+  ]));
   const billing = billingForPortal(project);
   const history = externalProjectBitacora(project, data.receipts, data.activity);
   const nativeRoadmap = toExternalPhaseRoadmap(project);
@@ -336,10 +340,22 @@ export function ExternalClientProjectDetailPage() {
             <h3 className={styles.sectionTitle}>Roadmap por Fases</h3>
             <span className={styles.sectionCaption}>Vista por semana de diseño, desarrollo, QA y aprobación por fase</span>
           </div>
-          {/* Las barras y el calendario son el Gantt nativo de Kora. */}
-          <PhaseRoadmap phaseRoadmap={nativeRoadmap}/>
-          <h3 className={styles.sectionTitle}>Entregas comprometidas</h3>
-          <CommittedDeliveriesRoadmap deliveries={deliveries} onReview={setConfirmId} showTimeline={false}/>
+          {/* El Gantt nativo conserva barras y marcadores. Cada fase despliega
+              sus propias entregas bajo el gráfico, sin lista global aparte. */}
+          <PhaseRoadmap
+            phaseRoadmap={nativeRoadmap}
+            renderPhaseReferences={(phase) => {
+              const phaseDeliveries = deliveriesByPhase.get(phase.id) ?? [];
+              return phaseDeliveries.length > 0 ? (
+                <CommittedDeliveriesRoadmap
+                  deliveries={phaseDeliveries}
+                  onReview={setConfirmId}
+                  showTimeline={false}
+                  embedded
+                />
+              ) : null;
+            }}
+          />
         </section>}
 
         {visible('impact') && (project.impactBeforeHours != null || project.impactAfterHours != null) && (
