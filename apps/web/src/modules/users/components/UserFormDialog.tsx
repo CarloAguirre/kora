@@ -65,7 +65,6 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
   const updateUser = useUpdateUser();
   const changeUserStatus = useChangeUserStatus();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [companySearch, setCompanySearch] = useState('');
 
   /**
    * El estado de la cuenta NO forma parte de `createUserSchema`: se cambia por
@@ -105,7 +104,7 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
   const teamRequirement = teamRequirementFor(selectedRole);
   const { data: availableClients, isLoading: loadingClients, isError: clientsError } = useClientsList({
     page: 1, pageSize: 100, status: 'active',
-    sortField: 'companyName', sortDirection: 'asc', search: companySearch,
+    sortField: 'companyName', sortDirection: 'asc',
   }, { enabled: open && !isEditing && selectedRole === 'cliente' });
 
   // Al abrir, el formulario refleja al usuario que toque (o queda limpio para
@@ -137,7 +136,6 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
           },
     );
     setEnabled(user ? user.status === 'active' : true);
-    setCompanySearch('');
     setServerError(null);
   }, [open, user, reset]);
 
@@ -314,12 +312,6 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
 
         {selectedRole === 'cliente' && !isEditing && (
           <div className={styles.portalCompany}>
-            <TextField
-              label="Buscar empresa"
-              placeholder="Nombre de la empresa"
-              value={companySearch}
-              onChange={(event) => setCompanySearch(event.target.value)}
-            />
             <Select
               label="Empresa"
               required
@@ -334,12 +326,6 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
               disabled={loadingClients || clientsError}
               {...register('clientId', { setValueAs: (value: string) => value || null })}
             />
-            <div className={styles.portalHint} role="note">
-              <strong>Acceso al portal de clientes</strong>
-              <span>El usuario quedará vinculado automáticamente al contacto de esta empresa.
-                Podrá iniciar sesión después de definir su contraseña y tener acceso habilitado.
-                Los proyectos y contratos se autorizan por separado desde la ficha del cliente.</span>
-            </div>
           </div>
         )}
 
