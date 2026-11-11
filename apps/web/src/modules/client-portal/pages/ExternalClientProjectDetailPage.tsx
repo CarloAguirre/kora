@@ -8,7 +8,7 @@ import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { useToast } from '@/shared/components/ui/Toast';
-import { BuildingIcon, ChevronLeftIcon, ClockIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';ns';
+import { BuildingIcon, ChevronLeftIcon, ClockIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
 import { CommittedDeliveriesRoadmap } from '../components/CommittedDeliveriesRoadmap';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
@@ -179,9 +179,9 @@ export function ExternalClientProjectDetailPage() {
             <span className={styles.infoValue}>{dmy(project.startDate)}</span>
             <span className={styles.infoValue}>{dmy(project.endDate)}</span>
           </div>
-        </Card>}
+        </Card>
 
-</Card>        {pending.length > 0 && (
+        {pending.length > 0 && (
           <div className={detailStyles.deliveryNotice} role="status">
             <div className={detailStyles.noticeText}>
               <strong>Tienes {pending.length} entrega{pending.length === 1 ? '' : 's'} esperando tu OK.</strong>
@@ -196,18 +196,18 @@ export function ExternalClientProjectDetailPage() {
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Facturación</h3>
           <ProjectBillingCard billing={billing}/>
-        </section>}
+        </section>
 
-</section>        <section className={styles.section}>
+        <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
           <ProjectProgressOverview actualPercent={project.progress.actual}
             expectedPercent={project.progress.expected} startDate={dmy(project.startDate)}
             endDate={dmy(project.endDate)}
             daysRemaining={project.endDate ? Math.max(0, Math.ceil(
               (new Date(project.endDate + 'T00:00:00').getTime() - Date.now()) / 86400000)) : 0}/>
-        </section>}
+        </section>
 
-</section>        <section className={styles.section}>
+        <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Horas y avance</h3>
           <div className={styles.hoursGrid}>
             <Card className={styles.statCard}>
@@ -259,9 +259,9 @@ export function ExternalClientProjectDetailPage() {
               </span>
             </Card>
           </div>
-        </section>}
+        </section>
 
-</section>        <section className={styles.section} id="entregas-comprometidas">
+        <section className={styles.section} id="entregas-comprometidas">
           <div className={styles.sectionHeadingRow}>
             <h3 className={styles.sectionTitle}>Roadmap por Fases</h3>
             <span className={styles.sectionCaption}>Vista por semana de diseño, desarrollo, QA y aprobación por fase</span>
@@ -282,9 +282,9 @@ export function ExternalClientProjectDetailPage() {
               ) : null;
             }}
           />
-        </section>}
+        </section>
 
-</section>        <ProjectBusinessImpact impact={toClientBusinessImpact(project)} />
+        <ProjectBusinessImpact impact={toClientBusinessImpact(project)} />
 
         {project.qaPlannedTests != null && <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Métricas de la etapa actual</h3>
@@ -299,8 +299,8 @@ export function ExternalClientProjectDetailPage() {
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Bitácora</h3>
           <ProjectBitacora entries={history}/>
-        </section>}
-</section>      </div>
+        </section>
+      </div>
       <Modal open={!!selected} title="Confirmar recepción" onClose={() => setConfirmId(null)}
         dismissible={!receive.isPending}
         description="Este OK es constancia de recepción y quedará registrado en el historial del proyecto."
