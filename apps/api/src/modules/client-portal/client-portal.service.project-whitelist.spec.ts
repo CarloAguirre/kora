@@ -41,6 +41,10 @@ describe('ClientPortalService — DTO exclusivamente externo', () => {
         ],
       }],
       observations: [],
+      impactBeforeHours: 24, impactBeforePeople: '3 personas',
+      impactBeforeDuration: '3 días laborales', impactBeforeModality: 'Planillas Excel',
+      impactAfterHours: 2, impactAfterPeople: '1 persona',
+      impactAfterDuration: 'Mismo día', impactAfterModality: 'Tablero automático',
     } as unknown as ProjectDetail;
     const external = (
       service as unknown as {
@@ -68,6 +72,16 @@ describe('ClientPortalService — DTO exclusivamente externo', () => {
     expect(external).not.toHaveProperty('testEnvironmentLink');
     expect(external).not.toHaveProperty('figmaLink');
     expect(external).not.toHaveProperty('documentationLink');
+    // Esos campos son los mismos que emplea PMO en Vista Cliente,
+    // pero llegan por el endpoint del portal sujeto a sus grants.
+    expect(external).toHaveProperty('impactBeforeHours', 24);
+    expect(external).toHaveProperty('impactBeforePeople', '3 personas');
+    expect(external).toHaveProperty('impactBeforeDuration', '3 días laborales');
+    expect(external).toHaveProperty('impactBeforeModality', 'Planillas Excel');
+    expect(external).toHaveProperty('impactAfterHours', 2);
+    expect(external).toHaveProperty('impactAfterPeople', '1 persona');
+    expect(external).toHaveProperty('impactAfterDuration', 'Mismo día');
+    expect(external).toHaveProperty('impactAfterModality', 'Tablero automático');
     expect(external).toHaveProperty('contractAmount', 180);
   });
 });
