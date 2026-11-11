@@ -21,6 +21,7 @@ export interface PortalDelivery {
   estimatedDate: string; status: 'planned' | 'approved';
 }
 export interface PortalProjectDetail extends PortalProject {
+  updatedAt: string;
   client: { id: string; companyName: string } | null;
   primaryContact: { name: string; position: string | null } | null;
   commercialManager: { fullName: string } | null;
