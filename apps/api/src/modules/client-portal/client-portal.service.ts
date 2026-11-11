@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   and, clientContacts, clientPortalAccounts, clientPortalDeliveryReceipts,
-  clientPortalProjectGrants, clientPortalSupportGrants, clients, eq, inArray,
+  clientPortalProjectGrants, clientPortalSupportGrants, clients, desc, eq, hourEntries, inArray,
   isNull, projectModuleDeliveries, projectModules, projects, roles, sql,
   supportPlans, tickets, users, type Database,
 } from '@kora/db';
@@ -240,16 +240,28 @@ export class ClientPortalService {
       // El cliente solo recibe entregas comprometidas. La planificación
       // operativa interna (segmentos, tareas, HH, bloqueos) no forma parte
       // del contrato de este portal, ni siquiera como datos ocultos.
+      // Solo geometría y nombres de los bloques para reutilizar el Gantt
+      // nativo de Kora. No se publican HH, miembros, asignaciones ni notas.
       modules: project.modules.map((m) => ({
-        id: m.id, name: m.name,
+        id: m.id, name: m.name, currentStage: m.currentStage,
+        timelineSegments: m.segments.map((s) => ({
+          id: s.id, teamName: s.teamName, name: s.name,
+          startDate: s.startDate, endDate: s.endDate, closedAt: s.closedAt ?? null,
+        })),
         deliveries: m.deliveries.map((d) => ({
           id: d.id, name: d.name, teamName: d.teamName,
-          estimatedDate: d.estimatedDate,
+          estimatedDate: d.estimatedDate, createdAt: d.createdAt,
           status: d.status === 'approved' ? 'approved' : 'planned',
         })),
       })),
-      // Ningún comentario/hora interna se divulga por defecto.
-      observations: [],
+      // Misma fuente de bitácora que PMO: registros del proyecto, incluidos
+      // cambios de tareas y entregas. Proyección explícita de lectura externa.
+      observations: project.observations.map((o) => ({
+        id: o.id, type: o.type, title: o.title, message: o.message,
+        date: o.date, createdAt: o.createdAt, authorName: o.authorName,
+        moduleId: o.moduleId, moduleName: o.moduleName,
+        deliveryId: o.deliveryId, taskId: o.taskId, status: o.status,
+      })),
       demoLink: project.demoLink, testEnvironmentLink: project.testEnvironmentLink,
       figmaLink: project.figmaLink, documentationLink: project.documentationLink,
       impactBeforeHours: project.impactBeforeHours,
@@ -292,7 +304,32 @@ export class ClientPortalService {
     }).from(clientPortalDeliveryReceipts)
       .innerJoin(users, eq(users.id, clientPortalDeliveryReceipts.receivedByUserId))
       .where(eq(clientPortalDeliveryReceipts.projectId, projectId));
-    return { project, receipts: receipts.map((r) => ({ ...r, receivedAt: r.receivedAt.toISOString() })) };
+    // PMO muestra además la actividad de horas. Traer un resumen limitado y
+    // de solo lectura: nunca compartir cantidad de HH, motivo de rechazo,
+    // aprobadores ni comentarios de bloqueo en el contrato externo.
+    const activity = await this.db.select({
+      id: hourEntries.id, date: hourEntries.date, createdAt: hourEntries.createdAt,
+      status: hourEntries.status, category: hourEntries.category,
+      firstName: users.firstName, lastName: users.lastName,
+      moduleName: projectModules.name, hasBlocker: hourEntries.hasBlocker,
+    }).from(hourEntries)
+      .innerJoin(users, eq(users.id, hourEntries.userId))
+      .leftJoin(projectModules, eq(projectModules.id, hourEntries.moduleId))
+      .where(eq(hourEntries.projectId, projectId))
+      .orderBy(desc(hourEntries.createdAt))
+      .limit(100);
+    return {
+      project,
+      receipts: receipts.map((r) => ({ ...r, receivedAt: r.receivedAt.toISOString() })),
+      activity: activity.map((entry) => ({
+        id: entry.id,
+        date: entry.date.toISOString().slice(0, 10),
+        createdAt: entry.createdAt.toISOString(),
+        status: entry.status, category: entry.category,
+        userName: [entry.firstName, entry.lastName].filter(Boolean).join(' ') || 'Colaborador',
+        moduleName: entry.moduleName, hasBlocker: entry.hasBlocker,
+      })),
+    };
   }
 
   async receiveDelivery(actor: PortalActor, idOrSlug: string, deliveryId: string) {
