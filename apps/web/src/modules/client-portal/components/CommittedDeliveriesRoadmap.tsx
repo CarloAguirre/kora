@@ -41,9 +41,12 @@ function deliveryState(item: CommittedDelivery, today: string) {
 export function CommittedDeliveriesRoadmap({
   deliveries,
   onReview,
+  showTimeline = true,
 }: {
   readonly deliveries: readonly CommittedDelivery[];
   readonly onReview: (deliveryId: string) => void;
+  /** El portal externo presenta primero el Gantt nativo y luego solo esta lista. */
+  readonly showTimeline?: boolean;
 }) {
   const sorted = useMemo(() =>
     [...deliveries].sort((a, b) => a.estimatedDate.localeCompare(b.estimatedDate) || a.name.localeCompare(b.name)),
@@ -90,6 +93,7 @@ export function CommittedDeliveriesRoadmap({
         </div>
         <span className={styles.caption}>Fechas de entrega acordadas y recepción del cliente</span>
       </div>
+      {showTimeline && (<>
       <div className={styles.legend}>
         <span><i className={styles.committedKey}/> Comprometida</span>
         <span><i className={styles.waitingKey}/> Entregada · esperando OK</span>
@@ -131,6 +135,7 @@ export function CommittedDeliveriesRoadmap({
         </div>
       </div>
 
+      </>)}
       <div className={styles.deliveriesTitle}>Entregas comprometidas</div>
       <div className={styles.deliveries}>
         {sorted.map((delivery) => {
