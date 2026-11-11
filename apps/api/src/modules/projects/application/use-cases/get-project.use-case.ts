@@ -129,9 +129,11 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
      */
     const hoursCutoff = snapshot.hito0At ??
       (snapshot.status === 'active' ? snapshot.startDate : null);
-    const cutoffDay = hoursCutoff ? new Date(hoursCutoff.toISOString().slice(0, 10)) : null;
-    const prospectPhaseHours = cutoffDay
-      ? await this.hourEntries.sumApprovedHoursBeforeDateForProject(project.id, cutoffDay)
+    const prospectPhaseHours = hoursCutoff
+      ? await this.hourEntries.sumApprovedHoursBeforeDateForProject(
+          project.id,
+          new Date(hoursCutoff.toISOString().slice(0, 10)),
+        )
       : snapshot.usedHours;
 
     if (!command.actorPermissions.includes('projects:read')) {
@@ -144,10 +146,6 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         members.some((member) => member.userId === command.actorUserId && !member.blockedAt);
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
-
-    // Solo tras autorizar la lectura: histórico mensual completo (NO los 20
-    // registros más recientes de la ficha). Es una vista, no modifica HH.
-    const approvedMonthlyHours = await this.hourEntries.approvedMonthlyHoursForProject(project.id, cutoffDay);
 
     // El traspaso ya fue aprobado. En la primera lectura autorizada de un
     // proyecto iniciado se materializan las semanas comerciales como bloques
@@ -218,7 +216,6 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         usedHoursUpdatedAt,
         leaderLastActivityAt,
         prospectPhaseHours,
-        approvedMonthlyHours,
         actorUserId: command.actorUserId,
         canManagePendings,
         ledTeamIds,
