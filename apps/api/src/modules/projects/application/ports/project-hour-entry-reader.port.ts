@@ -28,9 +28,10 @@ export interface ProjectHourEntryReader {
   maxApprovedEntryDateForProject(projectId: string): Promise<Date | null>;
   /**
    * Suma de horas aprobadas con fecha ANTERIOR a `beforeDate` (exclusivo) —
-   * alimenta la fase "Prospecto/Cotización" (ver `GetProjectUseCase`):
-   * horas registradas antes del Hito 0 quedan en esa fase, no en las de
-   * ejecución. `beforeDate` es la fecha del Hito 0 (`project.hito0At`).
+   * alimenta la fase "Prospecto/Cotización" (ver `GetProjectUseCase`).
+   * `beforeDate` es la fecha del Hito 0 oficial o, en un proyecto activo
+   * heredado sin Hito 0, su fecha de inicio provisional. Las HH del día
+   * del corte ya corresponden a ejecución. No altera filas de horas.
    */
   sumApprovedHoursBeforeDateForProject(projectId: string, beforeDate: Date): Promise<number>;
 }
