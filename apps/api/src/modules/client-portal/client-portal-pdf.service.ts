@@ -8,12 +8,24 @@ import { ClientPortalService } from './client-portal.service';
 import { renderClientPortalPdf } from './client-portal-pdf.renderer';
 
 type PortalActor = Pick<RequestUser, 'id' | 'email' | 'role'>;
-type ShareClaims = { v: 1; sub: string; project: string; exp: number; nonce: string };
+type ShareClaims = { sub: string; project: string; exp: number };
 const PDF_SHARE_TTL_SECONDS = 48 * 3600;
+// Dos UUID (32 B) + expiración (4 B) + nonce aleatorio (16 B) + HMAC-128 (16 B).
+// 68 bytes = 91 caracteres base64url: bajo el máximo por defecto (100)
+// de Fastify para un parámetro de ruta, sin cambiar la configuración global.
+const SHARE_PAYLOAD_BYTES = 52;
+const SHARE_MAC_BYTES = 16;
+const SHARE_TOKEN_BYTES = SHARE_PAYLOAD_BYTES + SHARE_MAC_BYTES;
+const SHARE_TOKEN_LENGTH = 91;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function uuidFromBytes(bytes: Buffer): string {
+  const hex = bytes.toString('hex');
+  return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20);
+}
 
 /**
- * Enlaces de descarga por capacidad: 256 bits de aleatoriedad + HMAC-SHA256.
+ * Enlaces de descarga por capacidad: nonce aleatorio de 128 bits + firma
+ * HMAC-SHA256 truncada a 128 bits, en un token compacto de 91 caracteres.
  * Caducan en 48 h y dejan de funcionar si el usuario o su grant se revocan.
  * No se publican tokens JWT de sesión ni se agrega autenticación en query.
  */
@@ -25,54 +37,56 @@ export class ClientPortalPdfService {
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
-  private signature(payload: string): Buffer {
-    // Separación criptográfica respecto del uso habitual de refresh tokens.
+  private signature(payload: Buffer): Buffer {
+    // Clave derivada exclusiva de este caso de uso; nunca usar JWT de sesión.
     const key = createHmac('sha256', this.config.auth.refreshSecret)
-      .update('kora-client-portal-pdf-share-v1').digest();
-    return createHmac('sha256', key).update(payload).digest();
+      .update('kora-client-portal-pdf-share-v2').digest();
+    return createHmac('sha256', key).update(payload).digest().subarray(0, SHARE_MAC_BYTES);
   }
 
   private parse(token: string): ShareClaims {
-    if (token.length > 1024 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token))
-      throw new NotFoundException('El enlace al PDF no existe o ha caducado.');
-    const [payload, mac] = token.split('.');
-    const supplied = Buffer.from(mac!, 'base64url');
-    const expected = this.signature(payload!);
-    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected))
-      throw new NotFoundException('El enlace al PDF no existe o ha caducado.');
+    const unavailable = () => new NotFoundException('El enlace al PDF no existe o ha caducado.');
+    if (token.length !== SHARE_TOKEN_LENGTH || !/^[A-Za-z0-9_-]+$/.test(token))
+      throw unavailable();
+    const bytes = Buffer.from(token, 'base64url');
+    // Rechazar codificaciones alternativas y longitudes malformadas.
+    if (bytes.length !== SHARE_TOKEN_BYTES || bytes.toString('base64url') !== token)
+      throw unavailable();
+    const payload = bytes.subarray(0, SHARE_PAYLOAD_BYTES);
+    const supplied = bytes.subarray(SHARE_PAYLOAD_BYTES);
+    if (!timingSafeEqual(supplied, this.signature(payload)))
+      throw unavailable();
 
-    try {
-      const claims: unknown = JSON.parse(Buffer.from(payload!, 'base64url').toString('utf8'));
-      if (!claims || typeof claims !== 'object') throw new Error('claims');
-      const data = claims as Partial<ShareClaims>;
-      if (data.v !== 1 || !UUID.test(data.sub ?? '') || !UUID.test(data.project ?? '') ||
-        typeof data.exp !== 'number' || !Number.isInteger(data.exp) ||
-        data.exp <= Math.floor(Date.now() / 1000) ||
-        data.exp > Math.floor(Date.now() / 1000) + PDF_SHARE_TTL_SECONDS ||
-        typeof data.nonce !== 'string' || !/^[A-Za-z0-9_-]{40,48}$/.test(data.nonce)) {
-        throw new Error('claims');
-      }
-      return data as ShareClaims;
-    } catch {
-      throw new NotFoundException('El enlace al PDF no existe o ha caducado.');
-    }
+    const exp = payload.readUInt32BE(32);
+    const now = Math.floor(Date.now() / 1000);
+    if (exp <= now || exp > now + PDF_SHARE_TTL_SECONDS)
+      throw unavailable();
+
+    const sub = uuidFromBytes(payload.subarray(0, 16));
+    const project = uuidFromBytes(payload.subarray(16, 32));
+    if (!UUID.test(sub) || !UUID.test(project)) throw unavailable();
+    return { sub, project, exp };
   }
 
   /** Únicamente tras autorizar al cliente sobre ese proyecto. */
   async createShare(actor: PortalActor, project: string): Promise<{ url: string; expiresAt: string }> {
     const detail = await this.portal.getProject(actor, project);
+    if (!UUID.test(actor.id) || !UUID.test(detail.project.id))
+      throw new NotFoundException('No fue posible crear el enlace de descarga.');
+
     const expiresAt = new Date(Date.now() + PDF_SHARE_TTL_SECONDS * 1000);
-    const payload = Buffer.from(JSON.stringify({
-      v: 1,
-      sub: actor.id,
-      project: detail.project.id,
-      exp: Math.floor(expiresAt.getTime() / 1000),
-      nonce: randomBytes(32).toString('base64url'),
-    } satisfies ShareClaims)).toString('base64url');
-    const signature = this.signature(payload).toString('base64url');
+    const expires = Buffer.alloc(4);
+    expires.writeUInt32BE(Math.floor(expiresAt.getTime() / 1000));
+    const payload = Buffer.concat([
+      Buffer.from(actor.id.replace(/-/g, ''), 'hex'),
+      Buffer.from(detail.project.id.replace(/-/g, ''), 'hex'),
+      expires,
+      randomBytes(16),
+    ]);
+    const token = Buffer.concat([payload, this.signature(payload)]).toString('base64url');
     const prefix = this.config.http.prefix.replace(/^\/+|\/+$/g, '');
     return {
-      url: `/${prefix}/portal/shared-pdfs/${payload}.${signature}`,
+      url: '/' + prefix + '/portal/shared-pdfs/' + token,
       expiresAt: expiresAt.toISOString(),
     };
   }
