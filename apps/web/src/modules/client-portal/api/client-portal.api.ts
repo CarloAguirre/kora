@@ -29,6 +29,7 @@ export interface PortalProjectDetail extends PortalProject {
   usedHoursUpdatedAt: string | null;
   leaderLastActivityAt: string | null;
   contractCurrency: 'UF' | 'CLP' | 'USD';
+  contractAmount: number | null;
   paymentMilestones: Array<{
     name: string; amount: number; percent: number | null; status: string;
     invoiceNumber: string | null; issuedAt: string | null; paidAt: string | null;
