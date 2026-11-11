@@ -1,6 +1,3 @@
-.credit{display:flex;align-items:center;gap:15px;color:#8392a4;font-size:11px;padding:14px 4px 0}
-.credit svg{max-width:84px;height:auto}
-@media print{.credit{break-inside:avoid}}
 /* Ajustes exclusivos de la vista externa; la vista previa interna no cambia. */
 .deliveryNotice {
   display:flex;align-items:center;justify-content:space-between;gap:16px;
@@ -26,20 +23,7 @@
 .hourCardHighlight .hourFoot{color:#a6e061}
 .goodDeviation{color:#299556;font-weight:700}
 .attentionDeviation{color:#bb594a;font-weight:700}
-.impactCard{display:grid;grid-template-columns:1fr 1fr minmax(130px,.55fr);background:#fff;border:1px solid #e1e7eb;border-radius:12px;overflow:hidden}
-.impactColumn{padding:20px;display:flex;flex-direction:column;gap:10px;border-right:1px solid #e4e8ed}
-.impactTitle{color:#8a99a5;font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
-.impactRow{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed #e9edf0;padding:7px 0;font-size:12px}
-.impactRow span{color:#6a7b8a}
-.impactRow strong{color:#142e49;text-align:right;overflow-wrap:anywhere}
-.impactResult{background:#edf7db;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#2d9f59;padding:20px;text-align:center}
-.impactResult strong{font-size:31px}
-.impactResult span{font-size:11px}
-@media(max-width:950px){.hoursGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.impactCard{grid-template-columns:1fr 1fr}.impactResult{grid-column:1/-1;padding:14px}}
-@media(max-width:560px){.hoursGrid{grid-template-columns:1fr}.impactCard{grid-template-columns:1fr}.impactColumn{border-right:0;border-bottom:1px solid #e9edf0}.impactResult{grid-column:auto}}
 @media print{
   .deliveryNotice{background:#f4fcdf!important}
   .hoursGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .impactCard{grid-template-columns:1fr 1fr minmax(100px,.55fr)}
-  .impactResult{grid-column:auto}
 }
