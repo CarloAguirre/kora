@@ -1,3 +1,6 @@
+.credit{display:flex;align-items:center;gap:15px;color:#8392a4;font-size:11px;padding:14px 4px 0}
+.credit svg{max-width:84px;height:auto}
+@media print{.credit{break-inside:avoid}}
 /* Ajustes exclusivos de la vista externa; la vista previa interna no cambia. */
 .deliveryNotice {
   display:flex;align-items:center;justify-content:space-between;gap:16px;
