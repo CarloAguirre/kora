@@ -68,7 +68,9 @@ export function ProjectDetailPage() {
   }
 
   /** Puede liderar más de un equipo del proyecto — en ese caso elige cuál ver con el selector de arriba. */
-  const ledTeams = user ? project.teams.filter((t) => t.leader?.id === user.id) : [];
+  // canManage viene del backend (líder del proyecto / equipo efectivo o projects:manage).
+  // A diferencia de team.leader, contempla equipos que heredan al líder del catálogo.
+  const ledTeams = project.teams.filter((t) => t.canManage);
   const leaderTeam = ledTeams.find((t) => t.teamId === selectedTeamId) ?? ledTeams[0];
   /**
    * Un líder puede ser a la vez líder de proyecto (o tener `projects:manage`)
