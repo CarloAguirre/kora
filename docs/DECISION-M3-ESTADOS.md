@@ -82,7 +82,7 @@ soporte declarado en el propio proyecto — el dato legado, no la reconciliació
 ## Ajuste de edición — 2026-11-04 (solicitud comercial)
 
 - **Prospecto y Cotización** admiten en la edición `draft` (No iniciado) y `on_hold` (Detenido), sin modificar `salesStage` ni aprobar el proyecto. Se conserva `onHoldReason` y la bitácora/auditoría del cambio de estado.
-- La **creación** mantiene su selector de estado original: los prospectos y cotizaciones nuevos nacen No iniciado y se detienen después desde Editar proyecto.
+- La **creación** permite elegir `on_hold` (Detenido) directamente en Prospecto/Cotización, con motivo obligatorio. Sin selección, nacen `draft` (No iniciado). Nunca se ofrece `active` antes de aprobación comercial. Este comportamiento se restauró tras la regresión del commit `9aacea322` (2026-10-28), que había vaciado las opciones y bloqueado el selector.
 - Reanudar un prospecto o cotización es volver de Detenido a No iniciado, **no** a Activo. La API rechaza activar sin aprobación comercial y rechaza retroceder a una etapa no aprobada mientras el proyecto siga Activo.
 - Para un proyecto aprobado sin Hito 0, pasar a Activo desde No iniciado **o Detenido** exige motivo de activación manual. Reactivar uno que ya tenía Hito 0 no lo vuelve a crear.
 - Los tramos pendientes no pasan a Por facturar mientras `salesStage !== 'approved'`, incluso si la fecha programada o fase se cumplen. Al aprobarse, se evalúan normalmente. No se cambian los tramos ya facturados ni los registros históricos.
