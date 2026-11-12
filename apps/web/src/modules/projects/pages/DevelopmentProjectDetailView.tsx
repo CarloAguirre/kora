@@ -26,6 +26,7 @@ import {
 import { ProjectModulesCard } from "../components/ProjectModulesCard";
 import { ProjectExecutionProgressCard } from "../components/ProjectExecutionProgressCard";
 import { calculateProjectExecutionProgress } from "../lib/project-execution-progress";
+import { calculateScheduleElapsedPercent } from "../lib/project-progress-display";
 import { TeamHoursSummaryChart } from "../components/TeamHoursSummaryChart";
 import styles from "./ProjectDetailPage.module.css";
 
@@ -309,7 +310,11 @@ export function DevelopmentProjectDetailView({
       </Card>
 
       <Card>
-        <ProjectExecutionProgressCard progress={projectExecutionProgress} />
+        <ProjectExecutionProgressCard
+          progress={projectExecutionProgress}
+          scheduleElapsedPercent={projectExecutionProgress.hasPlan
+            ? null : calculateScheduleElapsedPercent(project.startDate, project.endDate)}
+        />
 
         <div className={styles.metricsDivider} />
         <div className={styles.metricsStrip}>

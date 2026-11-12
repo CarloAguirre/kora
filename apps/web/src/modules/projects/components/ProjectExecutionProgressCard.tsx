@@ -66,12 +66,20 @@ function PhaseRows({ phase }: { phase: ProjectExecutionPhase }) {
  * Se alimenta directamente del detalle por bloques para mostrar las causas.
  * El backend ahora usa el mismo criterio operacional para project.progress.
  */
-export function ProjectExecutionProgressCard({ progress }: { readonly progress: ProjectExecutionProgress }) {
+export function ProjectExecutionProgressCard({
+  progress, scheduleElapsedPercent = null,
+}: {
+  readonly progress: ProjectExecutionProgress;
+  /** Se muestra solo si no hay plan operativo. No equivale a avance real. */
+  readonly scheduleElapsedPercent?: number | null;
+}) {
   const [expanded, setExpanded] = useState(false);
   const explanationId = useId();
   const actual = progress.actualPercent ?? 0;
   const expected = progress.expectedPercent ?? 0;
   const difference = Math.max(0, expected - actual);
+  const showSchedule = !progress.hasPlan && scheduleElapsedPercent != null;
+  const elapsed = showSchedule ? scheduleElapsedPercent : 0;
   const state = !progress.hasPlan ? 'Sin plan' : progress.paused ? 'Pausado' :
     actual < expected ? 'Atrasado' : actual > expected ? 'Adelantado' : 'Al día';
 
@@ -81,7 +89,11 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
   const incompleteCommercialPhases = useMemo(() => progress.phases.filter((phase) =>
     phase.commercialHours > phase.estimatedHours + 0.01), [progress.phases]);
   const soldMatch = sameHours(progress.plannedHours, progress.soldHours);
-  const planningDescription = !progress.hasPlan ? 'Sin HH definidas en los bloques de trabajo.' :
+  const planningDescription = !progress.hasPlan
+    ? showSchedule
+      ? 'Sin HH definidas en los bloques: la barra muestra solo el plazo calendario transcurrido.'
+      : 'Sin HH definidas en los bloques de trabajo.'
+    :
     'Plan actual: ' + progress.phases.length + (progress.phases.length === 1 ? ' fase, ' : ' fases, ') +
     progress.blocksCount + (progress.blocksCount === 1 ? ' bloque' : ' bloques') +
     ' de trabajo y ' + progress.taskCount + (progress.taskCount === 1
@@ -99,31 +111,41 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
       </span>
     </div>
     <div className={shared.summary}>
-      <strong>{progress.hasPlan ? percent(actual) : '—'}</strong>
+      <strong>{progress.hasPlan ? percent(actual) : showSchedule ? percent(elapsed) : '—'}</strong>
       <div>
-        <b>del plan completado</b>
+        <b>{showSchedule ? 'del plazo transcurrido' : 'del plan completado'}</b>
         <small>{progress.hasPlan
           ? 'A la fecha, el plan contemplaba ' + percent(expected) +
             ' de avance' + (difference > 0 ? '; faltan ' + difference + ' puntos por recuperar.' : '.')
-          : 'El presupuesto comercial existe, pero faltan HH en el plan de bloques.'}</small>
+          : showSchedule
+            ? 'Avance cronológico desde el inicio hasta la fecha de fin. El trabajo completado no se puede cuantificar sin HH planificadas por bloque.'
+            : 'El presupuesto comercial existe, pero faltan HH en el plan de bloques.'}</small>
       </div>
     </div>
     <div className={shared.timelineWrap}>
       <div className={[shared.timeline, styles.projectTimeline].join(' ')} role="img"
         aria-label={progress.hasPlan
           ? 'Avance real ' + percent(actual) + '; plan a la fecha ' + percent(expected)
-          : 'Sin plan operativo del proyecto'}>
+          : showSchedule ? 'Plazo calendario transcurrido ' + percent(elapsed) + '; no equivale a avance real'
+            : 'Sin plan operativo del proyecto'}>
         {progress.hasPlan && <>
           <span className={[shared.actualFill, styles.projectActualFill].join(' ')} style={{ width: percent(actual) }} />
           {difference > 0 && <span className={[shared.pendingFill, styles.projectPendingFill].join(' ')}
             style={{ left: percent(actual), width: percent(difference) }} />}
           <span className={[shared.expectedLine, styles.projectExpectedLine].join(' ')} style={{ left: percent(expected) }} />
         </>}
+        {showSchedule && <span className={[shared.actualFill, styles.projectScheduleFill].join(' ')}
+          style={{ width: percent(elapsed) }} />}
       </div>
       {progress.hasPlan && <span className={[shared.targetLabel, styles.projectTargetLabel].join(' ')}
         style={{ left: percent(expected), transform: expected <= 10 ? 'translateX(0)' :
           expected >= 90 ? 'translateX(-100%)' : 'translateX(-50%)' }}>
         Plan a la fecha: {percent(expected)}
+      </span>}
+      {showSchedule && <span className={[shared.targetLabel, styles.projectTargetLabel].join(' ')}
+        style={{ left: percent(elapsed), transform: elapsed <= 10 ? 'translateX(0)' :
+          elapsed >= 90 ? 'translateX(-100%)' : 'translateX(-50%)' }}>
+        Plazo transcurrido: {percent(elapsed)}
       </span>}
     </div>
     <p className={styles.planDescription}>{planningDescription}</p>
@@ -146,10 +168,18 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
             {' '}<b>{hours(progress.plannedHours)} HH</b> planificadas.
             Llevas <b>{percent(actual)}</b>, es decir,
             {' '}<b>{hours(progress.actualHours)} HH</b> completadas.</p>
-          : <p className={shared.lead}>Todavía no es posible medir el avance del proyecto:
-              las HH vendidas no sustituyen las HH y fechas de los bloques operativos.
-              Completa el Roadmap para establecer el plan.</p>}
-        <div className={shared.methodology}>
+          : showSchedule
+            ? <p className={shared.lead}>El <b>{percent(elapsed)}</b> representa exclusivamente
+                el tiempo calendario entre las fechas de inicio y fin, no trabajo terminado.
+                Se han consumido <b>{hours(progress.usedHours)} HH</b>
+                {progress.soldHours > 0 && <> de <b>{hours(progress.soldHours)} HH vendidas</b>
+                  {' '}({Math.round(progress.usedHours / progress.soldHours * 100)}% del presupuesto)</>}.
+                Esos registros no sustituyen las HH estimadas de los bloques para calcular
+                avance real. Completa el Roadmap para disponer de esa medición.</p>
+            : <p className={shared.lead}>Todavía no es posible medir el avance del proyecto:
+                las HH vendidas no sustituyen las HH y fechas de los bloques operativos.
+                Completa el Roadmap para establecer el plan.</p>}
+        {progress.hasPlan && <div className={shared.methodology}>
           <div><b>1. El plan</b><p>Son las HH de los bloques de trabajo:
             {' '}{hours(progress.plannedHours)} HH equivalen al 100% del plan operativo.
             Se distribuyen entre sus fechas de inicio y fin.</p></div>
@@ -157,7 +187,7 @@ export function ProjectExecutionProgressCard({ progress }: { readonly progress: 
             al avance de su bloque; sin aprobación aún no suma avance.</p></div>
           <div><b>3. La entrega</b><p>Una entrega de cierre <b>aprobada</b> o el cierre
             registrado completa ese bloque al 100%.</p></div>
-        </div>
+        </div>}
 
         {progress.laggingBlocks.length > 0 && !progress.paused && <div className={shared.reasons}>
           <strong>Qué explica la diferencia</strong>
