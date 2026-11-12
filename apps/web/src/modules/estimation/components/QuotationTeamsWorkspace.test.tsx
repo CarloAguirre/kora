@@ -13,7 +13,8 @@ const activeTeams = [{ id: dev, name: 'Desarrollo' }, { id: qa, name: 'QA' }];
 const handlers = {
   onChangeView: vi.fn(), onEditTeam: vi.fn(), onToggleTeam: vi.fn(),
   onEditGroupHours: vi.fn(), onEditRoleCollaborators: vi.fn(),
-  onEditMappedCollaborators: vi.fn(), onEditTeamCapacity: vi.fn(),
+  onEditMappedCollaborators: vi.fn(), onEditMappedDuration: vi.fn(),
+  onEditTeamCapacity: vi.fn(),
 };
 const team = (id: string) => ({
   teamId: id, collaborators: 2, unit: 'week' as const,
@@ -212,9 +213,10 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(screen.getByLabelText('Incluir Desarrollo')).toBeChecked();
     expect(screen.getByLabelText('Incluir QA')).not.toBeChecked();
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
-    expect(screen.getByLabelText('Unidad de Desarrollo')).toBeEnabled();
+    expect(screen.getByLabelText('Unidad de Desarrollo')).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Duración de Desarrollo'), { target: { value: '5' } });
-    expect(handlers.onEditTeam).toHaveBeenCalledWith(dev, { duration: 5 });
+    expect(handlers.onEditMappedDuration).toHaveBeenCalledWith(dev, 5);
+    expect(handlers.onEditTeam).not.toHaveBeenCalledWith(dev, { duration: 5 });
     expect(screen.queryByText('Desarrollador Backend')).not.toBeInTheDocument();
     expect(screen.queryByText('Carga semanal por equipo')).not.toBeInTheDocument();
     const input = screen.getByLabelText('Horas totales de Desarrollo');
