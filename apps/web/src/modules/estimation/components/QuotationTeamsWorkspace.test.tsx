@@ -100,7 +100,7 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     expect(screen.getByText('Capacidad hh/sem')).toBeInTheDocument();
     expect(screen.getByText('Disponible %')).toBeInTheDocument();
     expect(screen.getByLabelText('Carga efectiva de Desarrollo')).toHaveTextContent(
-      '5 HH/sem/persona · 12,5% de jornada completa');
+      '10 HH/sem/persona · 25% de jornada completa');
     expect(screen.getByLabelText('Carga efectiva de Desarrollo')).toHaveTextContent(
       'disponibilidad configurada: 40 HH/sem/persona');
     expect(screen.getByLabelText('Horas semanales de Desarrollo')).toHaveValue(40);
