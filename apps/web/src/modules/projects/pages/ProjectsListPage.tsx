@@ -5,7 +5,6 @@ import {
   PROJECT_KIND_LABELS,
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
-  PROJECT_QUOTATION_LIST_STATUSES,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
   SUPPORT_PLAN_TYPE_LABELS,
@@ -65,9 +64,6 @@ const QUOTATION_LABELS: Record<ProjectQuotationListStatus, string> = {
   transferred: 'Traspasada',
   planning_applied: 'Planificación preliminar aplicada',
 };
-const QUOTATION_OPTIONS = PROJECT_QUOTATION_LIST_STATUSES.map((status) => ({
-  value: status, label: QUOTATION_LABELS[status],
-}));
 // Igual que en Estado, "Finalizado" no se ofrece como filtro de Tipo de proyecto.
 const KIND_OPTIONS = PROJECT_KINDS.filter((kind) => kind !== 'finished').map((kind) => ({
   value: kind,
@@ -106,7 +102,6 @@ const DATE_COLUMN_WIDTH = '120px';
 export function ProjectsListPage() {
   const { can } = usePermissions();
   const toast = useToast();
-  const [quotationStatuses, setQuotationStatuses] = useState<ProjectQuotationListStatus[]>([]);
   const location = useLocation();
   const [listSearch, setListSearch] = useState(() => initialProjectsListSearch(location.state));
   const { tab, supportSubTab, search, leaderUserIds, kinds, statuses, phases, page, pageSize, sort } = listSearch;
@@ -131,7 +126,6 @@ export function ProjectsListPage() {
           kind: kinds.length > 0 ? kinds : undefined,
           status: statuses.length > 0 ? statuses : undefined,
           phase: phases.length > 0 ? phases : undefined,
-          quotationStatus: quotationStatuses.length > 0 ? quotationStatuses : undefined,
         }
       : {
           type: tab,
@@ -439,18 +433,6 @@ export function ProjectsListPage() {
                   options={PHASE_OPTIONS}
                   value={phases}
                   onChange={(next) => updateListSearch({ phases: next as ProjectPhase[], page: 1 })}
-                />
-                <MultiSelect
-                  className={styles.filter}
-                  label="Cotización"
-                  placeholder="Todas"
-                  searchPlaceholder="Buscar cotización"
-                  options={QUOTATION_OPTIONS}
-                  value={quotationStatuses}
-                  onChange={(next) => {
-                    setQuotationStatuses(next as ProjectQuotationListStatus[]);
-                    setPage(1);
-                  }}
                 />
               </>
             )}

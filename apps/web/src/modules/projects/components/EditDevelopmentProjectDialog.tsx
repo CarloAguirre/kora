@@ -51,8 +51,8 @@ const salesStageOf: Record<ProjectTipo, ProjectSalesStage | null> = {
   prospecto: 'prospect', cotizacion: 'quoted', aprobado: 'approved', finalizado: null,
 };
 const statusOptions: Record<ProjectTipo, ProjectStatus[]> = {
-  prospecto: ['draft'],
-  cotizacion: ['draft'],
+  prospecto: ['draft', 'on_hold'],
+  cotizacion: ['draft', 'on_hold'],
   aprobado: ['draft', 'active', 'on_hold'],
   finalizado: ['finished'],
 };
@@ -180,8 +180,11 @@ export function EditDevelopmentProjectDialog({
     soldHours !== project.soldHours;
   const missingHoursReason = soldHoursChanged && !watch('soldHoursChangeReason')?.trim();
   const estimationDisabled = tipo === 'prospecto';
-  const statusLocked = tipo !== 'aprobado';
-  const manualActivation = tipo === 'aprobado' && project.status === 'draft' && estado === 'active';
+  // Prospectos/Cotizaciones pueden detenerse y reanudarse sin aprobación comercial.
+  const statusLocked = tipo === 'finalizado';
+  // Aprobados detenidos que aún no tuvieron Hito 0 también requieren motivo al activarse.
+  const manualActivation = tipo === 'aprobado' && project.hito0At == null &&
+    project.status !== 'active' && estado === 'active';
   const billingIssue = !isInternal && tipo === 'aprobado' && project.salesStage !== 'approved'
     ? missingApprovalBillingData(paymentPlan) : null;
   const canEditPayment = !isInternal && !estimationDisabled;
@@ -231,7 +234,17 @@ export function EditDevelopmentProjectDialog({
       setPaymentPlanError(error);
       if (error) return;
     }
+    const statusChanged = estado !== project.status;
+    const statusInput = {
+      projectId: project.id,
+      input: { status: estado, ...(manualActivation ? { reason: manualActivationReason.trim() } : {}) },
+    };
+    // Una oportunidad comercial nunca puede quedar Activa. Al retroceder
+    // Aprobado Activo a Prospecto/Cotización, cambiar estado antes de etapa.
+    const stopBeforeDemotion = statusChanged && project.status === 'active' &&
+      (tipo === 'prospecto' || tipo === 'cotizacion');
     try {
+      if (stopBeforeDemotion) await changeStatus.mutateAsync(statusInput);
       await updateProject.mutateAsync({
         projectId: project.id,
         input: {
@@ -240,12 +253,7 @@ export function EditDevelopmentProjectDialog({
           ...(sendPlan ? paymentPlanPayload(paymentPlan) : {}),
         },
       });
-      if (estado !== project.status) {
-        await changeStatus.mutateAsync({
-          projectId: project.id,
-          input: { status: estado, ...(manualActivation ? { reason: manualActivationReason.trim() } : {}) },
-        });
-      }
+      if (statusChanged && !stopBeforeDemotion) await changeStatus.mutateAsync(statusInput);
       if (project.canAuthorizeOvertime && allowsOvertime !== project.allowsOvertime) {
         await updateOvertime.mutateAsync({ projectId: project.id, input: { allowsOvertime } });
       }
@@ -330,15 +338,15 @@ export function EditDevelopmentProjectDialog({
             <Select label="Estado"
               options={statusOptions[tipo].map((status) => ({
                 value: status,
-                label: status === 'active' && project.status === 'draft'
+                label: status === 'active' && project.status !== 'active' && project.hito0At == null
                   ? 'Activo (activación manual)' : PROJECT_STATUS_LABELS[status],
               }))}
               value={estado} disabled={statusLocked}
               onChange={(e) => setEstado(e.target.value as ProjectStatus)} />
             <Select label="Etapa de avance" placeholder="Sin definir"
               options={phaseOptions}
-              helperText={estado === 'active' ? undefined : 'Solo para proyectos activos.'}
-              disabled={estado !== 'active'}
+              helperText={tipo === 'aprobado' && estado === 'active' ? undefined : 'Solo para proyectos activos.'}
+              disabled={tipo !== 'aprobado' || estado !== 'active'}
               {...register('phase', { setValueAs: (value: string) => value || null })} />
           </div>
 

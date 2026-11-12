@@ -633,6 +633,82 @@ describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.
     isManagement: true,
   });
 
+  it.each(['prospect', 'quoted'] as const)(
+    'editor v5.02: permite detener %s sin aprobarlo ni activar Hito 0',
+    async (salesStage) => {
+      const user = userEvent.setup();
+      renderDevelopmentDialog(props({ salesStage, status: 'draft', phase: null, hito0At: null }));
+      const tipo = screen.getByLabelText('Tipo de proyecto');
+      expect(tipo).toHaveValue(salesStage === 'prospect' ? 'prospecto' : 'cotizacion');
+      const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
+      expect(estado).toBeEnabled();
+      expect(Array.from(estado.options).map((option) => option.value)).toEqual(['draft', 'on_hold']);
+      await user.selectOptions(estado, 'on_hold');
+      expect(screen.getByLabelText('Motivo del detenimiento')).toBeInTheDocument();
+      expect(screen.getByLabelText('Etapa de avance')).toBeDisabled();
+      expect(screen.queryByLabelText('Motivo de activación manual')).not.toBeInTheDocument();
+      await user.type(screen.getByLabelText('Motivo del detenimiento'), 'Cliente solicita pausa');
+      fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+      await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+        projectId: 'project-1', input: { status: 'on_hold' },
+      }));
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: 'project-1',
+        input: expect.objectContaining({ salesStage, onHoldReason: 'Cliente solicita pausa' }),
+      }));
+      expect(screen.queryByText(/Activación manual \(Hito 0/)).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(['prospect', 'quoted'] as const)(
+    'editor v5.02: permite reanudar %s a No iniciado sin aprobación',
+    async (salesStage) => {
+      const user = userEvent.setup();
+      renderDevelopmentDialog(props({
+        salesStage, status: 'on_hold', phase: null,
+        hito0At: null, onHoldReason: 'En pausa',
+      }));
+      await user.selectOptions(screen.getByLabelText('Estado'), 'draft');
+      fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+      await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+        projectId: 'project-1', input: { status: 'draft' },
+      }));
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        input: expect.objectContaining({ salesStage }),
+      }));
+    },
+  );
+
+  it('editor v5.02: detiene un Aprobado activo antes de retrocederlo a Cotización', async () => {
+    const user = userEvent.setup();
+    renderDevelopmentDialog(props({ salesStage: 'approved', status: 'active',
+      hito0At: '2026-10-01T00:00:00.000Z' }));
+    await user.selectOptions(screen.getByLabelText('Tipo de proyecto'), 'cotizacion');
+    expect(screen.getByLabelText('Estado')).toHaveValue('draft');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'draft' },
+    }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(changeStatusMutateAsync.mock.invocationCallOrder[0]).toBeLessThan(
+      mutateAsync.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('editor v5.02: un Aprobado detenido sin Hito 0 sigue exigiendo motivo de activación', async () => {
+    const user = userEvent.setup();
+    renderDevelopmentDialog(props({ salesStage: 'approved', status: 'on_hold', hito0At: null }));
+    await user.selectOptions(screen.getByLabelText('Estado'), 'active');
+    expect(screen.getByLabelText('Motivo de activación manual')).toBeInTheDocument();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    expect(changeStatusMutateAsync).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText('Motivo de activación manual'), 'OC aprobada');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'active', reason: 'OC aprobada' },
+    }));
+  });
+
   it('muestra exclusivamente los bloques de la imagen y ningún editor de equipos/fases', () => {
     renderDevelopmentDialog(props({ canAuthorizeOvertime: true }));
     expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('projectEditSide');

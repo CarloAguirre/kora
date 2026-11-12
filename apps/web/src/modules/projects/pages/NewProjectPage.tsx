@@ -90,6 +90,11 @@ import { ApiRequestError } from '@/shared/lib/api-client';
 import { formatMoney } from '@/shared/lib/format-money';
 import { paymentTriggerLabel } from '../lib/payment-milestone-display';
 import { projectPath, supportPlanPath } from '@/app/router/paths';
+import {
+  STATUS_OPTIONS_APPROVED,
+  STATUS_OPTIONS_NOT_APPROVED,
+  STATUS_PLACEHOLDER,
+} from '../lib/create-project-status-options';
 
 type ProjectFormValues = z.input<typeof createProjectSchema>;
 
@@ -99,20 +104,6 @@ const SALES_STAGE_OPTIONS = PROJECT_SALES_STAGES.map((stage) => ({
   label: PROJECT_SALES_STAGE_LABELS[stage],
 }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
-/**
- * Opciones de "Estado" al crear — dependen de la etapa comercial, mismo criterio que
- * `estadosDisponibles()` del prototipo de referencia (KORA · Definiciones de tipos, estados,
- * activación y horas de proyecto): Aprobado habilita los 3 estados operativos; Prospecto y
- * Cotización siempre quedan "No iniciado" y el Select se bloquea. El placeholder es "No iniciado"
- * (valor vacío → sin `status`, y el backend asigna `draft` por defecto a todo proyecto de desarrollo).
- */
-const STATUS_PLACEHOLDER = PROJECT_STATUS_LABELS.draft;
-const STATUS_OPTIONS_APPROVED = [
-  { value: 'active', label: 'Activo (activación manual)' },
-  { value: 'on_hold', label: PROJECT_STATUS_LABELS.on_hold },
-];
-const STATUS_OPTIONS_NOT_APPROVED: typeof STATUS_OPTIONS_APPROVED = [];
-
 /** Soporte no cambia: "Configuración de soporte" en el mismo índice donde Desarrollo tenía "Fases · Módulos". */
 const STEPS_SUPPORT = [
   { label: 'Datos del cliente' },
@@ -972,7 +963,6 @@ export function NewProjectPage() {
                       label="Estado"
                       placeholder={STATUS_PLACEHOLDER}
                       options={statusOptions}
-                      disabled={!isApproved}
                       {...register('status', { setValueAs: emptyToUndefined })}
                       onChange={(event) => {
                         register('status', { setValueAs: emptyToUndefined }).onChange(event);
