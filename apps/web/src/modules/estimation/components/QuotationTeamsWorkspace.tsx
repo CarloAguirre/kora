@@ -95,7 +95,7 @@ export function QuotationTeamsWorkspace({
       <p className={styles.caption}>
         {view === 'team'
           ? hasEdt
-            ? 'Las HH provienen de las tareas. 40 hh/sem = 100% de dedicación; editar la jornada propone una redistribución con confirmación.'
+            ? 'Las HH provienen de las tareas de la EDT. Capacidad (40 HH/sem = 100%) indica disponibilidad por persona, NO carga asignada. La carga y dedicación efectiva se calculan debajo de cada equipo; editar capacidad propone redistribuir HH con confirmación.'
             : 'Horas = colaboradores × duración × hh/semana. 40 hh/sem = 100% de dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
@@ -109,8 +109,12 @@ export function QuotationTeamsWorkspace({
           <span>Nº colab.</span>
           {view === 'team' && <>
             <span>Unidad</span><span>Duración</span>
-            <span title="Horas de dedicación semanal por persona">hh/sem</span>
-            <span title="40 HH por semana equivale a 100%">Dedicación %</span>
+            <span title={hasEdt
+              ? 'Capacidad semanal configurada por colaborador; no equivale a las HH asignadas en la EDT.'
+              : 'Horas semanales por colaborador'}>{hasEdt ? 'Capacidad hh/sem' : 'hh/sem'}</span>
+            <span title={hasEdt
+              ? 'Porcentaje de disponibilidad configurada (40 HH/sem = 100%), distinto de la dedicación efectiva de la EDT.'
+              : '40 HH por semana equivale a 100%'}>{hasEdt ? 'Disponible %' : 'Dedicación %'}</span>
           </>}
           <span>Horas</span>
         </div>
@@ -208,6 +212,19 @@ export function QuotationTeamsWorkspace({
                     disabled={!editable} value={getHours(teamId)}
                     onCommit={(hours) => onEditGroupHours(teamId, hours)}/>
                 : <strong className={styles.hours}>{checked ? fmt(getHours(teamId)) : '—'}</strong>}
+              {hasEdt && view === 'team' && checked && capacity && (
+                <p className={styles.effectiveLoad}
+                  aria-label={'Carga efectiva de ' + label}>
+                  {capacity.averagePerPerson === null || capacity.occupationPercent === null
+                    ? 'Carga efectiva no calculable: falta duración válida.'
+                    : <>
+                      <strong>Carga efectiva de tareas:</strong>{' '}
+                      {fmt(capacity.averagePerPerson)} HH/sem/persona
+                      {' · '}{fmt(capacity.occupationPercent)}% de jornada completa
+                      {' · '}disponibilidad configurada: {fmt(capacity.capacityPerPerson)} HH/sem/persona.
+                    </>}
+                </p>
+              )}
               {warningParts.length > 0 && <div className={styles.capacityWarning}
                 role="status" aria-label={'Alerta de capacidad de ' + label}>
                 <Badge tone="warning">Revisar capacidad</Badge>
