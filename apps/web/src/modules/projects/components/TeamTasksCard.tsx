@@ -114,7 +114,8 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
     return { teamId, teamName, leaderId, members };
   }, [project, teamId]);
 
-  const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
+  // La misma autorización efectiva que usa el backend para tareas del equipo.
+  const canManageTeam = project.teams.some((t) => t.teamId === teamId && t.canManage);
 
   const teamTasks = useMemo(() => {
     return project.modules.flatMap((module) =>
