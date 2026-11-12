@@ -104,6 +104,9 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     teamSlug: team.teamSlug,
     teamName: team.teamName,
     leader: team.leaderUserId ? { id: team.leaderUserId, fullName: team.leaderName ?? '' } : null,
+    // Alineado con el backend: el líder del proyecto puede gestionar todos sus equipos;
+    // si no hay override, el líder orgánico del equipo también puede gestionar el suyo.
+    canManage: source.canManagePendings || team.effectiveLeaderUserId === source.actorUserId,
     assignedHours: team.assignedHours,
     memberCount: team.memberCount,
     maxMembers: team.maxMembers,
