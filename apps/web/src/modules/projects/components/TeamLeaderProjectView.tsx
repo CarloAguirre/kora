@@ -37,14 +37,11 @@ interface TeamMemberDraftRow {
 }
 
 /**
- * Vista restringida de la ficha del proyecto para quien lidera SOLO un
- * equipo dentro de él (no el proyecto completo) — mismo `/proyectos/:id`,
- * `ProjectDetailPage` decide renderizar esto en vez de
- * `DevelopmentProjectDetailView` cuando el actor no tiene `projects:manage`
- * pero sí lidera uno de los equipos asignados (ver mockup
- * "10-vista-proyecto-lider-equipo.html"). Aquí gestiona a su propia gente y
- * las tareas de su equipo — el resto de la ficha (Roadmap, Bitácora,
- * Extras) queda fuera de esta vista.
+ * Ficha específica de un equipo dentro del proyecto, accesible desde el
+ * resumen, desde Equipos o desde la vista acotada de soporte. Puede consultarla
+ * un participante y gestionarla el líder efectivo del equipo, el líder del
+ * proyecto o quien tenga projects:manage. La API calcula canManage por equipo;
+ * esta vista nunca debe inferir permisos de un rol genérico.
  */
 export function TeamLeaderProjectView({
   project,
