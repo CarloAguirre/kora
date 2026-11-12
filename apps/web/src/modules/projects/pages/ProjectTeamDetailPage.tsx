@@ -49,7 +49,7 @@ export function ProjectTeamDetailPage() {
   const teamRow = project.teams.find((t) => t.teamId === teamId || t.teamSlug === teamId);
   const teamName = teamRow?.teamName ?? 'Equipo';
   /** Si quien entra lidera más de un equipo del proyecto, puede saltar entre ellos sin volver a la ficha. */
-  const ledTeams = user ? project.teams.filter((t) => t.leader?.id === user.id) : [];
+  const ledTeams = project.teams.filter((t) => t.canManage);
   const showTeamSwitcher = ledTeams.length > 1 && ledTeams.some((t) => t.teamId === teamRow?.teamId);
 
   return (
