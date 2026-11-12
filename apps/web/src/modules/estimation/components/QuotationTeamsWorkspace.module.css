@@ -70,18 +70,4 @@
   font-size:10.5px;line-height:1.4}
 @media(max-width:850px){.detailedColumns{min-width:790px}}
 
-/* EDT: mostrar HH y dedicación efectivamente asignadas en las columnas.
-   Configuración opcional de capacidad permanece separada de esos valores. */
-.capacitySettings{grid-column:1/-1;min-width:0;color:var(--kora-text-muted);
-  font-size:11px;line-height:1.45}
-.capacitySettings>summary{display:inline-flex;align-items:center;cursor:pointer;
-  color:var(--kora-navy);font-weight:600;padding:2px 6px;border-radius:5px;
-  list-style:disclosure-closed}
-.capacitySettings[open]>summary{list-style:disclosure-open}
-.capacitySettings>summary:focus-visible{outline:2px solid var(--kora-navy);outline-offset:2px}
-.capacitySettingsFields{display:grid;grid-template-columns:145px 145px minmax(190px,1fr);
-  gap:10px;align-items:center;padding:10px 9px;background:var(--kora-surface-alt);
-  border:1px solid var(--kora-border-subtle);border-radius:var(--kora-radius-input)}
-.capacitySettingsFields small{color:var(--kora-text-muted);font-size:10.5px}
-@media(max-width:700px){.capacitySettingsFields{grid-template-columns:1fr 1fr}
- .capacitySettingsFields small{grid-column:1/-1}}
+/* EDT: las columnas existentes muestran las HH/sem y dedicación reales. */

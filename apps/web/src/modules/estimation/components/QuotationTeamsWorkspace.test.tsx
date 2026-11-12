@@ -95,27 +95,16 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
   });
 
 
-  it('EDT muestra 10 HH/sem y 25% reales en las columnas; disponibilidad editable solo al desplegar', () => {
+  it('EDT reemplaza 40 y 100 por las HH y dedicación reales, en las mismas columnas', () => {
     renderTeams(mappedEdtDraft);
     expect(screen.getByText('HH/sem reales')).toBeInTheDocument();
     expect(screen.getByText('Dedicación real %')).toBeInTheDocument();
     expect(screen.getByLabelText('HH semanales reales de Desarrollo')).toHaveTextContent('10');
     expect(screen.getByLabelText('Dedicación real de Desarrollo')).toHaveTextContent('25%');
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
-    expect(screen.getByText('Configurar disponibilidad de Desarrollo').closest('details'))
-      .not.toHaveAttribute('open');
-    fireEvent.click(screen.getByText('Configurar disponibilidad de Desarrollo'));
-    expect(screen.getByLabelText('Horas semanales de Desarrollo')).toHaveValue(40);
-    expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(100);
-    fireEvent.change(screen.getByLabelText('Horas semanales de Desarrollo'),
-      { target: { value: '20' } });
-    expect(handlers.onEditTeamCapacity).not.toHaveBeenCalledWith(dev, 'hoursPerWeek', 20);
-    fireEvent.blur(screen.getByLabelText('Horas semanales de Desarrollo'));
-    expect(handlers.onEditTeamCapacity).toHaveBeenCalledWith(dev, 'hoursPerWeek', 20);
-    fireEvent.change(screen.getByLabelText('Dedicación de Desarrollo'),
-      { target: { value: '75' } });
-    fireEvent.blur(screen.getByLabelText('Dedicación de Desarrollo'));
-    expect(handlers.onEditTeamCapacity).toHaveBeenCalledWith(dev, 'dedicationPercent', 75);
+    expect(screen.queryByText('Configurar disponibilidad de Desarrollo')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Horas semanales de Desarrollo')).not.toBeInTheDocument();
+    expect(handlers.onEditTeamCapacity).not.toHaveBeenCalled();
   });
 
   it('QA 150 HH durante ocho semanas no equivale a 40 HH/sem ni 100% de dedicación', () => {
@@ -156,9 +145,7 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     renderTeams(customized);
     expect(screen.getByLabelText('HH semanales reales de Desarrollo')).toHaveTextContent('10');
     expect(screen.getByLabelText('Dedicación real de Desarrollo')).toHaveTextContent('25%');
-    fireEvent.click(screen.getByText('Configurar disponibilidad de Desarrollo'));
-    expect(screen.getByLabelText('Horas semanales de Desarrollo')).toHaveValue(20);
-    expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(50);
+    expect(screen.queryByText('Configurar disponibilidad de Desarrollo')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
   });
 

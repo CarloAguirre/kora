@@ -95,7 +95,7 @@ export function QuotationTeamsWorkspace({
       <p className={styles.caption}>
         {view === 'team'
           ? hasEdt
-            ? 'Las HH/sem y la dedicación % muestran la carga REAL promedio por persona, calculada desde la EDT, las personas y las semanas. La capacidad máxima de referencia es 40 HH/sem; si necesitas cambiar disponibilidad, despliega «Configurar disponibilidad» debajo del equipo.'
+            ? 'Las HH/sem y la dedicación % muestran la carga real promedio de cada persona, calculada desde las HH de la EDT, los colaboradores y la duración. Se utiliza una jornada de referencia de 40 HH/semana. Las HH totales de las tareas no se modifican.'
             : 'Horas = colaboradores × duración × hh/semana. 40 hh/sem = 100% de dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
@@ -227,25 +227,6 @@ export function QuotationTeamsWorkspace({
                     disabled={!editable} value={getHours(teamId)}
                     onCommit={(hours) => onEditGroupHours(teamId, hours)}/>
                 : <strong className={styles.hours}>{checked ? fmt(getHours(teamId)) : '—'}</strong>}
-              {hasEdt && view === 'team' && checked && fieldsEditable && (
-                <details className={styles.capacitySettings}>
-                  <summary>Configurar disponibilidad de {label}</summary>
-                  <div className={styles.capacitySettingsFields}>
-                    <QuotationCapacityInput className={styles.numberField}
-                      label={'Horas semanales de ' + label}
-                      value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
-                      max={KORA_QUOTATION_REFERENCE_WEEK_HOURS}
-                      onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
-                    <QuotationCapacityInput className={styles.numberField}
-                      label={'Dedicación de ' + label}
-                      value={team?.dedicationPercent ?? 100} max={100}
-                      onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
-                    <small>Disponibilidad máxima configurada. Los valores principales
-                      son la carga efectiva derivada de las tareas; un cambio de capacidad
-                      requiere confirmar la redistribución de HH.</small>
-                  </div>
-                </details>
-              )}
               {warningParts.length > 0 && <div className={styles.capacityWarning}
                 role="status" aria-label={'Alerta de capacidad de ' + label}>
                 <Badge tone="warning">Revisar capacidad</Badge>
