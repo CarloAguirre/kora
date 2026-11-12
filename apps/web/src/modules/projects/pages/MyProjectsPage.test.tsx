@@ -32,4 +32,34 @@ describe('Mis proyectos del colaborador', () => {
     expect(screen.queryByRole('button', { name: /editar|eliminar|planificar/i })).not.toBeInTheDocument();
     expect(mocks.mine).toHaveBeenCalledWith(expect.objectContaining({ page: 1, pageSize: 10 }));
   });
+  it('sin HH operativas, App Walvy muestra plazo calendario y no avance real', () => {
+    mocks.mine.mockReturnValue({ isLoading: false, error: null, data: {
+      page: 1, pageSize: 10, pageCount: 1, total: 1, items: [{
+        id: 'p-2', slug: 'app-walvy', name: 'App Walvy',
+        client: { id: 'c-1', companyName: 'Edificate Inteligente' },
+        leader: null, phase: 'development', status: 'active', type: 'development',
+        startDate: '2026-03-30', endDate: '2026-12-21',
+        progress: { actual: null, expected: null, delay: null },
+        weekHours: 0,
+      }] },
+    });
+    render(<MemoryRouter><MyProjectsPage /></MemoryRouter>);
+    const bar = screen.getByRole('progressbar', { name: 'Plazo calendario transcurrido de App Walvy' });
+    expect(bar).toHaveAttribute('aria-valuenow');
+    expect(screen.getByText('(plazo)')).toBeInTheDocument();
+    expect(screen.queryByText('Sin plan')).not.toBeInTheDocument();
+  });
+
+  it('sin fechas ni plan no inventa un progreso', () => {
+    mocks.mine.mockReturnValue({ isLoading: false, error: null, data: {
+      page: 1, pageSize: 10, pageCount: 1, total: 1, items: [{
+        id: 'p-3', slug: 'sin-fechas', name: 'Sin fechas',
+        client: null, leader: null, phase: null, status: 'active', type: 'development',
+        startDate: null, endDate: null, progress: { actual: null, expected: null }, weekHours: 0,
+      }] },
+    });
+    render(<MemoryRouter><MyProjectsPage /></MemoryRouter>);
+    expect(screen.getByText('Sin plan')).toBeInTheDocument();
+    expect(screen.queryByText('(plazo)')).not.toBeInTheDocument();
+  });
 });

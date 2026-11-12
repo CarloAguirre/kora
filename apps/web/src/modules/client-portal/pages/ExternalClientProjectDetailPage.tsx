@@ -10,6 +10,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { useToast } from '@/shared/components/ui/Toast';
 import { BuildingIcon, ChevronLeftIcon, ClockIcon, DownloadIcon, LinkIcon } from '@/shared/components/icons/Icons';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
+import { calculateScheduleElapsedPercent } from '@/modules/projects/lib/project-progress-display';
 import { CommittedDeliveriesRoadmap } from '../components/CommittedDeliveriesRoadmap';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { toExternalPhaseRoadmap, externalProjectBitacora, deliveriesGroupedByPhase } from '../adapters/external-project-presentation.adapter';
@@ -201,7 +202,10 @@ export function ExternalClientProjectDetailPage() {
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
           <ProjectProgressOverview actualPercent={project.progress.actual}
-            expectedPercent={project.progress.expected} startDate={dmy(project.startDate)}
+            expectedPercent={project.progress.expected}
+            scheduleElapsedPercent={project.progress.actual == null
+              ? calculateScheduleElapsedPercent(project.startDate, project.endDate) : null}
+            startDate={dmy(project.startDate)}
             endDate={dmy(project.endDate)}
             daysRemaining={project.endDate ? Math.max(0, Math.ceil(
               (new Date(project.endDate + 'T00:00:00').getTime() - Date.now()) / 86400000)) : 0}/>

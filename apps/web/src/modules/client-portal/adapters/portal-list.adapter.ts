@@ -1,5 +1,6 @@
 import type { ClientDetail, ProjectSummary, SupportPlanListItem } from '@kora/contracts';
 import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-display';
+import { calculateScheduleElapsedPercent } from '@/modules/projects/lib/project-progress-display';
 import type { ClientCompanyInfo, ClientProjectHealth, ClientProjectRow, ClientSupportContractRow } from '../types';
 
 /** Traduce las listas reales del cliente (`GET /projects`, `GET /support-plans/client/:id`) a las filas del portal — ver `docs/DECISION-PORTAL-CLIENTE.md`. */
@@ -37,6 +38,8 @@ export function toClientCompanyInfo(client: ClientDetail): ClientCompanyInfo {
 }
 
 export function toClientProjectRow(project: ProjectSummary): ClientProjectRow {
+  const elapsed = project.progress.actual == null
+    ? calculateScheduleElapsedPercent(project.startDate, project.endDate) : null;
   return {
     id: project.id,
     slug: project.slug,
@@ -49,7 +52,8 @@ export function toClientProjectRow(project: ProjectSummary): ClientProjectRow {
     health: projectHealth(project),
     // Misma etiqueta que la columna "Etapa" interna: solo con `phase`, un Prospecto/Cotización (sin fase) salía "Sin etapa".
     stageLabel: getProjectStageLabel(project),
-    progressPercent: project.progress.actual,
+    progressPercent: project.progress.actual ?? elapsed,
+    progressIsSchedule: project.progress.actual == null && elapsed != null,
   };
 }
 

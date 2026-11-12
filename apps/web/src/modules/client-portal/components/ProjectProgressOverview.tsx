@@ -7,6 +7,8 @@ interface ProjectProgressOverviewProps {
   /** `null` = el proyecto todavía no tiene plan cargado. */
   readonly actualPercent: number | null;
   readonly expectedPercent: number | null;
+  /** Fallback de plazo calendario (no avance real), solo cuando no existe avance operativo. */
+  readonly scheduleElapsedPercent?: number | null;
   /** Ya formateadas (dd-mm-aaaa). Sin ellas no hay pie de fechas (la ficha interna ya las muestra aparte). */
   readonly startDate?: string;
   readonly endDate?: string;
@@ -48,6 +50,7 @@ function describeStatus(actual: number, expected: number): { label: string; tone
 export function ProjectProgressOverview({
   actualPercent,
   expectedPercent,
+  scheduleElapsedPercent = null,
   startDate,
   endDate,
   daysRemaining = 0,
@@ -58,6 +61,47 @@ export function ProjectProgressOverview({
   const containerClass = bare ? styles.bare : styles.card;
 
   if (actualPercent == null || expectedPercent == null) {
+    // La ausencia de plan no implica 0% de tiempo transcurrido. Este dato
+    // nunca se presenta como trabajo completado ni altera el cálculo real.
+    const elapsed = scheduleElapsedPercent != null && Number.isFinite(scheduleElapsedPercent)
+      ? Math.max(0, Math.min(100, Math.round(scheduleElapsedPercent))) : null;
+    if (elapsed != null) {
+      return (
+        <div className={containerClass}>
+          <div className={styles.header}>
+            <div className={styles.headline}>
+              <span className={styles.bigNumber}>{elapsed}%</span>
+              <span className={styles.headlineText}>
+                <span className={styles.headlineTitle}>del plazo transcurrido</span>
+                <span className={styles.headlineSentence}>
+                  Tiempo transcurrido entre inicio y fin. El avance real no es cuantificable sin HH planificadas por bloque.
+                </span>
+              </span>
+            </div>
+            <StatusPill tone="neutral">Sin plan</StatusPill>
+          </div>
+          <div className={styles.barArea}>
+            <div className={styles.track} role="img"
+              aria-label={`Plazo calendario transcurrido ${elapsed}%; no equivale a avance real`}>
+              <div className={styles.scheduleFill} style={{ width: `${elapsed}%` }} />
+            </div>
+            <span className={styles.planMark} style={{ left: `${elapsed}%` }}>
+              <span className={styles.planLine} />
+              <span className={[styles.planLabel, edgeAlign(elapsed)].filter(Boolean).join(' ')}>
+                Plazo transcurrido · {elapsed}%
+              </span>
+            </span>
+          </div>
+          {note && <p className={styles.note}>{note}</p>}
+          {startDate && endDate && <div className={styles.footer}>
+            <span className={styles.footerDate}><span className={styles.footerLabel}>Inicio</span>{startDate}</span>
+            <span className={[styles.footerDate, styles.footerDateEnd].join(' ')}>
+              <span className={styles.footerLabel}>Entrega</span>{endDate}
+            </span>
+          </div>}
+        </div>
+      );
+    }
     return (
       <div className={containerClass}>
         <p className={styles.empty}>El avance se mostrará apenas el plan de trabajo del proyecto esté cargado.</p>

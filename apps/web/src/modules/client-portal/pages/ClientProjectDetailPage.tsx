@@ -35,6 +35,7 @@ import { ProjectBillingCard } from '../components/ProjectBillingCard';
 import { ProjectBusinessImpact } from '../components/ProjectBusinessImpact';
 import { ProjectBitacora } from '../components/ProjectBitacora';
 import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
+import { calculateScheduleElapsedPercent } from '@/modules/projects/lib/project-progress-display';
 import { ProjectViewTabs } from '../components/ProjectViewTabs';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toClientProjectDetail } from '../adapters/project-detail.adapter';
@@ -376,6 +377,9 @@ export function ClientProjectDetailPage({
           <ProjectProgressOverview
             actualPercent={project.progressActualPercent}
             expectedPercent={project.progressExpectedPercent}
+            scheduleElapsedPercent={projectDetail?.progress.actual == null
+              ? calculateScheduleElapsedPercent(projectDetail?.startDate, projectDetail?.endDate)
+              : null}
             startDate={project.startDate}
             endDate={project.endDate}
             daysRemaining={project.daysRemaining}

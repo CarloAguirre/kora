@@ -137,4 +137,38 @@ describe('Detalle de proyecto del colaborador', () => {
     expect(screen.queryByRole('region', { name: 'Tarea: Revisar prototipo' }))
       .not.toBeInTheDocument();
   });
+  it('App Walvy sin HH de bloques muestra plazo calendario en el detalle del colaborador', () => {
+    mocks.roadmap.mockReturnValue({ phases: [], rangeStartDate: '', rangeEndDate: '' });
+    mocks.detail.mockReturnValue({ isLoading: false, error: null, data: {
+      id: 'p-walvy', name: 'App Walvy', slug: 'app-walvy', type: 'development',
+      status: 'active', phase: 'development',
+      progress: { actual: null, expected: null },
+      client: { id: 'c-1', companyName: 'Edificate Inteligente' },
+      leader: null, startDate: '2026-03-30', endDate: '2026-12-21',
+      modules: [], observations: [], events: [], activityTruncated: false,
+    } });
+    render(<MemoryRouter initialEntries={['/mis-proyectos/app-walvy']}>
+      <Routes><Route path="/mis-proyectos/:projectId" element={<MyProjectDetailPage />} /></Routes>
+    </MemoryRouter>);
+    expect(screen.getByText('del plazo transcurrido')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Plazo calendario transcurrido/ })).toBeInTheDocument();
+    expect(screen.queryByText(/El avance se mostrará apenas el plan de trabajo/)).not.toBeInTheDocument();
+  });
+
+  it('con avance operativo real conserva las barras de plan y real', () => {
+    mocks.roadmap.mockReturnValue({ phases: [], rangeStartDate: '', rangeEndDate: '' });
+    mocks.detail.mockReturnValue({ isLoading: false, error: null, data: {
+      id: 'p-plan', name: 'Con plan', type: 'development',
+      status: 'active', phase: null,
+      progress: { actual: 40, expected: 60 },
+      client: null, leader: null, startDate: '2026-01-01', endDate: '2026-12-31',
+      modules: [], observations: [], events: [], activityTruncated: false,
+    } });
+    render(<MemoryRouter initialEntries={['/mis-proyectos/con-plan']}>
+      <Routes><Route path="/mis-proyectos/:projectId" element={<MyProjectDetailPage />} /></Routes>
+    </MemoryRouter>);
+    expect(screen.getByText('del proyecto completado')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Avance real 40%, planificado a la fecha 60%/ })).toBeInTheDocument();
+    expect(screen.queryByText('del plazo transcurrido')).not.toBeInTheDocument();
+  });
 });

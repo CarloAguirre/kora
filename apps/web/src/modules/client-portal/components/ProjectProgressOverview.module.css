@@ -221,3 +221,12 @@
 .remaining b {
   color: #0f2a44;
 }
+
+/* El azul diferencia plazo calendario de avance real operativo (verde). */
+.scheduleFill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: #7898bc;
+  transition: width 0.4s ease;
+}

@@ -15,6 +15,7 @@ import { ProjectProgressOverview } from '@/modules/client-portal/components/Proj
 import { toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { useMyProjectDetail } from '../api/projects.queries';
 import { calculateOperationalBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
+import { calculateScheduleElapsedPercent } from '../lib/project-progress-display';
 import { SegmentDrawer } from '../components/SegmentDrawer';
 import { ProjectPhaseTasksTable } from '../components/ProjectPhaseTasksTable';
 import { ProjectRoadmapTaskDetail } from '../components/ProjectRoadmapTaskDetail';
@@ -85,7 +86,10 @@ export function MyProjectDetailPage() {
         <h2>Avance del proyecto</h2>
         <ProjectProgressOverview bare actualPercent={project.progress.actual}
           expectedPercent={project.progress.expected}
-          startDate={date(project.startDate)} endDate={date(project.endDate)} />
+          scheduleElapsedPercent={project.progress.actual == null
+            ? calculateScheduleElapsedPercent(project.startDate, project.endDate ?? project.estimatedDeliveryDate)
+            : null}
+          startDate={date(project.startDate)} endDate={date(project.endDate ?? project.estimatedDeliveryDate)} />
       </Card>
       <div className={styles.tabsShell}>
         <div className={styles.tabs} role="tablist" aria-label="Detalle de mi proyecto">
