@@ -32,6 +32,8 @@ export const ESTIMATION_EDT_GUIDANCE = [
   'Una tarea de integración externa solo recibe HH propias para adaptar o entregar un contrato expresamente requerido. No presupuestes el trabajo del tercero.',
   'Para cada actividad justifica complejidad a partir de reglas de negocio, estados, permisos, datos, integraciones, errores y criterios de terminado; no inventes tareas de relleno.',
   'Las HH deben ser factibles para el calendario, las personas y el paralelismo real; distingue esfuerzo en HH, duración y capacidad.',
+  'Prioriza dotación mínima con tramos compactos: una tarea autónoma de 40 HH puede ocupar a un colaborador una semana. Objetivo orientativo: 90–100% de ocupación durante semanas activas, no una obligación de llenar todas las semanas.',
+  'Evita asignar dos personas al 50% cuando una sola puede completar el alcance en el mismo plazo. Admite dedicaciones bajas por dependencias reales, pruebas iterativas, supervisión transversal o semanas residuales. No inventes HH ni entregables para rellenar jornadas.',
   'NO incluyas en activities ni roleHours la supervisión semanal ordinaria del Líder Técnico: el backend la añade una vez en un tramo propio con 5 HH por semana.',
   'Puedes asignar HH adicionales de Líder Técnico únicamente a arquitectura o implementación hands-on específica, separada de la supervisión.',
   'Devuelve como máximo 19 módulos, 19 tramos y 119 actividades generadas por IA: el motor reserva un módulo, un tramo y una actividad para supervisión técnica.',

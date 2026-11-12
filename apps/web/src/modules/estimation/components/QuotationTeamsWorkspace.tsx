@@ -95,7 +95,7 @@ export function QuotationTeamsWorkspace({
       <p className={styles.caption}>
         {view === 'team'
           ? hasEdt
-            ? 'Las HH provienen de las tareas. 40 hh/sem = 100% de dedicación; editar la jornada propone una redistribución con confirmación.'
+            ? 'Las HH/sem y la dedicación % muestran la carga real promedio de cada persona, calculada desde las HH de la EDT, los colaboradores y la duración. Se utiliza una jornada de referencia de 40 HH/semana. Las HH totales de las tareas no se modifican.'
             : 'Horas = colaboradores × duración × hh/semana. 40 hh/sem = 100% de dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
@@ -109,8 +109,12 @@ export function QuotationTeamsWorkspace({
           <span>Nº colab.</span>
           {view === 'team' && <>
             <span>Unidad</span><span>Duración</span>
-            <span title="Horas de dedicación semanal por persona">hh/sem</span>
-            <span title="40 HH por semana equivale a 100%">Dedicación %</span>
+            <span title={hasEdt
+              ? 'Esfuerzo de la EDT dividido por cantidad de colaboradores y semanas del equipo; media por persona, no disponibilidad máxima.'
+              : 'Horas semanales por colaborador'}>{hasEdt ? 'HH/sem reales' : 'hh/sem'}</span>
+            <span title={hasEdt
+              ? 'Carga promedio por persona sobre 40 HH semanales de referencia; no es la disponibilidad configurada.'
+              : '40 HH por semana equivale a 100%'}>{hasEdt ? 'Dedicación real %' : 'Dedicación %'}</span>
           </>}
           <span>Horas</span>
         </div>
@@ -191,16 +195,31 @@ export function QuotationTeamsWorkspace({
                   onChange={(e) => onEditTeam(teamId, {
                     duration: Math.max(0, Number(e.target.value) || 0),
                   })}/>
-                <QuotationCapacityInput className={styles.numberField}
-                  label={'Horas semanales de ' + label}
-                  value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
-                  max={KORA_QUOTATION_REFERENCE_WEEK_HOURS} disabled={!fieldsEditable}
-                  onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
-                <QuotationCapacityInput className={styles.numberField}
-                  label={'Dedicación de ' + label}
-                  value={team?.dedicationPercent ?? 100} max={100}
-                  disabled={!fieldsEditable}
-                  onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
+                {hasEdt ? <>
+                  <output className={styles.derivedLoad}
+                    aria-label={'HH semanales reales de ' + label}
+                    title="Media por persona calculada desde HH de tareas / colaboradores / semanas">
+                    {checked && capacity?.averagePerPerson != null
+                      ? fmt(capacity.averagePerPerson) : '—'}
+                  </output>
+                  <output className={styles.occupancy}
+                    aria-label={'Dedicación real de ' + label}
+                    title="Ocupación promedio de la jornada de referencia de 40 HH/semana">
+                    {checked && capacity?.occupationPercent != null
+                      ? fmt(capacity.occupationPercent) + '%' : '—'}
+                  </output>
+                </> : <>
+                  <QuotationCapacityInput className={styles.numberField}
+                    label={'Horas semanales de ' + label}
+                    value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
+                    max={KORA_QUOTATION_REFERENCE_WEEK_HOURS} disabled={!fieldsEditable}
+                    onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
+                  <QuotationCapacityInput className={styles.numberField}
+                    label={'Dedicación de ' + label}
+                    value={team?.dedicationPercent ?? 100} max={100}
+                    disabled={!fieldsEditable}
+                    onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
+                </>}
               </>}
               {hasEdt && checked
                 ? <QuotationGroupHoursInput className={styles.hoursInput}

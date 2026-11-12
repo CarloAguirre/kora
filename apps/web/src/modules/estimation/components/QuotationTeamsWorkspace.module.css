@@ -69,3 +69,5 @@
 .peakLoad{grid-column:1/-1;margin:0;color:var(--kora-text-muted);
   font-size:10.5px;line-height:1.4}
 @media(max-width:850px){.detailedColumns{min-width:790px}}
+
+/* EDT: las columnas existentes muestran las HH/sem y dedicación reales. */
