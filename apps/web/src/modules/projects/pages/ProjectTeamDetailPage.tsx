@@ -8,6 +8,7 @@ import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { ProjectManagerTeamDetailView } from '../components/ProjectManagerTeamDetailView';
+import { shouldShowProjectManagerTeamView } from '../lib/team-detail-view';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '../api/projects.queries';
 import { projectPath, projectTeamPath } from '@/app/router/paths';
@@ -54,7 +55,7 @@ export function ProjectTeamDetailPage() {
   const isProjectManager = project.type === 'development' &&
     (can('projects:manage') || (user !== null && project.leader?.id === user.id));
   /** Si quien entra lidera más de un equipo del proyecto, puede saltar entre ellos sin volver a la ficha. */
-  const ledTeams = user ? project.teams.filter((t) => t.leader?.id === user.id) : [];
+  const ledTeams = project.teams.filter((t) => t.isTeamLeader);
   const showTeamSwitcher = ledTeams.length > 1 && ledTeams.some((t) => t.teamId === teamRow?.teamId);
 
   return (
@@ -77,7 +78,7 @@ export function ProjectTeamDetailPage() {
             />
           )}
         </div>
-        {isProjectManager ? (
+        {shouldShowProjectManagerTeamView(isProjectManager, teamRow?.isTeamLeader ?? false) ? (
           <ProjectManagerTeamDetailView project={project} projectId={projectId}
             teamId={teamRow?.teamId ?? teamId} />
         ) : (
