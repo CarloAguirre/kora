@@ -4,6 +4,9 @@ export interface HourEntryProjectReference {
   readonly id: string;
   readonly name: string;
   readonly status: ProjectStatus;
+  readonly startDate?: Date | null;
+  readonly hito0At?: Date | null;
+  readonly createdAt?: Date;
   readonly leaderUserId: string | null;
   readonly allowsOvertime: boolean;
 }

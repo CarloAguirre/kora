@@ -81,6 +81,9 @@ export class ProjectsModuleHourEntryProjectReader implements HourEntryProjectRea
       id: project.id,
       name: project.name,
       status: project.status,
+      startDate: project.toSnapshot().startDate,
+      hito0At: project.hito0At,
+      createdAt: project.createdAt,
       leaderUserId: project.leaderUserId,
       allowsOvertime: project.allowsOvertime,
     };

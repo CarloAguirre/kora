@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { hourEntryRequiresApproval, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
+import { hourEntryRequiresApproval, isLegacyHourEntryProject, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
   InvalidDesignatedApproverError,
@@ -71,11 +71,19 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
 
     let projectStageAtEntry: string | null = null;
     let projectAllowsOvertime = false;
+    let legacyProject = false;
     if (data.projectId) {
       const project = await this.projects.findById(data.projectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
       if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
+      legacyProject = isLegacyHourEntryProject(project);
+      if (legacyProject && (data.moduleId || data.segmentId || data.taskId)) {
+        return err(new ForbiddenError(
+          'Proyectos anteriores al 11-11-2026: registra HH sin seleccionar fase, bloque ni tarea.',
+          'HOUR_ENTRY_LEGACY_PLAN_DISABLED',
+        ));
+      }
       if (data.isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
       projectAllowsOvertime = project.allowsOvertime;
       projectStageAtEntry = project.status;
@@ -99,7 +107,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       return err(new ForbiddenError('Selecciona una fase antes de elegir la tarea.', 'HOUR_ENTRY_TASK_INVALID'));
     }
 
-    if (data.projectId && data.assignment === 'Proyecto' && !data.moduleId &&
+    if (data.projectId && data.assignment === 'Proyecto' && !data.moduleId && !legacyProject &&
       await this.projects.hasAttributableWorkBlocks(data.projectId, ownerId)) {
       return err(new HourEntrySegmentRequiredError());
     }
