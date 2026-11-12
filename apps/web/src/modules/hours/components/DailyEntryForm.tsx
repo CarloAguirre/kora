@@ -731,6 +731,7 @@ export function DailyEntryBlockFields({
               value={block.assignment}
               onChange={(event) => {
                 const nextAssignment = event.target.value as HourEntryAssignment;
+                const needsProjectNext = PROJECT_REQUIRING_ASSIGNMENTS.has(nextAssignment);
                 const keepProject = filterHourEntryProjects(projects, nextAssignment)
                   .some((project) => project.id === block.projectId);
                 onUpdate({
