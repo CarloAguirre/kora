@@ -95,17 +95,18 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
   });
 
 
-  it('muestra 7 columnas y permite editar las dos representaciones de capacidad en EDT', () => {
+  it('EDT muestra 10 HH/sem y 25% reales en las columnas; disponibilidad editable solo al desplegar', () => {
     renderTeams(mappedEdtDraft);
-    expect(screen.getByText('Capacidad hh/sem')).toBeInTheDocument();
-    expect(screen.getByText('Disponible %')).toBeInTheDocument();
-    expect(screen.getByLabelText('Carga efectiva de Desarrollo')).toHaveTextContent(
-      '10 HH/sem/persona · 25% de jornada completa');
-    expect(screen.getByLabelText('Carga efectiva de Desarrollo')).toHaveTextContent(
-      'disponibilidad configurada: 40 HH/sem/persona');
+    expect(screen.getByText('HH/sem reales')).toBeInTheDocument();
+    expect(screen.getByText('Dedicación real %')).toBeInTheDocument();
+    expect(screen.getByLabelText('HH semanales reales de Desarrollo')).toHaveTextContent('10');
+    expect(screen.getByLabelText('Dedicación real de Desarrollo')).toHaveTextContent('25%');
+    expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
+    expect(screen.getByText('Configurar disponibilidad de Desarrollo').closest('details'))
+      .not.toHaveAttribute('open');
+    fireEvent.click(screen.getByText('Configurar disponibilidad de Desarrollo'));
     expect(screen.getByLabelText('Horas semanales de Desarrollo')).toHaveValue(40);
     expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(100);
-    expect(screen.getByLabelText('Dedicación de Desarrollo')).toBeEnabled();
     fireEvent.change(screen.getByLabelText('Horas semanales de Desarrollo'),
       { target: { value: '20' } });
     expect(handlers.onEditTeamCapacity).not.toHaveBeenCalledWith(dev, 'hoursPerWeek', 20);
@@ -115,7 +116,6 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
       { target: { value: '75' } });
     fireEvent.blur(screen.getByLabelText('Dedicación de Desarrollo'));
     expect(handlers.onEditTeamCapacity).toHaveBeenCalledWith(dev, 'dedicationPercent', 75);
-    expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
   });
 
   it('QA 150 HH durante ocho semanas no equivale a 40 HH/sem ni 100% de dedicación', () => {
@@ -143,12 +143,8 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     renderTeams(qaDraft);
     expect(screen.getByLabelText('Horas totales de QA')).toHaveValue(150);
     expect(screen.getByLabelText('Duración de QA')).toHaveValue(8);
-    expect(screen.getByLabelText('Horas semanales de QA')).toHaveValue(40);
-    expect(screen.getByLabelText('Dedicación de QA')).toHaveValue(100);
-    expect(screen.getByLabelText('Carga efectiva de QA')).toHaveTextContent(
-      '18,75 HH/sem/persona · 46,88% de jornada completa');
-    expect(screen.getByLabelText('Carga efectiva de QA')).toHaveTextContent(
-      'disponibilidad configurada: 40 HH/sem/persona');
+    expect(screen.getByLabelText('HH semanales reales de QA')).toHaveTextContent('18,75');
+    expect(screen.getByLabelText('Dedicación real de QA')).toHaveTextContent('46,88%');
     expect(handlers.onEditTeamCapacity).not.toHaveBeenCalled();
   });
 
@@ -158,6 +154,9 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
       teams: [{ ...team(dev), hoursPerWeek: 20, dedicationPercent: 50 }],
     });
     renderTeams(customized);
+    expect(screen.getByLabelText('HH semanales reales de Desarrollo')).toHaveTextContent('10');
+    expect(screen.getByLabelText('Dedicación real de Desarrollo')).toHaveTextContent('25%');
+    fireEvent.click(screen.getByText('Configurar disponibilidad de Desarrollo'));
     expect(screen.getByLabelText('Horas semanales de Desarrollo')).toHaveValue(20);
     expect(screen.getByLabelText('Dedicación de Desarrollo')).toHaveValue(50);
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);
@@ -221,8 +220,8 @@ describe('Equipos · fuente visual prototipo HTML v5', () => {
     renderTeams(mappedEdtDraft);
     expect(screen.getByText('Unidad')).toBeInTheDocument();
     expect(screen.getByText('Duración')).toBeInTheDocument();
-    expect(screen.getByText('Capacidad hh/sem')).toBeInTheDocument();
-    expect(screen.getByText('Disponible %')).toBeInTheDocument();
+    expect(screen.getByText('HH/sem reales')).toBeInTheDocument();
+    expect(screen.getByText('Dedicación real %')).toBeInTheDocument();
     expect(screen.getByLabelText('Incluir Desarrollo')).toBeChecked();
     expect(screen.getByLabelText('Incluir QA')).not.toBeChecked();
     expect(screen.getByLabelText('Horas totales de Desarrollo')).toHaveValue(40);

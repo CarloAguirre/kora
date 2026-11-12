@@ -95,7 +95,7 @@ export function QuotationTeamsWorkspace({
       <p className={styles.caption}>
         {view === 'team'
           ? hasEdt
-            ? 'Las HH provienen de las tareas de la EDT. Capacidad (40 HH/sem = 100%) indica disponibilidad por persona, NO carga asignada. La carga y dedicación efectiva se calculan debajo de cada equipo; editar capacidad propone redistribuir HH con confirmación.'
+            ? 'Las HH/sem y la dedicación % muestran la carga REAL promedio por persona, calculada desde la EDT, las personas y las semanas. La capacidad máxima de referencia es 40 HH/sem; si necesitas cambiar disponibilidad, despliega «Configurar disponibilidad» debajo del equipo.'
             : 'Horas = colaboradores × duración × hh/semana. 40 hh/sem = 100% de dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
@@ -110,11 +110,11 @@ export function QuotationTeamsWorkspace({
           {view === 'team' && <>
             <span>Unidad</span><span>Duración</span>
             <span title={hasEdt
-              ? 'Capacidad semanal configurada por colaborador; no equivale a las HH asignadas en la EDT.'
-              : 'Horas semanales por colaborador'}>{hasEdt ? 'Capacidad hh/sem' : 'hh/sem'}</span>
+              ? 'Esfuerzo de la EDT dividido por cantidad de colaboradores y semanas del equipo; media por persona, no disponibilidad máxima.'
+              : 'Horas semanales por colaborador'}>{hasEdt ? 'HH/sem reales' : 'hh/sem'}</span>
             <span title={hasEdt
-              ? 'Porcentaje de disponibilidad configurada (40 HH/sem = 100%), distinto de la dedicación efectiva de la EDT.'
-              : '40 HH por semana equivale a 100%'}>{hasEdt ? 'Disponible %' : 'Dedicación %'}</span>
+              ? 'Carga promedio por persona sobre 40 HH semanales de referencia; no es la disponibilidad configurada.'
+              : '40 HH por semana equivale a 100%'}>{hasEdt ? 'Dedicación real %' : 'Dedicación %'}</span>
           </>}
           <span>Horas</span>
         </div>
@@ -195,16 +195,31 @@ export function QuotationTeamsWorkspace({
                   onChange={(e) => onEditTeam(teamId, {
                     duration: Math.max(0, Number(e.target.value) || 0),
                   })}/>
-                <QuotationCapacityInput className={styles.numberField}
-                  label={'Horas semanales de ' + label}
-                  value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
-                  max={KORA_QUOTATION_REFERENCE_WEEK_HOURS} disabled={!fieldsEditable}
-                  onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
-                <QuotationCapacityInput className={styles.numberField}
-                  label={'Dedicación de ' + label}
-                  value={team?.dedicationPercent ?? 100} max={100}
-                  disabled={!fieldsEditable}
-                  onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
+                {hasEdt ? <>
+                  <output className={styles.derivedLoad}
+                    aria-label={'HH semanales reales de ' + label}
+                    title="Media por persona calculada desde HH de tareas / colaboradores / semanas">
+                    {checked && capacity?.averagePerPerson != null
+                      ? fmt(capacity.averagePerPerson) : '—'}
+                  </output>
+                  <output className={styles.occupancy}
+                    aria-label={'Dedicación real de ' + label}
+                    title="Ocupación promedio de la jornada de referencia de 40 HH/semana">
+                    {checked && capacity?.occupationPercent != null
+                      ? fmt(capacity.occupationPercent) + '%' : '—'}
+                  </output>
+                </> : <>
+                  <QuotationCapacityInput className={styles.numberField}
+                    label={'Horas semanales de ' + label}
+                    value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
+                    max={KORA_QUOTATION_REFERENCE_WEEK_HOURS} disabled={!fieldsEditable}
+                    onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
+                  <QuotationCapacityInput className={styles.numberField}
+                    label={'Dedicación de ' + label}
+                    value={team?.dedicationPercent ?? 100} max={100}
+                    disabled={!fieldsEditable}
+                    onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
+                </>}
               </>}
               {hasEdt && checked
                 ? <QuotationGroupHoursInput className={styles.hoursInput}
@@ -212,18 +227,24 @@ export function QuotationTeamsWorkspace({
                     disabled={!editable} value={getHours(teamId)}
                     onCommit={(hours) => onEditGroupHours(teamId, hours)}/>
                 : <strong className={styles.hours}>{checked ? fmt(getHours(teamId)) : '—'}</strong>}
-              {hasEdt && view === 'team' && checked && capacity && (
-                <p className={styles.effectiveLoad}
-                  aria-label={'Carga efectiva de ' + label}>
-                  {capacity.averagePerPerson === null || capacity.occupationPercent === null
-                    ? 'Carga efectiva no calculable: falta duración válida.'
-                    : <>
-                      <strong>Carga efectiva de tareas:</strong>{' '}
-                      {fmt(capacity.averagePerPerson)} HH/sem/persona
-                      {' · '}{fmt(capacity.occupationPercent)}% de jornada completa
-                      {' · '}disponibilidad configurada: {fmt(capacity.capacityPerPerson)} HH/sem/persona.
-                    </>}
-                </p>
+              {hasEdt && view === 'team' && checked && fieldsEditable && (
+                <details className={styles.capacitySettings}>
+                  <summary>Configurar disponibilidad de {label}</summary>
+                  <div className={styles.capacitySettingsFields}>
+                    <QuotationCapacityInput className={styles.numberField}
+                      label={'Horas semanales de ' + label}
+                      value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
+                      max={KORA_QUOTATION_REFERENCE_WEEK_HOURS}
+                      onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
+                    <QuotationCapacityInput className={styles.numberField}
+                      label={'Dedicación de ' + label}
+                      value={team?.dedicationPercent ?? 100} max={100}
+                      onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
+                    <small>Disponibilidad máxima configurada. Los valores principales
+                      son la carga efectiva derivada de las tareas; un cambio de capacidad
+                      requiere confirmar la redistribución de HH.</small>
+                  </div>
+                </details>
               )}
               {warningParts.length > 0 && <div className={styles.capacityWarning}
                 role="status" aria-label={'Alerta de capacidad de ' + label}>
