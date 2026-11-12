@@ -86,7 +86,9 @@ export function TeamLeaderProjectView({
   }, [project, teamId]);
   const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
 
-  const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
+  // Permiso calculado en el backend: incluye al PM del proyecto y al líder efectivo
+  // del equipo, incluso cuando hereda su líder del catálogo general.
+  const canManageTeam = project.teams.some((t) => t.teamId === teamId && t.canManage);
 
   const availableMembers = (teamMemberOptions?.items ?? []).filter((m) => m.teamId === teamId);
 
