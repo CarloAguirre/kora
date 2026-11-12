@@ -5,7 +5,6 @@ import { Button } from '@/shared/components/ui/Button';
 import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Select } from '@/shared/components/ui/Select';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
-import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { TeamLeaderProjectView } from '../components/TeamLeaderProjectView';
 import { useProjectDetail } from '../api/projects.queries';
 import { projectPath, projectTeamPath } from '@/app/router/paths';
@@ -26,7 +25,6 @@ import { PROJECTS_LIST_PATH, RESTORE_PROJECTS_LIST_STATE } from '../lib/projects
 export function ProjectTeamDetailPage() {
   const { projectId, teamId } = useParams<{ projectId: string; teamId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { data: project, isLoading, error } = useProjectDetail(projectId ?? null);
 
   if (error) {
@@ -48,7 +46,7 @@ export function ProjectTeamDetailPage() {
   /** `projectTeamPath` arma la URL con el slug del equipo; la vista trabaja con el UUID. */
   const teamRow = project.teams.find((t) => t.teamId === teamId || t.teamSlug === teamId);
   const teamName = teamRow?.teamName ?? 'Equipo';
-  /** Si quien entra lidera más de un equipo del proyecto, puede saltar entre ellos sin volver a la ficha. */
+  /** Opciones editables según el backend; incluye equipos con líder heredado o administrados por el PM. */
   const ledTeams = project.teams.filter((t) => t.canManage);
   const showTeamSwitcher = ledTeams.length > 1 && ledTeams.some((t) => t.teamId === teamRow?.teamId);
 
