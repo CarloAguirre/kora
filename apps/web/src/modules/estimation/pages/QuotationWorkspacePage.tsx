@@ -764,9 +764,12 @@ export function QuotationWorkspacePage() {
                       view={teamView}
                       onChangeView={(view) => {
                         setTeamView(view);
-                        // En una EDT las tareas son la fuente de HH. Este switch
-                        // cambia la vista, nunca la modalidad del cálculo.
-                        if (!form.draft.aiPoc?.edt) updateDraft({ mode: view });
+                        // Los tabs solo cambian el resumen superior cuando ya
+                        // existen fases o una EDT. Nunca modificar el modo de
+                        // cálculo ni ocultar la sección inferior de tareas.
+                        if (!form.draft.aiPoc?.edt && form.draft.phases.length === 0) {
+                          updateDraft({ mode: view });
+                        }
                       }}
                       onEditTeam={editTeamById}
                       onEditTeamCapacity={editTeamCapacity}
@@ -786,8 +789,12 @@ export function QuotationWorkspacePage() {
                     />
                   </Card>
 
-                  {teamView === 'phases' &&
-                    (form.draft.mode === 'phases' || form.draft.aiPoc?.edt) && (
+                  {/* El desglose de fases permanece visible bajo ambos tabs del
+                      resumen. La fuente es la EDT o las fases de la cotización,
+                      no la opción de presentación «Por equipo». */}
+                  {(form.draft.mode === 'phases' ||
+                    Boolean(form.draft.aiPoc?.edt) ||
+                    form.draft.phases.length > 0) && (
                     <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
                       draft={form.draft}
