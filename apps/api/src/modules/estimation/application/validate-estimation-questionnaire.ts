@@ -62,6 +62,21 @@ export function validateQuestionnaireAnswers(
   }
 }
 
+/**
+ * El wizard envía «Otro (especificar)» como "other:<texto>" para conservar
+ * exactamente la decisión humana. Solo se admite si la pregunta ofrece
+ * explícitamente la opción "other"; el texto debe ser no vacío y <=300.
+ */
+function validChoiceValue(question: EstimationQuestion, value: string): boolean {
+  if (value === 'other') return false; // La UI exige especificar la alternativa.
+  if (value.startsWith('other:')) {
+    const detail = value.slice('other:'.length).trim();
+    return question.options.some((option) => option.value === 'other') &&
+      detail.length > 0 && detail.length <= 300;
+  }
+  return question.options.some((option) => option.value === value);
+}
+
 function validQuestionValue(
   question: EstimationQuestion,
   value: SubmitEstimationAnswerInput['value'],
@@ -69,12 +84,12 @@ function validQuestionValue(
   if (value === null) return !question.required;
   switch (question.answerType) {
     case 'single_choice':
-      return typeof value === 'string' &&
-        question.options.some((option) => option.value === value);
+      return typeof value === 'string' && validChoiceValue(question, value);
     case 'multi_choice':
       return Array.isArray(value) && value.length > 0 &&
         new Set(value).size === value.length &&
-        value.every((item) => question.options.some((option) => option.value === item)) &&
+        value.filter((item) => item.startsWith('other:')).length <= 1 &&
+        value.every((item) => validChoiceValue(question, item)) &&
         !(value.includes('none') && value.length > 1);
     case 'text':
       return typeof value === 'string' && value.trim().length > 0 && value.length <= 2000;
