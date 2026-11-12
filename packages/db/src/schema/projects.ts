@@ -131,6 +131,8 @@ export const projects = pgTable(
 
     soldHours: numeric('sold_hours', { precision: 10, scale: 2 }).notNull().default('0'),
     usedHours: numeric('used_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+    /** Saldo anterior no registrado en hour_entries; se suma una sola vez en recordUsedHours. */
+    historicalHoursAdjustment: numeric('historical_hours_adjustment', { precision: 10, scale: 2 }).notNull().default('0'),
     expectedProgress: integer('expected_progress'),
     actualProgress: integer('actual_progress'),
 

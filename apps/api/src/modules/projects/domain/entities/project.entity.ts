@@ -31,6 +31,8 @@ export interface ProjectProps {
   estimatedDeliveryDate: Date | null;
   soldHours: number;
   usedHours: number;
+  /** Ajuste de consumo histórico aprobado fuera de registros HH; no es avance funcional ni horas de tareas. */
+  historicalHoursAdjustment: number;
   expectedProgress: number | null;
   actualProgress: number | null;
   supportPlanDescription: string | null;
@@ -166,6 +168,7 @@ export class Project extends AggregateRoot<string> {
       estimatedDeliveryDate: props.estimatedDeliveryDate ?? null,
       soldHours: props.soldHours ?? 0,
       usedHours: 0,
+      historicalHoursAdjustment: 0,
       expectedProgress: null,
       actualProgress: null,
       supportPlanDescription: props.supportPlanDescription ?? null,
@@ -414,8 +417,14 @@ export class Project extends AggregateRoot<string> {
     this.touch(now);
   }
 
-  recordUsedHours(hours: number, now: Date): void {
-    this.props.usedHours = hours;
+  /**
+   * Recibe exclusivamente la suma de HH aprobadas en hour_entries.
+   * La corrección histórica vive separada del registro de actividad, así que
+   * no debe sumarse al llamador ni al resultado anterior de usedHours.
+   */
+  recordUsedHours(approvedEntryHours: number, now: Date): void {
+    this.props.usedHours =
+      Math.round((approvedEntryHours + this.props.historicalHoursAdjustment) * 100) / 100;
     this.touch(now);
   }
 
