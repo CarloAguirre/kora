@@ -276,6 +276,7 @@ describe('UpdateProjectUseCase — equipos con bloques', () => {
   const team = {
     id: 'project-team-1', teamId: 'team-1', teamName: 'Desarrollo',
     teamSlug: 'desarrollo', leaderUserId: 'leader-1', leaderName: 'Líder',
+    effectiveLeaderUserId: 'leader-1',
     assignedHours: 200, memberCount: 0, maxMembers: 2,
     leaderConsumedHours: 0,
   };
