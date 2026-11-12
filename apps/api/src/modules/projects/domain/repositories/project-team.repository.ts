@@ -21,8 +21,11 @@ export interface ProjectTeamRecord {
   readonly teamId: string;
   readonly teamSlug: string;
   readonly teamName: string;
+  /** Override explícito de líder en este proyecto; null significa que hereda el del catálogo de equipos. */
   readonly leaderUserId: string | null;
   readonly leaderName: string | null;
+  /** Líder efectivo: coalesce(project_teams.leader_user_id, teams.leader_user_id). Solo para permisos/consulta. */
+  readonly effectiveLeaderUserId: string | null;
   readonly assignedHours: number | null;
   /** Contado en vivo desde `project_team_members` — la v1 no traía este dato, así que el valor migrado siempre es nulo. */
   readonly memberCount: number;
