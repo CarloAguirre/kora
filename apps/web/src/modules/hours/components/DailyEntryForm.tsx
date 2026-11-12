@@ -780,7 +780,7 @@ export function DailyEntryBlockFields({
 
           {needsProject && block.projectId && legacyProject && (
             <p className={styles.noticeInfo} role="status">
-              Proyecto iniciado antes del 11-11-2026: fase, bloque y tarea deshabilitados.
+              Proyecto historico (sin planificación).
               Registra las HH directamente al proyecto.
             </p>
           )}
