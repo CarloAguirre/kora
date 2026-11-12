@@ -84,12 +84,10 @@ export interface TeamTasksCardProps {
 }
 
 /**
- * "Tareas del equipo" — tabla + alta/edición/baja de tareas de UN equipo del
- * proyecto. Se usa tanto en `TeamLeaderProjectView` (vista acotada a un solo
- * equipo) como en `DevelopmentProjectDetailView`, cuando quien ve la ficha
- * completa (líder de proyecto o `projects:manage`) también lidera uno de los
- * equipos asignados — en ese caso conserva la vista de administrador, pero
- * sigue pudiendo crear/editar las tareas de su propio equipo.
+ * "Tareas del equipo" — tabla + alta/edición/baja de tareas de un equipo
+ * del proyecto. Reutilizada en fichas de equipo y proyecto. El backend define
+ * canManage para el equipo seleccionado (líder de proyecto, líder efectivo
+ * de equipo o projects:manage), sin conceder acceso sobre equipos ajenos.
  */
 export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps) {
   const toast = useToast();
