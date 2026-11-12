@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
+  isLegacyHourEntryProject,
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_REQUIRING_ASSIGNMENTS,
   hourEntryRequiresApproval,
@@ -20,7 +21,7 @@ import { useProjectDetail, useProjectPhases, useProjectsList } from '@/modules/p
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
+import { HOUR_ENTRY_PROJECT_STATUSES, filterHourEntryProjects } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
 import { activityForTaskChange, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId } from './hour-task-selection';
@@ -188,11 +189,14 @@ export function validateDailyBlock(
   if (hours > 24) return 'No puede registrar más de 24 horas en un día.';
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment);
   if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
-  if (block.assignment === 'Proyecto' && block.roadmapNeedsPhase && !block.moduleId)
+  const selectedProject = projects.find((project) => project.id === block.projectId);
+  if (needsProject && !selectedProject) return 'Selecciona un proyecto disponible para esta asignación.';
+  const legacyProject = selectedProject ? isLegacyHourEntryProject(selectedProject) : false;
+  if (!legacyProject && block.assignment === 'Proyecto' && block.roadmapNeedsPhase && !block.moduleId)
     return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
-  if (block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId)
+  if (!legacyProject && block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId)
     return 'Selecciona el bloque al que corresponden estas HH.';
-  if (block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
+  if (!legacyProject && block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
     return 'Selecciona una tarea o «Otro trabajo del bloque».';
   if (needsProject && ((block.isOvertime && !overtimeAlreadyGranted) || exceedsDailyCap)) {
     const project = projects.find((p) => p.id === block.projectId);
@@ -340,7 +344,7 @@ export function DailyEntryForm({
 
   const validateBlock = (block: DailyBlock) =>
     validateDailyBlock(block, {
-      projects: projects?.items ?? [],
+      projects: filterHourEntryProjects(projects?.items ?? [], block.assignment),
       isCollaborator: user?.role === 'collaborator',
       overtimeNeedsApproval,
       exceedsDailyCap: (overflowByKey.get(block.key) ?? 0) > 0,
@@ -366,12 +370,14 @@ export function DailyEntryForm({
       while (remaining.length > 0) {
         const block = remaining[0]!;
         const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
+        const chosenProject = (projects?.items ?? []).find((p) => p.id === block.projectId);
+        const noPlanLink = chosenProject ? isLegacyHourEntryProject(chosenProject) : false;
         const input: CreateHourEntryInput = {
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : undefined,
-          moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
-          segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : undefined,
-          taskId: needsProject && block.moduleId ? toHourTaskId(block.taskId) : undefined,
+          moduleId: needsProject && !noPlanLink && block.moduleId ? block.moduleId : undefined,
+          segmentId: needsProject && !noPlanLink && block.moduleId && block.segmentId ? block.segmentId : undefined,
+          taskId: needsProject && !noPlanLink && block.moduleId ? toHourTaskId(block.taskId) : undefined,
           category: block.category.trim(),
           description: block.description || undefined,
           hours: Number(block.hours),
@@ -615,15 +621,17 @@ export function DailyEntryBlockFields({
   const showApproverInRow =
     block.assignment !== '' && !needsProject && (isCollaborator || (overtimeNeedsApproval && (block.isOvertime || exceedsDailyCap)));
   const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
+  const legacyProject = selectedProject ? isLegacyHourEntryProject(selectedProject) : false;
+  const selectableProjects = filterHourEntryProjects(projects, block.assignment);
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const { user } = useAuth();
   // Los colaboradores no requieren projects:read para registrar horas; /phases
   // entrega el contexto autorizado. Evita un GET de detalle innecesario/403.
   const { data: projectDetail } = useProjectDetail(
-    needsProject && block.projectId && user?.role !== 'collaborator' ? block.projectId : null,
+    needsProject && block.projectId && !legacyProject && user?.role !== 'collaborator' ? block.projectId : null,
   );
   const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
-  const { data: hourPhases } = useProjectPhases(needsProject && block.projectId ? block.projectId : null);
+  const { data: hourPhases } = useProjectPhases(needsProject && block.projectId && !legacyProject ? block.projectId : null);
   const selectedHourPhase = hourPhases?.find((phase) => phase.id === block.moduleId);
   const availableTasks = selectAttributableTasks(
     hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [],
@@ -650,16 +658,16 @@ export function DailyEntryBlockFields({
   // La obligatoriedad depende de los equipos REALES del autor en este proyecto.
   // La capa de API conserva la misma regla y vuelve a comprobarla al guardar.
   useEffect(() => {
-    const roadmapNeedsPhase = Boolean(needsProject && block.projectId && requiresPhase);
-    const roadmapNeedsSegment = Boolean(needsProject && block.moduleId && availableSegments.length > 0);
-    const roadmapNeedsTask = Boolean(needsProject && block.segmentId && availableTasks.length > 0);
+    const roadmapNeedsPhase = Boolean(needsProject && !legacyProject && block.projectId && requiresPhase);
+    const roadmapNeedsSegment = Boolean(needsProject && !legacyProject && block.moduleId && availableSegments.length > 0);
+    const roadmapNeedsTask = Boolean(needsProject && !legacyProject && block.segmentId && availableTasks.length > 0);
     if (block.roadmapNeedsPhase !== roadmapNeedsPhase ||
       block.roadmapNeedsSegment !== roadmapNeedsSegment || block.roadmapNeedsTask !== roadmapNeedsTask) {
       onUpdate({ roadmapNeedsPhase, roadmapNeedsSegment, roadmapNeedsTask });
     }
   }, [needsProject, block.projectId, block.moduleId, block.segmentId,
     block.roadmapNeedsPhase, block.roadmapNeedsSegment, block.roadmapNeedsTask,
-    requiresPhase, availableSegments.length, availableTasks.length, onUpdate]);
+    legacyProject, requiresPhase, availableSegments.length, availableTasks.length, onUpdate]);
 
   return (
     <div className={styles.block}>
@@ -703,13 +711,15 @@ export function DailyEntryBlockFields({
               options={ASSIGNMENT_OPTIONS}
               value={block.assignment}
               onChange={(event) => {
-                const needsProjectNext = PROJECT_REQUIRING_ASSIGNMENTS.has(event.target.value);
+                const nextAssignment = event.target.value as HourEntryAssignment;
+                const keepProject = filterHourEntryProjects(projects, nextAssignment)
+                  .some((project) => project.id === block.projectId);
                 onUpdate({
-                  assignment: event.target.value as HourEntryAssignment,
-                  projectId: needsProjectNext ? block.projectId : '',
-                  moduleId: needsProjectNext ? block.moduleId : '',
-                  segmentId: needsProjectNext ? block.segmentId : '',
-                  taskId: needsProjectNext ? block.taskId : '',
+                  assignment: nextAssignment,
+                  projectId: keepProject ? block.projectId : '',
+                  moduleId: keepProject ? block.moduleId : '',
+                  segmentId: keepProject ? block.segmentId : '',
+                  taskId: keepProject ? block.taskId : '',
                   category: needsProjectNext
                     ? block.category
                     : activityForTaskChange(block.category, selectedTask?.name, undefined),
@@ -731,7 +741,7 @@ export function DailyEntryBlockFields({
                 label="Proyecto"
                 disabled={!needsProject}
                 placeholder="Buscar proyecto..."
-                options={projects.map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
+                options={selectableProjects.map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
                 value={block.projectId}
                 onChange={(nextProjectId) => {
                   const nextProject = projects.find((p) => p.id === nextProjectId);
@@ -748,7 +758,13 @@ export function DailyEntryBlockFields({
             )}
           </div>
 
-          {needsProject && block.projectId && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+          {needsProject && block.projectId && legacyProject && (
+            <p className={styles.noticeInfo} role="status">
+              Proyecto iniciado antes del 11-11-2026: fase, bloque y tarea deshabilitados.
+              Registra las HH directamente al proyecto.
+            </p>
+          )}
+          {needsProject && block.projectId && !legacyProject && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
             <ProjectHourPlanFields
               phases={projectDetail?.modules ?? hourPhases ?? []}
               phaseId={block.moduleId}

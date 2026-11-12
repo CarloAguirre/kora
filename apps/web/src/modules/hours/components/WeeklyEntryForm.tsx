@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
+  isLegacyHourEntryProject,
   PROJECT_REQUIRING_ASSIGNMENTS,
   hourEntryRequiresApproval,
   type CreateHourEntryInput,
@@ -17,7 +18,7 @@ import { useProjectDetail, useProjectPhases, useProjectsList } from '@/modules/p
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
+import { HOUR_ENTRY_PROJECT_STATUSES, filterHourEntryProjects } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
@@ -105,12 +106,14 @@ export function WeeklyEntryForm({
 
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(assignment as HourEntryAssignment);
   const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
+  const legacyProject = selectedProject ? isLegacyHourEntryProject(selectedProject) : false;
+  const selectableProjects = filterHourEntryProjects(projects?.items ?? [], assignment);
   // Colaborador usa /phases y no solicita detalle que podría estar prohibido.
   const { data: projectDetail } = useProjectDetail(
-    needsProject && projectId && user?.role !== 'collaborator' ? projectId : null,
+    needsProject && projectId && !legacyProject && user?.role !== 'collaborator' ? projectId : null,
   );
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
-  const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
+  const { data: hourPhases } = useProjectPhases(needsProject && projectId && !legacyProject ? projectId : null);
   const selectedHourPhase = hourPhases?.find((phase) => phase.id === moduleId);
   const availableTasks = selectAttributableTasks(
     hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [],
@@ -210,11 +213,13 @@ export function WeeklyEntryForm({
     if (activeDays.some((day) => day.hours > 24)) return 'No puede registrar más de 24 horas en un día.';
     if (activeDays.some((day) => holidayDayIndexes.has(day.index))) return 'No se pueden registrar horas en un día feriado.';
     if (needsProject && !projectId) return 'Selecciona un proyecto para esta asignación.';
-    if (needsProject && hasEligibleRoadmapBlocks && !moduleId)
+    if (needsProject && !selectableProjects.some((p) => p.id === projectId))
+      return 'Selecciona un proyecto disponible para esta asignación.';
+    if (needsProject && !legacyProject && hasEligibleRoadmapBlocks && !moduleId)
       return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
-    if (needsProject && availableSegments.length > 0 && !segmentId)
+    if (needsProject && !legacyProject && availableSegments.length > 0 && !segmentId)
       return 'Selecciona el bloque al que corresponden estas HH.';
-    if (needsProject && segmentId && availableTasks.length > 0 && !taskId)
+    if (needsProject && !legacyProject && segmentId && availableTasks.length > 0 && !taskId)
       return 'Selecciona una tarea o «Otro trabajo del bloque».';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (unauthorizedOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
@@ -246,9 +251,9 @@ export function WeeklyEntryForm({
         const input: CreateHourEntryInput = {
           assignment: assignment as HourEntryAssignment,
           projectId: needsProject ? projectId : undefined,
-          moduleId: needsProject && moduleId ? moduleId : undefined,
-          segmentId: needsProject && moduleId && segmentId ? segmentId : undefined,
-          taskId: needsProject && moduleId ? toHourTaskId(taskId) : undefined,
+          moduleId: needsProject && !legacyProject && moduleId ? moduleId : undefined,
+          segmentId: needsProject && !legacyProject && moduleId && segmentId ? segmentId : undefined,
+          taskId: needsProject && !legacyProject && moduleId ? toHourTaskId(taskId) : undefined,
           category: category.trim(),
           description: description || undefined,
           hours: day.hours,
@@ -322,6 +327,9 @@ export function WeeklyEntryForm({
             const next = event.target.value as HourEntryAssignment;
             setAssignment(next);
             if (PROJECT_REQUIRING_ASSIGNMENTS.has(next)) {
+              if (!filterHourEntryProjects(projects?.items ?? [], next).some((p) => p.id === projectId)) {
+                setProjectId(''); setModuleId(''); setSegmentId(''); setTaskId('');
+              }
               setDesignatedApproverUserId('');
             } else {
               setProjectId('');
@@ -344,7 +352,7 @@ export function WeeklyEntryForm({
             label="Proyecto"
             disabled={!needsProject}
             placeholder="Buscar proyecto..."
-            options={(projects?.items ?? []).map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
+            options={selectableProjects.map((project) => ({ value: project.id, label: getProjectOptionLabel(project) }))}
             value={projectId}
             onChange={(nextProjectId) => {
               const nextProject = (projects?.items ?? []).find((p) => p.id === nextProjectId);
@@ -361,7 +369,13 @@ export function WeeklyEntryForm({
         )}
       </div>
 
-      {needsProject && projectId && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+      {needsProject && projectId && legacyProject && (
+        <p className={styles.noticeInfo} role="status">
+          Proyecto iniciado antes del 11-11-2026: fase, bloque y tarea deshabilitados.
+          Registra las HH directamente al proyecto.
+        </p>
+      )}
+      {needsProject && projectId && !legacyProject && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
         <ProjectHourPlanFields
           phases={projectDetail?.modules ?? hourPhases ?? []}
           phaseId={moduleId}

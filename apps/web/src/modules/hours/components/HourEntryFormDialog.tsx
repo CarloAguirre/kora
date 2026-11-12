@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
+  isLegacyHourEntryProject,
   PROJECT_REQUIRING_ASSIGNMENTS,
   hourEntryRequiresApproval,
   type HourEntryAssignment,
@@ -18,7 +19,7 @@ import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { HOUR_ENTRY_PROJECT_STATUSES } from '../lib/selectable-project-statuses';
+import { HOUR_ENTRY_PROJECT_STATUSES, filterHourEntryProjects } from '../lib/selectable-project-statuses';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import {
   DAILY_CAP_HOURS,
@@ -189,6 +190,11 @@ function EditEntryForm({
     .reduce((sum, e) => sum + e.hours, 0);
   const nonOvertimeTotal = otherNonOvertimeHours + (block.isOvertime ? 0 : Number(block.hours) || 0);
   const editableProject = projects.find((project) => project.id === block.projectId);
+  const legacyProject = editableProject ? isLegacyHourEntryProject(editableProject) : false;
+  const filteredProjects = filterHourEntryProjects(projects, block.assignment);
+  const selectableProjects = editableProject && entry.project?.id === block.projectId &&
+    !filteredProjects.some((p) => p.id === block.projectId)
+      ? [editableProject, ...filteredProjects] : filteredProjects;
   const maxHours = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment) &&
     editableProject && !editableProject.allowsOvertime && !block.isOvertime
     ? Math.max(0, Math.round((DAILY_CAP_HOURS - otherNonOvertimeHours) * 100) / 100)
@@ -216,7 +222,7 @@ function EditEntryForm({
   // Las horas extra de un líder se autoaprueban; con el registro de otro se asume que no.
   const overtimeNeedsApproval = user?.id === entry.user.id ? hourEntryRequiresApproval(user.role, true) : true;
   const validationOptions = {
-    projects,
+    projects: selectableProjects,
     isCollaborator: ownerRequiresApprover,
     overtimeNeedsApproval,
     overtimeAlreadyGranted: entry.isOvertime && block.projectId === entry.project?.id,
@@ -243,9 +249,9 @@ function EditEntryForm({
         input: {
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : null,
-          moduleId: needsProject && block.moduleId ? block.moduleId : null,
-          segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : null,
-          taskId: needsProject && block.moduleId ? (toHourTaskId(block.taskId) ?? null) : null,
+          moduleId: needsProject && (!legacyProject || entry.project?.id === block.projectId) && block.moduleId ? block.moduleId : null,
+          segmentId: needsProject && (!legacyProject || entry.project?.id === block.projectId) && block.moduleId && block.segmentId ? block.segmentId : null,
+          taskId: needsProject && (!legacyProject || entry.project?.id === block.projectId) && block.moduleId ? (toHourTaskId(block.taskId) ?? null) : null,
           category: block.category.trim(),
           description: block.description,
           hours: Number(block.hours),
@@ -304,7 +310,7 @@ function EditEntryForm({
         block={block}
         index={0}
         removable={false}
-        projects={projects}
+        projects={selectableProjects}
         leaders={leaders?.items ?? []}
         isCollaborator={ownerRequiresApprover}
         overtimeNeedsApproval={overtimeNeedsApproval}
