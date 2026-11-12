@@ -83,6 +83,14 @@ export interface ProjectDetailSource {
   readonly now: Date;
 }
 
+/** Permiso de liderazgo de equipo alineado con el COALESCE del repositorio. */
+export function isProjectTeamLeader(
+  actorUserId: string,
+  team: Pick<ProjectTeamRecord, 'effectiveLeaderUserId'>,
+): boolean {
+  return team.effectiveLeaderUserId !== null && team.effectiveLeaderUserId === actorUserId;
+}
+
 export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
   const snapshot = source.project.toSnapshot();
 
@@ -106,6 +114,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     teamSlug: team.teamSlug,
     teamName: team.teamName,
     leader: team.leaderUserId ? { id: team.leaderUserId, fullName: team.leaderName ?? '' } : null,
+    isTeamLeader: isProjectTeamLeader(source.actorUserId, team),
     assignedHours: team.assignedHours,
     memberCount: team.memberCount,
     maxMembers: team.maxMembers,
