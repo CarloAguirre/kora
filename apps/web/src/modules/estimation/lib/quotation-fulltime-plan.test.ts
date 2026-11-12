@@ -228,11 +228,11 @@ describe('Planificación IA con dotación a 40 HH/semana', () => {
     ];
     source.modules = [
       { name: 'A', totalHours: 20, tasks: [
-        { wbs: 'A.01', name: 'Tarea A', role: 'Desarrollo',
+        { wbs: 'A.01', name: 'Tarea A', description: 'Construir tramo A', role: 'Desarrollo',
           stageCode: 'A', hours: 20, roleEffort: [{ role: 'Desarrollo', hours: 20 }] },
       ] },
       { name: 'B', totalHours: 20, tasks: [
-        { wbs: 'B.01', name: 'Tarea B', role: 'Desarrollo',
+        { wbs: 'B.01', name: 'Tarea B', description: 'Construir tramo B', role: 'Desarrollo',
           stageCode: 'B', hours: 20, roleEffort: [{ role: 'Desarrollo', hours: 20 }] },
       ] },
     ];
