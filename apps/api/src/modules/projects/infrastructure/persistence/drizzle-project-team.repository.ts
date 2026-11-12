@@ -107,8 +107,10 @@ export class DrizzleProjectTeamRepository implements ProjectTeamRepository {
         teamId: row.teamId,
         teamSlug: row.teamSlug,
         teamName: row.teamName,
+        // Preservar el override explícito: no persistir accidentalmente el líder heredado al editar el proyecto.
         leaderUserId: row.leaderUserId,
         leaderName: row.leaderUserId ? `${row.leaderFirstName ?? ''} ${row.leaderLastName ?? ''}`.trim() : null,
+        effectiveLeaderUserId: row.effectiveLeaderUserId,
         assignedHours: row.assignedHours !== null ? Number(row.assignedHours) : null,
         memberCount: Number(row.memberCount),
         maxMembers: row.maxMembers,
