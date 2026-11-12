@@ -19,8 +19,6 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
 import { AssignCollaboratorModal } from './AssignCollaboratorModal';
 import { useCreateProjectModuleTask, useDeleteProjectModuleTask, useUpdateProjectModuleTask } from '../api/projects.queries';
-import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { useCheckForecastOverload, useForecastLoadPreview } from '@/modules/forecast/api/forecast.queries';
 import { ForecastOverloadAlert, summarizeOverload } from '@/modules/forecast/components/ForecastOverloadAlert';
@@ -95,8 +93,6 @@ export interface TeamTasksCardProps {
  */
 export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps) {
   const toast = useToast();
-  const { user } = useAuth();
-  const { can } = usePermissions();
   const createTask = useCreateProjectModuleTask();
   const updateTask = useUpdateProjectModuleTask();
   const deleteTask = useDeleteProjectModuleTask();
@@ -107,11 +103,8 @@ export function TeamTasksCard({ project, projectId, teamId }: TeamTasksCardProps
   const [taskDraft, setTaskDraft] = useState<TaskDraft>(EMPTY_TASK_DRAFT);
 
   const team = useMemo(() => {
-    const teamRow = project.teams.find((t) => t.teamId === teamId);
     const members = project.members.filter((m) => m.teamId === teamId);
-    const teamName = teamRow?.teamName ?? members[0]?.teamName ?? 'Equipo';
-    const leaderId = teamRow?.leader?.id ?? null;
-    return { teamId, teamName, leaderId, members };
+    return { members };
   }, [project, teamId]);
 
   // La misma autorización efectiva que usa el backend para tareas del equipo.
