@@ -123,7 +123,10 @@ export const projectTeamSchema = z.object({
   /** Slug del equipo — `projectTeamPath` lo usa en la URL, así que la ficha del equipo resuelve por id o slug. */
   teamSlug: z.string(),
   teamName: z.string(),
+  /** Líder explícito del proyecto; null = hereda el líder del catálogo de equipos. */
   leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
+  /** Permiso efectivo del actor: PMO/admin, líder del proyecto o líder efectivo de este equipo. */
+  canManage: z.boolean(),
   assignedHours: z.number().nullable(),
   memberCount: z.number().int(),
   maxMembers: z.number().int().nullable(),
