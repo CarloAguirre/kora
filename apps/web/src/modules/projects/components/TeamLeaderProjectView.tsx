@@ -17,8 +17,6 @@ import { TeamDeliveriesCard } from './TeamDeliveriesCard';
 import deliveryModalStyles from './DeliveryModal.module.css';
 import { useAssignProjectMember, useUnassignProjectMember, useUpdateProjectMember } from '../api/projects.queries';
 import { useTeamMemberOptions } from '@/modules/teams/api/teams.queries';
-import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { getTeamStyle } from '../utils/team-style';
 
@@ -58,8 +56,6 @@ export function TeamLeaderProjectView({
   teamId: string;
 }) {
   const toast = useToast();
-  const { user } = useAuth();
-  const { can } = usePermissions();
   const { data: teamMemberOptions } = useTeamMemberOptions();
   const assignMember = useAssignProjectMember();
   const unassignMember = useUnassignProjectMember();
@@ -77,12 +73,10 @@ export function TeamLeaderProjectView({
     const teamRow = project.teams.find((t) => t.teamId === teamId);
     const members = project.members.filter((m) => m.teamId === teamId);
     const teamName = teamRow?.teamName ?? members[0]?.teamName ?? 'Equipo';
-    const leaderId = teamRow?.leader?.id ?? null;
-    const leaderName = teamRow?.leader?.fullName ?? null;
     const maxMembers = teamRow?.maxMembers || null;
     const assignedHours = teamRow?.assignedHours ?? members.reduce((sum, m) => sum + m.assignedHours, 0);
     const consumedHours = members.reduce((sum, m) => sum + m.consumedHours, 0) + (teamRow?.leaderConsumedHours ?? 0);
-    return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
+    return { teamId, teamName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
   const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
 
