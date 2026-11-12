@@ -87,6 +87,7 @@ describe('R4-a · respuestas de cuestionario F01–F05', () => {
       category: 'Integraciones', question: '¿Qué canales se requieren?',
       reason: 'Determina el alcance de integraciones',
       impact: 'high' as const, required: true,
+      canPrefill: false, priorityScore: 5, dependsOn: [],
       sourceRefs: [{ sourceId: 'drive-scope', fileName: 'Alcance.pdf' }],
       options: [
         { value: 'web', label: 'Web' }, { value: 'mobile', label: 'Móvil' },
@@ -109,6 +110,7 @@ describe('R4-a · respuestas de cuestionario F01–F05', () => {
       id: 'D03', kind: 'dynamic' as const, category: 'Integraciones',
       question: '¿Qué canal?', reason: 'Impacta esfuerzo',
       impact: 'high' as const, required: true,
+      canPrefill: false, priorityScore: 5, dependsOn: [],
       sourceRefs: [{ sourceId: 'drive-scope', fileName: 'Alcance.pdf' }],
       answerType: 'multi_choice' as const,
       options: [
