@@ -94,7 +94,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     const replanned = quotationDraftDataSchema.parse({
       ...mappedDraft,
       edtStageSettings: [{
-        stageCode: 'T02', startWeek: 11, durationWeeks: 3,
+        stageCode: 'T02', name: 'Pruebas', startWeek: 11, durationWeeks: 3,
       }],
     });
     const phases = referencePhasesFromEdt(edt, replanned.aiPoc!.roleTeamIds,
@@ -103,7 +103,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(edt.stages?.[1]?.startWeek).toBe(3); // El snapshot no se mutó
     const shorter = quotationDraftDataSchema.parse({
       ...replanned, edtStageSettings: [{
-        stageCode: 'T02', startWeek: 6, durationWeeks: 2,
+        stageCode: 'T02', name: 'Pruebas', startWeek: 6, durationWeeks: 2,
       }],
     });
     expect(nextQuotationPhaseStartWeek(referencePhasesFromEdt(
@@ -117,8 +117,8 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     const modified = quotationDraftDataSchema.parse({
       ...mappedDraft, edtCommercialStages: [extra],
       edtStageSettings: [
-        { stageCode: 'T02', startWeek: 6, durationWeeks: 2 },
-        { stageCode: extra.code, startWeek: 12, durationWeeks: 2 },
+        { stageCode: 'T02', name: 'Pruebas', startWeek: 6, durationWeeks: 2 },
+        { stageCode: extra.code, name: 'Control', startWeek: 12, durationWeeks: 2 },
       ],
     });
     const visible = referencePhasesFromEdt(edt, modified.aiPoc!.roleTeamIds,
