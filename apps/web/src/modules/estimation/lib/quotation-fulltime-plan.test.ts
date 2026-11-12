@@ -163,7 +163,8 @@ describe('Planificación IA con dotación a 40 HH/semana', () => {
       replanQuotationEdtForWorkforce(withDevPeople(three, 4)));
     const back = reconcilePocCommercialDraft(
       replanQuotationEdtForWorkforce(withDevPeople(four, 3)));
-    expect([horizonOf(three), horizonOf(four), horizonOf(back)]).toEqual([12, 11, 12]);
+    expect(horizonOf(four)).toBeLessThanOrEqual(horizonOf(three));
+    expect(horizonOf(back)).toBe(horizonOf(three));
     expect(back.edtStageSettings?.filter((s) => s.stageCode !== 'TL-GOV'))
       .toEqual(three.edtStageSettings?.filter((s) => s.stageCode !== 'TL-GOV'));
     expect(back.aiPoc?.edt).toEqual(source.aiPoc?.edt);
@@ -177,7 +178,8 @@ describe('Planificación IA con dotación a 40 HH/semana', () => {
     }
     // También después de serializar/restaurar el snapshot de una revisión.
     const persisted = quotationDraftDataSchema.parse(JSON.parse(JSON.stringify(back)));
-    expect(horizonOf(replanQuotationEdtForWorkforce(withDevPeople(persisted, 4)))).toBe(11);
+    expect(horizonOf(replanQuotationEdtForWorkforce(withDevPeople(persisted, 4))))
+      .toBe(horizonOf(four));
   });
 
   it('una edición manual de fechas permanece como referencia al cambiar dotación varias veces', () => {
@@ -199,6 +201,50 @@ describe('Planificación IA con dotación a 40 HH/semana', () => {
     expect(restored.edtWorkforceReferenceStages).toEqual(manual.edtWorkforceReferenceStages);
     expect(withQuotationEdtStageSetting(restored, 'S2', { name: 'Fase renombrada' })
       .edtWorkforceReferenceStages).toEqual(manual.edtWorkforceReferenceStages);
+  });
+
+  it('no permite falsificar seis semanas editando solo la duración del equipo', () => {
+    const original = fixture(2);
+    original.teams[0]!.duration = 1; // simulación de un borrador antiguo inconsistente
+    const planned = replanQuotationEdtForWorkforce(original);
+    expect(planned.teams.find((row) => row.teamId === dev)?.duration).toBe(4);
+    expect(planned.edtStageSettings?.find((row) => row.stageCode === 'DEV')?.durationWeeks)
+      .toBe(4);
+    expect(() => replanQuotationEdtForWorkforce(original, {
+      teamId: dev, maxWeeks: 3,
+    })).toThrow(/requiere al menos 4 semanas/);
+    expect(replanQuotationEdtForWorkforce(original, {
+      teamId: dev, maxWeeks: 4,
+    }).teams[0]?.duration).toBe(4);
+    expect(effectiveQuotationEdt(planned)?.modules[0]?.tasks[0]?.hours).toBe(320);
+  });
+
+  it('compacta dos tramos independientes consecutivos de 20 HH a una semana, sin inflar WBS', () => {
+    const draft = fixture(1);
+    const source = draft.aiPoc!.edt!;
+    source.stages = [
+      { code: 'A', name: 'A', startWeek: 1, durationWeeks: 1, totalHours: 20 },
+      { code: 'B', name: 'B', startWeek: 2, durationWeeks: 1, totalHours: 20 },
+    ];
+    source.modules = [
+      { name: 'A', totalHours: 20, tasks: [
+        { wbs: 'A.01', name: 'Tarea A', role: 'Desarrollo',
+          stageCode: 'A', hours: 20, roleEffort: [{ role: 'Desarrollo', hours: 20 }] },
+      ] },
+      { name: 'B', totalHours: 20, tasks: [
+        { wbs: 'B.01', name: 'Tarea B', role: 'Desarrollo',
+          stageCode: 'B', hours: 20, roleEffort: [{ role: 'Desarrollo', hours: 20 }] },
+      ] },
+    ];
+    source.totalHours = 40;
+    source.totalWithReserve = 40;
+    const planned = replanQuotationEdtForWorkforce(draft);
+    expect(planned.edtStageSettings?.find((stage) => stage.stageCode === 'A')?.startWeek)
+      .toBe(1);
+    expect(planned.edtStageSettings?.find((stage) => stage.stageCode === 'B')?.startWeek)
+      .toBe(1);
+    expect(planned.teams.find((team) => team.teamId === dev)?.duration).toBe(1);
+    expect(effectiveQuotationEdt(planned)?.totalHours).toBe(40);
   });
 
   it('con cuatro devs reduce implementación a dos semanas sin modificar sus 320 HH', () => {

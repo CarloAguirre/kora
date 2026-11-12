@@ -25,7 +25,9 @@ import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanning
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
 import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
 import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
-import { replanQuotationEdtForWorkforce } from '../lib/quotation-fulltime-plan';
+import {
+  alignQuotationEdtTeamsWithSchedule, replanQuotationEdtForWorkforce,
+} from '../lib/quotation-fulltime-plan';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
 import { QuotationHoursRedistributionDialog } from '../components/QuotationHoursRedistributionDialog';
 import { buildQuotationRedistributionPreview, type QuotationRedistributionPreview } from '../lib/quotation-hour-redistribution-preview';
@@ -335,7 +337,8 @@ export function QuotationWorkspacePage() {
   const applyEdtChanges = (draft: QuotationDraftData) => {
     try {
       quotationEdtAssignments(draft); // validación del mismo contrato que usa la API
-      const saved = reconcilePocCommercialDraft(draft);
+      const saved = alignQuotationEdtTeamsWithSchedule(
+        reconcilePocCommercialDraft(draft));
       change((current) => ({ ...current, draft: saved }));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No fue posible conciliar la EDT.');
@@ -514,6 +517,17 @@ export function QuotationWorkspacePage() {
       { role, collaborators },
     ];
     applyEdtChanges({ ...form.draft, edtRoleCollaborators: next });
+  };
+  const editMappedDuration = (teamId: string, maxWeeks: number) => {
+    if (!editable || !form) return;
+    try {
+      const candidate = replanQuotationEdtForWorkforce(
+        form.draft, { teamId, maxWeeks });
+      applyEdtChanges(candidate);
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message :
+        'El plazo solicitado no es viable con las tareas EDT.');
+    }
   };
   const editMappedCollaborators = (teamId: string, collaborators: number) => {
     if (!editable || !form) return;
@@ -761,6 +775,7 @@ export function QuotationWorkspacePage() {
                         adjustEdtGroupHours(teamKey, hours)}
                       onEditRoleCollaborators={editRoleCollaborators}
                       onEditMappedCollaborators={editMappedCollaborators}
+                      onEditMappedDuration={editMappedDuration}
                       mappingAction={form.draft.aiPoc && !aiRolesMapped
                         ? <Button variant="tertiary" size="sm"
                             disabled={dirty}

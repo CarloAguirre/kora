@@ -25,7 +25,8 @@ const teamName = (key: string, names: ReadonlyMap<string, string>) =>
 export function QuotationTeamsWorkspace({
   draft, editable, teamNames, activeTeams, view, onChangeView,
   onEditTeam, onToggleTeam, onEditGroupHours, onEditRoleCollaborators,
-  onEditMappedCollaborators, onEditTeamCapacity, mappingAction,
+  onEditMappedCollaborators, onEditMappedDuration,
+  onEditTeamCapacity, mappingAction,
 }: {
   draft: QuotationDraftData;
   editable: boolean;
@@ -38,6 +39,7 @@ export function QuotationTeamsWorkspace({
   onEditGroupHours: (teamKey: string, hours: number) => void;
   onEditRoleCollaborators: (role: string, people: number) => void;
   onEditMappedCollaborators: (teamId: string, people: number) => void;
+  onEditMappedDuration: (teamId: string, weeks: number) => void;
   onEditTeamCapacity: (teamId: string, field: QuotationTeamCapacityField, value: number) => void;
   mappingAction?: ReactNode;
 }) {
@@ -77,8 +79,15 @@ export function QuotationTeamsWorkspace({
   const capacityForTeam = (teamId: string) => {
     const team = draft.teams.find((row) => row.teamId === teamId);
     if (!team) return null;
-    return quotationTeamCapacity(team, getHours(teamId),
-      weeklyPlan?.rows.find((row) => row.teamKey === teamId), loadFromPlanning);
+    const scheduled = weeklyPlan?.rows.find((row) => row.teamKey === teamId);
+    // La EDT define las semanas reales. team.duration puede venir de una
+    // versión antigua o de una edición todavía no aplicada al roadmap.
+    const effective = hasEdt && scheduled ? {
+      ...team, unit: 'week' as const,
+      duration: scheduled.lastWeek - scheduled.firstWeek + 1,
+    } : team;
+    return quotationTeamCapacity(effective, getHours(teamId),
+      scheduled, loadFromPlanning);
   };
   const columns = view === 'team' ? styles.detailedColumns : styles.compactColumns;
   return (
@@ -95,7 +104,7 @@ export function QuotationTeamsWorkspace({
       <p className={styles.caption}>
         {view === 'team'
           ? hasEdt
-            ? 'Las HH/sem y la dedicación % muestran la carga real promedio de cada persona, calculada desde las HH de la EDT, los colaboradores y la duración. Se utiliza una jornada de referencia de 40 HH/semana. Las HH totales de las tareas no se modifican.'
+            ? 'Las HH/sem, la dedicación y la duración del equipo se calculan desde las tareas y las fases de la EDT. Cambiar colaboradores replanifica el calendario; editar duración propone un plazo máximo que debe ser viable. Jornada de referencia: 40 HH/semana. Las HH de tareas se conservan.'
             : 'Horas = colaboradores × duración × hh/semana. 40 hh/sem = 100% de dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
@@ -125,6 +134,9 @@ export function QuotationTeamsWorkspace({
           const checked = Boolean(team);
           const fieldsEditable = editable && (checked || canStartManualTeam);
           const capacity = capacityForTeam(teamId);
+          const scheduled = weeklyPlan?.rows.find((row) => row.teamKey === teamId);
+          const effectiveDuration = hasEdt && scheduled
+            ? scheduled.lastWeek - scheduled.firstWeek + 1 : team?.duration ?? 0;
           const warningParts: string[] = [];
           if (capacity && loadFromPlanning && checked) {
             if (capacity.overloadedWeeks.length) {
@@ -171,7 +183,8 @@ export function QuotationTeamsWorkspace({
                   else onEditTeam(teamId, { collaborators: count });
                 }}/>
               {view === 'team' && <>
-                <Select className={styles.unitField} disabled={!fieldsEditable}
+                <Select className={styles.unitField}
+                  disabled={!fieldsEditable || hasEdt}
                   aria-label={'Unidad de ' + label} value={team?.unit ?? 'week'}
                   title="Al cambiar unidad se conserva la duración efectiva (5 días por semana)."
                   options={[
@@ -188,13 +201,18 @@ export function QuotationTeamsWorkspace({
                     if (converted > 520) return;
                     onEditTeam(teamId, { unit, duration: converted });
                   }} />
-                <TextField className={styles.numberField} type="number" min={0} max={520}
+                <TextField className={styles.numberField} type="number"
+                  min={hasEdt ? 1 : 0} max={520}
                   disabled={!fieldsEditable}
                   aria-label={'Duración de ' + label}
-                  value={team?.duration ?? (canStartManualTeam ? 1 : 0)}
-                  onChange={(e) => onEditTeam(teamId, {
-                    duration: Math.max(0, Number(e.target.value) || 0),
-                  })}/>
+                  title={hasEdt ? 'Plazo objetivo. Kora replanifica la EDT y rechaza plazos inviables.' : undefined}
+                  value={hasEdt ? effectiveDuration
+                    : team?.duration ?? (canStartManualTeam ? 1 : 0)}
+                  onChange={(e) => {
+                    const weeks = Math.max(hasEdt ? 1 : 0, Number(e.target.value) || 0);
+                    if (hasEdt) onEditMappedDuration(teamId, weeks);
+                    else onEditTeam(teamId, { duration: weeks });
+                  }}/>
                 {hasEdt ? <>
                   <output className={styles.derivedLoad}
                     aria-label={'HH semanales reales de ' + label}
