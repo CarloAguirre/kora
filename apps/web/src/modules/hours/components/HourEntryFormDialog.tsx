@@ -310,7 +310,9 @@ function EditEntryForm({
         block={block}
         index={0}
         removable={false}
-        projects={selectableProjects}
+        projects={projects}
+        historicalProjectId={entry.project?.id}
+        historicalAssignment={entry.assignment as HourEntryAssignment}
         leaders={leaders?.items ?? []}
         isCollaborator={ownerRequiresApprover}
         overtimeNeedsApproval={overtimeNeedsApproval}

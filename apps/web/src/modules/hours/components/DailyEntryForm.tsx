@@ -275,7 +275,10 @@ export function DailyEntryForm({
       block.taskId === taskId && block.segmentId !== segmentId
         ? { ...block, segmentId } : block));
   }, [initialTask, targetAllowed, targetTask]);
-  const validTaskPrefill = matchesTaskHourTarget(blocks, initialTask, taskPhases, user?.id);
+  const legacyTaskTarget = Boolean(initialTask &&
+    isLegacyHourEntryProject((projects?.items ?? []).find((p) => p.id === initialTask.projectId) ?? {}));
+  const validTaskPrefill = !legacyTaskTarget &&
+    matchesTaskHourTarget(blocks, initialTask, taskPhases, user?.id);
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -405,6 +408,10 @@ export function DailyEntryForm({
         ? 'Registra las horas de «' + initialTask.taskTitle +
           '». Al guardarlas, la tarea se enviará a aprobación.'
         : 'Agrega uno o más registros y registra tus horas del día'}</p>
+      {legacyTaskTarget && <p className={styles.noticeWarning} role="status">
+        En proyectos iniciados antes del 11-11-2026, las HH no se vinculan a tareas.
+        Para registrar horas, usa «Registrar horas» sin iniciar desde una tarea.
+      </p>}
       {initialTask && taskPhasesError &&
         <p className={styles.alert} role="alert">
           No se pudo consultar la tarea. Cancela e inténtalo nuevamente.
@@ -596,6 +603,8 @@ export function DailyEntryBlockFields({
   onToggleExpand,
   onAdjustHours,
   ownerUserId,
+  historicalProjectId,
+  historicalAssignment,
 }: {
   block: DailyBlock;
   index: number;
@@ -616,6 +625,8 @@ export function DailyEntryBlockFields({
   onToggleExpand: () => void;
   onAdjustHours: (delta: number) => void;
   ownerUserId?: string;
+  historicalProjectId?: string;
+  historicalAssignment?: HourEntryAssignment | '';
 }) {
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
   const showApproverInRow =
@@ -623,6 +634,14 @@ export function DailyEntryBlockFields({
   const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
   const legacyProject = selectedProject ? isLegacyHourEntryProject(selectedProject) : false;
   const selectableProjects = filterHourEntryProjects(projects, block.assignment);
+  // En edición, el proyecto puede haber cambiado de etapa comercial desde
+  // que se registraron las HH: mantenerlo visible solo mientras NO se cambie
+  // la asignación original. Nunca ampliar el listado para nuevas selecciones.
+  if (historicalProjectId && historicalProjectId === block.projectId &&
+      historicalAssignment === block.assignment && selectedProject &&
+      !selectableProjects.some((p) => p.id === historicalProjectId)) {
+    selectableProjects.unshift(selectedProject);
+  }
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const { user } = useAuth();
   // Los colaboradores no requieren projects:read para registrar horas; /phases
