@@ -80,12 +80,12 @@ export function TeamLeaderProjectView({
     const historicalMembers = project.members.filter((m) => m.teamId === teamId);
     const members = historicalMembers.filter((m) => !m.blockedAt);
     const teamName = teamRow?.teamName ?? members[0]?.teamName ?? 'Equipo';
-    const leaderId = teamRow?.leader?.id ?? null;
+    const isTeamLeader = teamRow?.isTeamLeader ?? false;
     const leaderName = teamRow?.leader?.fullName ?? null;
     const maxMembers = teamRow?.maxMembers || null;
     const assignedHours = teamRow?.assignedHours ?? members.reduce((sum, m) => sum + m.assignedHours, 0);
     const consumedHours = historicalMembers.reduce((sum, m) => sum + m.consumedHours, 0) + (teamRow?.leaderConsumedHours ?? 0);
-    return { teamId, teamName, leaderId, leaderName, maxMembers, assignedHours, consumedHours, members };
+    return { teamId, teamName, isTeamLeader, leaderName, maxMembers, assignedHours, consumedHours, members };
   }, [project, teamId]);
   const { pageItems: pagedMembers, pagination: membersPagination } = usePaginatedItems(team.members);
   const teamProgress = useMemo(() => calculateTeamProgress(project, teamId), [project, teamId]);
@@ -93,7 +93,10 @@ export function TeamLeaderProjectView({
     .filter((segment) => segment.teamId === teamId)
     .map((segment) => segment.endDate).sort().at(-1) ?? project.estimatedDeliveryDate;
 
-  const canManageTeam = can('projects:manage') || (user !== null && team.leaderId === user.id);
+  // El líder del proyecto puede coincidir con el del equipo; respetar ambos permisos.
+  // isTeamLeader también contempla el líder heredado cuando no existe override.
+  const canManageTeam = can('projects:manage') ||
+    (user !== null && (team.isTeamLeader || project.leader?.id === user.id));
 
   const availableMembers = (teamMemberOptions?.items ?? []).filter((m) => m.teamId === teamId);
 
