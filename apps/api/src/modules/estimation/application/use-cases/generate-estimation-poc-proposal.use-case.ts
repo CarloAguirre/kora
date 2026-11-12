@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { z } from 'zod';
 import { fitGeneratedLabel, normalizeGeneratedProposal } from '../ai-generated-text';
-import { optimizeWorkforceForEdt, replanEdtStagesToFullTime } from '../estimation-workforce-optimizer';
+import { inferLeanStaffingForEdt, optimizeWorkforceForEdt, replanEdtStagesToFullTime } from '../estimation-workforce-optimizer';
 import { extractDriveFolderId } from '../drive-source-selection';
 import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
 import {
@@ -416,15 +416,15 @@ export class GenerateEstimationPocProposalUseCase {
     }
     // Replanificar con 40 HH por persona antes de calcular la supervisión TL.
     // No altera HH por actividad ni consume una llamada adicional a Gemini.
+    const edtEfforts = parsed.roleHours.map((item) => ({
+      stageCode: parsed.activities.find((activity) =>
+        activity.wbs === item.wbs)?.stageCode ?? '',
+      role: item.role, hours: item.hours,
+    }));
     const planned = source === 'drive'
       ? { ...parsed, stages: replanEdtStagesToFullTime(
-          parsed.stages,
-          parsed.roleHours.map((item) => ({
-            stageCode: parsed.activities.find((activity) =>
-              activity.wbs === item.wbs)?.stageCode ?? '',
-            role: item.role, hours: item.hours,
-          })),
-          proposal.roles,
+          parsed.stages, edtEfforts,
+          inferLeanStaffingForEdt(parsed.stages, edtEfforts, proposal.roles),
         ) }
       : parsed;
     const raw = source === 'drive'

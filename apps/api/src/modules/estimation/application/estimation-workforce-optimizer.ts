@@ -4,7 +4,8 @@
  * La EDT establece HH y ventanas temporales; este motor calcula la menor
  * dotación simultánea compatible con esas ventanas, a 40 HH por persona y
  * semana. Las semanas se calculan en centésimos para conservar todo el esfuerzo.
- * NO inventa HH, adelanta dependencias ni aumenta/reduce calendarios de Gemini.
+ * NO inventa HH ni cambia el orden relativo de las ventanas de Gemini.
+ * Compacta el calendario cuando el reparto semanal sigue siendo factible.
  *
  * No confundir "dotación de pico" (personas concurrentes máximas) con la
  * asignación constante de esas personas a todas las semanas del proyecto:
@@ -138,13 +139,92 @@ export function replanEdtStagesToFullTime<T extends WorkforceStage>(
     if (current > 521) throw new Error('La EDT requiere más de 520 semanas.');
   }
   transformed.set(bounds[bounds.length - 1]!, current);
-  return stages.map((stage) => ({
+  const conservative = stages.map((stage) => ({
     ...stage,
     startWeek: transformed.get(stage.startWeek)!,
     durationWeeks: Math.max(1,
       transformed.get(stage.startWeek + stage.durationWeeks)! -
       transformed.get(stage.startWeek)!),
   }));
+
+  // Si hay dos etapas consecutivas de 20 HH, una persona puede trabajar en
+  // ambas durante una sola semana: redondear cada fragmento individualmente
+  // producía dos semanas al 50%. Conservar sub-semanas internamente y
+  // redondear SOLO las ventanas resultantes al calendario entero.
+  const fractional = new Map<number, number>();
+  let elapsed = 0;
+  for (let i = 0; i < bounds.length - 1; i++) {
+    const from = bounds[i]!, to = bounds[i + 1]!;
+    fractional.set(from, elapsed);
+    const demandByTeam = new Map<string, number>();
+    for (const stage of stages) {
+      if (stage.startWeek > from || stage.startWeek + stage.durationWeeks < to) continue;
+      for (const [key, hours] of perStageTeam) {
+        const [code, team] = JSON.parse(key) as [string, string];
+        if (code !== stage.code) continue;
+        demandByTeam.set(team, (demandByTeam.get(team) ?? 0) +
+          hours * (to - from) / stage.durationWeeks);
+      }
+    }
+    elapsed += Math.max(0, ...[...demandByTeam].map(([team, hours]) =>
+      hours / (WEEKLY_HOURS_PER_PERSON * (peopleByTeam.get(team) ?? 1))));
+    if (elapsed > 520) return conservative;
+  }
+  fractional.set(bounds[bounds.length - 1]!, elapsed);
+  const compact = stages.map((stage) => {
+    const begin = fractional.get(stage.startWeek)!;
+    const finish = fractional.get(stage.startWeek + stage.durationWeeks)!;
+    const first = Math.floor(begin + 1e-8) + 1;
+    const last = Math.max(first, Math.ceil(finish - 1e-8));
+    return { ...stage, startWeek: first, durationWeeks: last - first + 1 };
+  });
+  // La EDT distribuye horas uniformemente por stage. Si el redondeo a
+  // semanas de dos trabajos secuenciales provoca picos incompatibles,
+  // descartar la compactación y mantener el plan conservador.
+  try {
+    const sized = optimizeWorkforceForEdt(compact, efforts, roles);
+    const overloadedRole = sized.roles.some((role) =>
+      role.peakWeeklyHours > WEEKLY_HOURS_PER_PERSON *
+        (peopleByTeam.get(teamForRole.get(role.role)!) ?? 1) + 0.005);
+    const overloadedTeam = sized.teams.some((team) =>
+      team.peakWeeklyHours > WEEKLY_HOURS_PER_PERSON *
+        (peopleByTeam.get(team.teamId) ?? 1) + 0.005);
+    if (!overloadedRole && !overloadedTeam) return compact;
+  } catch {
+    // Errores de WBS/roles deben ser atendidos por el validador de la EDT.
+  }
+  return conservative;
+}
+
+/**
+ * Primera estimación automática: la IA determina perfiles y esfuerzo, pero
+ * su headcount preliminar no es una restricción de capacidad. Dimensionar
+ * por el pico SEMANAL de la EDT antes de comprimir el calendario.
+ * No se usa en ediciones comerciales manuales de dotación.
+ */
+export function inferLeanStaffingForEdt(
+  stages: readonly WorkforceStage[],
+  efforts: readonly WorkforceEffort[],
+  roles: readonly (WorkforceRoleInput & { people?: number })[],
+): Array<WorkforceRoleInput & { people: number }> {
+  const involved = new Set(efforts.map((effort) => effort.role));
+  try {
+    const sized = optimizeWorkforceForEdt(
+      stages, efforts, roles.filter((role) => involved.has(role.role)),
+    );
+    const byRole = new Map(sized.roles.map((role) => [role.role, role.people]));
+    const byTeam = new Map(sized.teams.map((team) => [team.teamId, team.people]));
+    return roles.map((role) => ({
+      ...role,
+      people: role.teamId
+        ? byTeam.get(role.teamId) ?? byRole.get(role.role) ?? 1
+        : byRole.get(role.role) ?? 1,
+    }));
+  } catch {
+    // No ocultar un WBS/rol inválido: el validador estricto lo diagnostica.
+    // En ese caso conservar la dotación original para no inventar información.
+    return roles.map((role) => ({ ...role, people: role.people ?? 1 }));
+  }
 }
 
 export function optimizeWorkforceForEdt(

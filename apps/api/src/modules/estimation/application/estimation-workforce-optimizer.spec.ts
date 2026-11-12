@@ -1,7 +1,65 @@
 import { describe, expect, it } from 'vitest';
-import { optimizeWorkforceForEdt, replanEdtStagesToFullTime } from './estimation-workforce-optimizer';
+import { inferLeanStaffingForEdt, optimizeWorkforceForEdt, replanEdtStagesToFullTime } from './estimation-workforce-optimizer';
 
 describe('dimensionamiento determinístico posterior a EDT', () => {
+  it('40 HH en una semana con headcount IA de 5 => un solo colaborador', () => {
+    const stages = [{ code: 'DEV', startWeek: 1, durationWeeks: 1 }];
+    const hours = [{ stageCode: 'DEV', role: 'Dev', hours: 40 }];
+    const staff = inferLeanStaffingForEdt(stages, hours, [
+      { role: 'Dev', teamId: 'dev', people: 5 },
+      { role: 'Líder Técnico', teamId: 'tl', people: 2 },
+    ]);
+    expect(staff.map((role) => role.people)).toEqual([1, 1]);
+    expect(replanEdtStagesToFullTime(stages, hours, staff)[0])
+      .toMatchObject({ startWeek: 1, durationWeeks: 1 });
+  });
+
+  it('150 HH QA en ocho semanas => una persona cuatro semanas (93,75%)', () => {
+    const stages = [{ code: 'QA', startWeek: 1, durationWeeks: 8 }];
+    const effort = [{ stageCode: 'QA', role: 'QA', hours: 150 }];
+    const staff = inferLeanStaffingForEdt(stages, effort, [
+      { role: 'QA', teamId: 'qa', people: 4 },
+    ]);
+    expect(staff[0]?.people).toBe(1);
+    const result = replanEdtStagesToFullTime(stages, effort, staff);
+    expect(result[0]?.durationWeeks).toBe(4);
+    const summary = optimizeWorkforceForEdt(result, effort, [
+      { role: 'QA', teamId: 'qa' },
+    ]);
+    expect(summary.totalHours).toBe(150);
+    expect(summary.roles[0]?.people).toBe(1);
+    expect(summary.roles[0]!.totalHours / (40 * 4)).toBe(0.9375);
+  });
+
+  it('dos tramos consecutivos de 20 HH pueden ocupar una semana completa', () => {
+    const stages = [{ code: 'A', startWeek: 1, durationWeeks: 1 },
+      { code: 'B', startWeek: 2, durationWeeks: 1 }];
+    const effort = [{ stageCode: 'A', role: 'Dev', hours: 20 },
+      { stageCode: 'B', role: 'Dev', hours: 20 }];
+    const result = replanEdtStagesToFullTime(stages, effort, [{ role: 'Dev', people: 1 }]);
+    expect(result).toEqual([
+      { code: 'A', startWeek: 1, durationWeeks: 1 },
+      { code: 'B', startWeek: 1, durationWeeks: 1 },
+    ]);
+    const plan = optimizeWorkforceForEdt(result, effort, [{ role: 'Dev' }]);
+    expect(plan.roles[0]).toMatchObject({
+      people: 1, peakWeeklyHours: 40, totalHours: 40,
+    });
+  });
+
+  it('descarta la compactación si semanas uniformes generarían sobrecarga', () => {
+    const effort = [{ stageCode: 'A', role: 'Dev', hours: 20 },
+      { stageCode: 'B', role: 'Dev', hours: 80 }];
+    const result = replanEdtStagesToFullTime([
+      { code: 'A', startWeek: 1, durationWeeks: 1 },
+      { code: 'B', startWeek: 2, durationWeeks: 2 },
+    ], effort, [{ role: 'Dev', people: 1 }]);
+    const plan = optimizeWorkforceForEdt(result, effort, [{ role: 'Dev' }]);
+    expect(plan.roles[0]?.people).toBe(1);
+    expect(plan.totalHours).toBe(100);
+  });
+
+
   it('320 HH con 2 devs en 8 semanas se comprimen a 4 sin tocar esfuerzo', () => {
     const stages = replanEdtStagesToFullTime(
       [{ code: 'DEV', startWeek: 1, durationWeeks: 8 }],
