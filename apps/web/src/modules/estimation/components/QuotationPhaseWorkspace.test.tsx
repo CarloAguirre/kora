@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationDraftDataSchema, quotationReferenceEdtSchema } from '@kora/contracts';
-import { QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt } from './QuotationPhaseWorkspace';
+import {
+  QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt,
+  nextQuotationPhaseStartWeek,
+} from './QuotationPhaseWorkspace';
 import buttonStyles from '@/shared/components/ui/Button.module.css';
 
 // Los tipos generados para CSS Modules contemplan claves ausentes.
@@ -85,6 +88,48 @@ function renderEditor(custom = draft) {
 afterEach(() => vi.clearAllMocks());
 
 describe('Cotización HTML v5 · fases y tareas', () => {
+  it('agrega una fase después del fin ACTUAL de la EDT replanificada, no del snapshot IA', () => {
+    // La IA terminó originalmente en semana 3, pero la cotización cambió
+    // una fase a semanas 11–13 y otra quedó en 1–2.
+    const replanned = quotationDraftDataSchema.parse({
+      ...mappedDraft,
+      edtStageSettings: [{
+        stageCode: 'T02', startWeek: 11, durationWeeks: 3,
+      }],
+    });
+    const phases = referencePhasesFromEdt(edt, replanned.aiPoc!.roleTeamIds,
+      teams, replanned);
+    expect(nextQuotationPhaseStartWeek(phases)).toBe(14);
+    expect(edt.stages?.[1]?.startWeek).toBe(3); // El snapshot no se mutó
+    const shorter = quotationDraftDataSchema.parse({
+      ...replanned, edtStageSettings: [{
+        stageCode: 'T02', startWeek: 6, durationWeeks: 2,
+      }],
+    });
+    expect(nextQuotationPhaseStartWeek(referencePhasesFromEdt(
+      edt, shorter.aiPoc!.roleTeamIds, teams, shorter,
+    ))).toBe(8);
+  });
+
+  it('considera fases comerciales previas, cambios manuales y límite de semanas', () => {
+    const extra = { code: 'KS-0777e456-fd76-445e-83f1-afc25061c106',
+      name: 'Control', startWeek: 9, durationWeeks: 2 };
+    const modified = quotationDraftDataSchema.parse({
+      ...mappedDraft, edtCommercialStages: [extra],
+      edtStageSettings: [
+        { stageCode: 'T02', startWeek: 6, durationWeeks: 2 },
+        { stageCode: extra.code, startWeek: 12, durationWeeks: 2 },
+      ],
+    });
+    const visible = referencePhasesFromEdt(edt, modified.aiPoc!.roleTeamIds,
+      teams, modified);
+    expect(nextQuotationPhaseStartWeek(visible)).toBe(14);
+    expect(nextQuotationPhaseStartWeek([])).toBe(1);
+    expect(nextQuotationPhaseStartWeek([{ startWeek: 519, durationWeeks: 2 }]))
+      .toBe(521);
+  });
+
+
   it('muestra módulos y roadmap aun sin fases comerciales ni equipos mapeados', () => {
     renderEditor();
     expect(screen.getByText('Fases · Módulos')).toBeInTheDocument();
