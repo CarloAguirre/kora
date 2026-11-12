@@ -29,6 +29,7 @@ export interface ProjectRow {
   estimatedDeliveryDate: Date | null;
   soldHours: string;
   usedHours: string;
+  historicalHoursAdjustment: string;
   expectedProgress: number | null;
   actualProgress: number | null;
   supportPlanDescription: string | null;
@@ -94,6 +95,7 @@ export function toDomain(row: ProjectRow): Project {
     estimatedDeliveryDate: row.estimatedDeliveryDate,
     soldHours: Number(row.soldHours),
     usedHours: Number(row.usedHours),
+    historicalHoursAdjustment: Number(row.historicalHoursAdjustment),
     expectedProgress: row.expectedProgress,
     actualProgress: row.actualProgress,
     supportPlanDescription: row.supportPlanDescription,
@@ -161,6 +163,7 @@ export function toPersistence(project: Project) {
     estimatedDeliveryDate: snapshot.estimatedDeliveryDate,
     soldHours: String(snapshot.soldHours),
     usedHours: String(snapshot.usedHours),
+    historicalHoursAdjustment: String(snapshot.historicalHoursAdjustment),
     expectedProgress: snapshot.expectedProgress,
     actualProgress: snapshot.actualProgress,
     supportPlanDescription: snapshot.supportPlanDescription,
