@@ -23,6 +23,8 @@ export interface ProjectTeamRecord {
   readonly teamName: string;
   readonly leaderUserId: string | null;
   readonly leaderName: string | null;
+  /** Líder efectivo para permisos: override del proyecto o líder orgánico del equipo. */
+  readonly effectiveLeaderUserId: string | null;
   readonly assignedHours: number | null;
   /** Contado en vivo desde `project_team_members` — la v1 no traía este dato, así que el valor migrado siempre es nulo. */
   readonly memberCount: number;

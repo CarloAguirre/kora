@@ -113,8 +113,10 @@ describe('GetProjectUseCase — lectura del líder de un equipo aprobado', () =>
       { findByProject: vi.fn().mockResolvedValue([{
         id: 'link-1', teamId: 'team-1', teamName: 'Desarrollo',
         teamSlug: 'desarrollo',
-        leaderUserId: actorUserId, leaderName: 'Líder orgánico',
+        leaderUserId: null, leaderName: null,
+        effectiveLeaderUserId: actorUserId,
         assignedHours: 100, memberCount: 0, maxMembers: 2,
+        leaderConsumedHours: 0,
       }]) } as unknown as ProjectTeamRepository,
       { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectObservationRepository,
       { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectModuleRepository,
@@ -136,7 +138,10 @@ describe('GetProjectUseCase — lectura del líder de un equipo aprobado', () =>
       projectId: project.id, actorUserId, actorPermissions: ['projects:read_assigned'],
     });
     expect(result.isOk()).toBe(true);
-    if (result.isOk()) expect(result.value.teams[0]?.leader?.id).toBe(actorUserId);
+    if (result.isOk()) {
+      expect(result.value.teams[0]?.leader).toBeNull(); // override explícito ausente
+      expect(result.value.teams[0]?.isTeamLeader).toBe(true); // el líder orgánico sí puede gestionar
+    }
   });
 });
 

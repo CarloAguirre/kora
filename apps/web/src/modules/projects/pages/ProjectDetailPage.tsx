@@ -70,7 +70,7 @@ export function ProjectDetailPage() {
   }
 
   /** Puede liderar más de un equipo del proyecto — en ese caso elige cuál ver con el selector de arriba. */
-  const ledTeams = user ? project.teams.filter((t) => t.leader?.id === user.id) : [];
+  const ledTeams = project.teams.filter((t) => t.isTeamLeader);
   const leaderTeam = ledTeams.find((t) => t.teamId === selectedTeamId) ?? ledTeams[0];
   /**
    * Un líder puede ser a la vez líder de proyecto (o tener `projects:manage`)

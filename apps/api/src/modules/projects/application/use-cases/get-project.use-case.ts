@@ -141,8 +141,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         snapshot.leaderUserId === command.actorUserId ||
         snapshot.developerUserId === command.actorUserId ||
         snapshot.commercialManagerUserId === command.actorUserId ||
-        // findByProject ya resuelve el líder efectivo: override del proyecto o líder oficial.
-        projectTeams.some((team) => team.leaderUserId === command.actorUserId) ||
+        // Igual que la autorización de tareas y entregas: líder efectivo del equipo.
+        projectTeams.some((team) => team.effectiveLeaderUserId === command.actorUserId) ||
         members.some((member) => member.userId === command.actorUserId && !member.blockedAt);
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }

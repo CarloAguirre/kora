@@ -185,8 +185,12 @@ function ClientProjectsSection({
       key: 'progress',
       header: 'Avance',
       sortValue: (p) => p.progressPercent,
-      // `null` = sin plan cargado: "--", no un 0% que parezca medido.
-      render: (p) => (p.progressPercent != null ? `${p.progressPercent}%` : '--'),
+      // El plazo transcurrido es un fallback informativo, nunca avance real.
+      render: (p) => (p.progressPercent != null
+        ? <span title={p.progressIsSchedule ? 'Porcentaje del plazo calendario, no del trabajo completado' : undefined}>
+            {p.progressPercent}%{p.progressIsSchedule ? ' (plazo)' : ''}
+          </span>
+        : '--'),
     },
   ];
 

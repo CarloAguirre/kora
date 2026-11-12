@@ -146,9 +146,9 @@ function buildProject(): ProjectDetail {
     contractLink: null,
     additionalLinks: null,
     teams: [
-      { id: 'pt-dev', teamId: 'team-dev', teamSlug: 'desarrollo', teamName: 'Desarrollo', leader: { id: 'u-jose', fullName: 'José Aponte' }, assignedHours: 400, memberCount: 2, maxMembers: null, leaderConsumedHours: 0 },
-      { id: 'pt-ux', teamId: 'team-ux', teamSlug: 'ux-ui', teamName: 'UX-UI', leader: { id: 'u-eduardo', fullName: 'Eduardo Aranda' }, assignedHours: 200, memberCount: 2, maxMembers: null, leaderConsumedHours: 0 },
-      { id: 'pt-rpa', teamId: 'team-rpa', teamSlug: 'rpa', teamName: 'RPA', leader: null, assignedHours: 45, memberCount: 3, maxMembers: null, leaderConsumedHours: 0 },
+      { id: 'pt-dev', teamId: 'team-dev', teamSlug: 'desarrollo', teamName: 'Desarrollo', leader: { id: 'u-jose', fullName: 'José Aponte' }, assignedHours: 400, memberCount: 2, maxMembers: null, leaderConsumedHours: 0, isTeamLeader: false },
+      { id: 'pt-ux', teamId: 'team-ux', teamSlug: 'ux-ui', teamName: 'UX-UI', leader: { id: 'u-eduardo', fullName: 'Eduardo Aranda' }, assignedHours: 200, memberCount: 2, maxMembers: null, leaderConsumedHours: 0, isTeamLeader: false },
+      { id: 'pt-rpa', teamId: 'team-rpa', teamSlug: 'rpa', teamName: 'RPA', leader: null, assignedHours: 45, memberCount: 3, maxMembers: null, leaderConsumedHours: 0, isTeamLeader: false }
     ],
     members: [
       buildMember({ id: 'm1', userId: 'user-jose', teamId: 'team-rpa', teamName: 'RPA', fullName: 'José Aponte', consumedHours: 16 }),

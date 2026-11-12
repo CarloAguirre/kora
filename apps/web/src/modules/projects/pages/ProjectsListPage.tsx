@@ -32,7 +32,7 @@ import { SearchIcon, PlusIcon, DownloadIcon, TrashIcon } from '@/shared/componen
 import { ProjectStatusBadge } from '../components/ProjectStatusBadge';
 import { ProjectsSummaryChart } from '../components/ProjectsSummaryChart';
 import { getProjectStageLabel } from '../lib/project-stage-display';
-import { formatProgressPercent } from '../lib/project-progress-display';
+import { calculateScheduleElapsedPercent, formatProgressPercent } from '../lib/project-progress-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
 import {
   DEFAULT_PROJECTS_SORT,
@@ -278,8 +278,15 @@ export function ProjectsListPage() {
       key: 'progress',
       header: '% Avance',
       sortable: true,
-      render: (p) =>
-        p.progress.actual != null ? formatProgressPercent(p.progress.actual) : <span className={styles.empty}>Sin plan</span>,
+      render: (p) => {
+        if (p.progress.actual != null) return formatProgressPercent(p.progress.actual);
+        const elapsed = calculateScheduleElapsedPercent(p.startDate, p.endDate);
+        return elapsed != null
+          ? <span title="Plazo calendario transcurrido; no representa trabajo completado.">
+              {elapsed}% <span className={styles.empty}>(plazo)</span>
+            </span>
+          : <span className={styles.empty}>Sin plan</span>;
+      },
     },
     { key: 'soldHours', header: 'HH vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },

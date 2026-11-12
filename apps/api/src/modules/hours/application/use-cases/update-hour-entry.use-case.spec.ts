@@ -73,6 +73,26 @@ describe('edición de horas y atribución a bloque', () => {
     expect(entry.toSnapshot()).toMatchObject({ taskId: 'task-2', segmentId: 'segment-2' });
   });
 
+  it('histórico: preserva atribuciones existentes y bloquea cambios de vínculo', async () => {
+    const { useCase, entry, projects, save } = setup();
+    projects.findById.mockResolvedValue({
+      id: 'project-1', status: 'active', allowsOvertime: false,
+      startDate: new Date('2026-03-30T00:00:00Z'),
+    });
+    const okResult = await useCase.execute({
+      entryId: 'entry-1', data: { description: 'Corrección de HH históricas' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(okResult.isOk()).toBe(true);
+    expect(entry.toSnapshot().segmentId).toBe('segment-1');
+    const denied = await useCase.execute({
+      entryId: 'entry-1', data: { segmentId: 'segment-2', taskId: 'task-2' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(denied.isErr() && denied.error.code).toBe('HOUR_ENTRY_LEGACY_PLAN_DISABLED');
+    expect(save).toHaveBeenCalledOnce();
+  });
+
   it('no permite vincular una tarea ajena al autor', async () => {
     const { useCase, save } = setup();
     const result = await useCase.execute({

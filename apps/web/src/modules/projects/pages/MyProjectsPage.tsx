@@ -9,6 +9,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { SearchIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { myProjectPath } from '@/app/router/paths';
 import { useMyProjects } from '../api/projects.queries';
+import { calculateScheduleElapsedPercent } from '../lib/project-progress-display';
 import styles from './MyProjectsPage.module.css';
 
 const date = (iso: string | null) => iso
@@ -33,16 +34,23 @@ export function MyProjectsPage() {
       </Link> },
     { key: 'leader', header: 'Líder a cargo', render: (p) => p.leader?.fullName ?? '—' },
     { key: 'stage', header: 'Etapa', render: (p) => <span className={styles.stage}>{stage(p)}</span> },
-    { key: 'progress', header: 'Avance', render: (p) =>
-      <div className={styles.progress}>
+    { key: 'progress', header: 'Avance', render: (p) => {
+      const elapsed = p.progress.actual == null
+        ? calculateScheduleElapsedPercent(p.startDate, p.endDate) : null;
+      const value = p.progress.actual ?? elapsed;
+      const isCalendar = p.progress.actual == null && elapsed != null;
+      return <div className={styles.progress}>
         <div className={styles.progressTrack} role="progressbar"
           aria-valuemin={0} aria-valuemax={100}
-          aria-valuenow={p.progress.actual ?? undefined}
-          aria-label={'Avance de ' + p.name}>
-          <span style={{ width: (p.progress.actual ?? 0) + '%' }} />
+          aria-valuenow={value ?? undefined}
+          aria-label={(isCalendar ? 'Plazo calendario transcurrido de ' : 'Avance de ') + p.name}>
+          <span className={isCalendar ? styles.progressScheduleFill : undefined}
+            style={{ width: (value ?? 0) + '%' }} />
         </div>
-        <strong>{pct(p.progress.actual)}</strong>
-      </div> },
+        <strong>{pct(value)}{isCalendar && <span className={styles.progressScheduleLabel}
+          title="Plazo calendario transcurrido; no es avance real."> (plazo)</span>}</strong>
+      </div>;
+    } },
     { key: 'hours', header: 'Mis HH semana', align: 'right', render: (p) => hour(p.weekHours) + ' HH' },
     { key: 'end', header: 'Fecha fin', render: (p) =>
       <span className={styles.date}>{date(p.endDate)}</span> },

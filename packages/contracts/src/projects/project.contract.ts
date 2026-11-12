@@ -131,6 +131,8 @@ export const projectTeamSchema = z.object({
   teamSlug: z.string(),
   teamName: z.string(),
   leader: z.object({ id: uuidSchema, fullName: z.string() }).nullable(),
+  /** El usuario autenticado lidera efectivamente este equipo (incluye el líder heredado). */
+  isTeamLeader: z.boolean(),
   assignedHours: z.number().nullable(),
   memberCount: z.number().int(),
   maxMembers: z.number().int().nullable(),

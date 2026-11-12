@@ -179,9 +179,16 @@ describe('ClientProjectDetailPage — avance del proyecto', () => {
     expect(screen.queryByText(/Plan cargado/)).not.toBeInTheDocument();
   });
 
-  it('sin plan cargado avisa que el avance se mostrará después', () => {
+  it('sin plan, pero con fechas, informa plazo transcurrido en lugar de barra vacía', () => {
     renderPage(buildProject());
 
+    expect(screen.getByText('del plazo transcurrido')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Plazo calendario transcurrido/i })).toBeInTheDocument();
+    expect(screen.queryByText(/El avance se mostrará apenas el plan de trabajo/)).not.toBeInTheDocument();
+  });
+
+  it('sin plan y sin fechas, mantiene el estado sin información', () => {
+    renderPage(buildProject({ startDate: null, endDate: null }));
     expect(screen.getByText(/El avance se mostrará apenas el plan de trabajo/)).toBeInTheDocument();
   });
 });

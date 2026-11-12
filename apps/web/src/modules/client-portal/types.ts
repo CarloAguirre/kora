@@ -41,8 +41,9 @@ export interface ClientProjectRow {
   readonly endDateIso: string | null;
   readonly health: ClientProjectHealth;
   readonly stageLabel: string;
-  /** Avance real (`progress.actual`); `null` = sin plan cargado. */
+  /** Avance operativo cuando existe; en su ausencia, plazo calendario (etiquetado en UI). */
   readonly progressPercent: number | null;
+  readonly progressIsSchedule?: boolean;
 }
 
 export interface ClientSupportContractRow {

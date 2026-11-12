@@ -118,12 +118,13 @@ export function TeamTasksCard({ project, projectId, teamId, managerView = false 
     const teamRow = project.teams.find((t) => t.teamId === teamId);
     const members = project.members.filter((m) => m.teamId === teamId && !m.blockedAt);
     const teamName = teamRow?.teamName ?? members[0]?.teamName ?? 'Equipo';
-    const leaderId = teamRow?.leader?.id ?? null;
-    return { teamId, teamName, leaderId, members };
+    const isTeamLeader = teamRow?.isTeamLeader ?? false;
+    return { teamId, teamName, isTeamLeader, members };
   }, [project, teamId]);
 
+  // La API conoce al líder efectivo (override o líder orgánico).
   const canManageTeam = can('projects:manage') ||
-    (user !== null && (team.leaderId === user.id || project.leader?.id === user.id));
+    (user !== null && (team.isTeamLeader || project.leader?.id === user.id));
 
   const teamTasks = useMemo(() => {
     return project.modules.flatMap((module) =>

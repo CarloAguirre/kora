@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { hourEntryRequiresApproval, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
+import { hourEntryRequiresApproval, isLegacyHourEntryProject, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { splitByDailyCap, type HoursTranche } from '../../domain/services/daily-cap';
 import {
@@ -112,6 +112,16 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       ? data.taskId
       : (moduleId === previous.moduleId && segmentId === previous.segmentId &&
          projectId === previous.projectId ? previous.taskId ?? null : null);
+    // Se preservan vínculos históricos sin permitir nuevos vínculos/cambios.
+    if (project && isLegacyHourEntryProject(project) &&
+        (moduleId || segmentId || taskId) &&
+        (projectId !== previous.projectId || moduleId !== previous.moduleId ||
+         segmentId !== previous.segmentId || taskId !== (previous.taskId ?? null))) {
+      return err(new ForbiddenError(
+        'Fase, bloque y tarea deshabilitados para proyectos anteriores al 11-11-2026.',
+        'HOUR_ENTRY_LEGACY_PLAN_DISABLED',
+      ));
+    }
     if (moduleId) {
       const module = await this.projects.findModuleById(moduleId);
       if (!module) return err(new ReferencedModuleNotFoundError(moduleId));
@@ -131,6 +141,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     }
 
     if (projectId && !moduleId && data.projectId !== undefined &&
+      !isLegacyHourEntryProject(project ?? {}) &&
       await this.projects.hasAttributableWorkBlocks(projectId, entry.userId)) {
       return err(new HourEntrySegmentRequiredError());
     }

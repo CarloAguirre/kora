@@ -46,6 +46,24 @@ export type HourEntryAssignment = z.infer<typeof hourEntryAssignmentSchema>;
 /** Asignaciones que requieren seleccionar un proyecto. */
 export const PROJECT_REQUIRING_ASSIGNMENTS: ReadonlySet<string> = new Set(['Proyecto', 'Prospecto']);
 
+/** Fecha inclusiva en que comienzan las imputaciones con vínculo operativo. */
+export const HOUR_ENTRY_PLAN_LINK_START_DATE = '2026-11-11';
+
+/** Inicio programado, en su ausencia Hito 0, o creación del proyecto. */
+export function isLegacyHourEntryProject(project: {
+  startDate?: string | Date | null;
+  hito0At?: string | Date | null;
+  createdAt?: string | Date | null;
+}): boolean {
+  const source = project.startDate ?? project.hito0At ?? project.createdAt;
+  if (!source) return false;
+  const date = source instanceof Date
+    ? (Number.isFinite(source.getTime()) ? source.toISOString().slice(0, 10) : '')
+    : source.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && date < HOUR_ENTRY_PLAN_LINK_START_DATE;
+}
+
+
 export const hourEntrySummarySchema = z.object({
   id: uuidSchema,
   user: z.object({ id: uuidSchema, fullName: z.string() }),
