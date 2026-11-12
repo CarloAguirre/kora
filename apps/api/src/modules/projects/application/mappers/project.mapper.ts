@@ -82,6 +82,19 @@ export interface ProjectDetailSource {
   readonly now: Date;
 }
 
+/**
+ * Acceso al equipo según las reglas de autorización del backend.
+ * `canManagePendings` ya representa projects:manage o liderazgo de ESTE proyecto.
+ * El líder efectivo respeta el override del proyecto y hereda del equipo global si es null.
+ */
+export function canManageProjectTeam(
+  source: Pick<ProjectDetailSource, 'actorUserId' | 'canManagePendings'>,
+  team: Pick<ProjectTeamRecord, 'effectiveLeaderUserId'>,
+): boolean {
+  return source.canManagePendings ||
+    (team.effectiveLeaderUserId !== null && team.effectiveLeaderUserId === source.actorUserId);
+}
+
 export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
   const snapshot = source.project.toSnapshot();
 
@@ -106,7 +119,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     leader: team.leaderUserId ? { id: team.leaderUserId, fullName: team.leaderName ?? '' } : null,
     // Alineado con el backend: el líder del proyecto puede gestionar todos sus equipos;
     // si no hay override, el líder orgánico del equipo también puede gestionar el suyo.
-    canManage: source.canManagePendings || team.effectiveLeaderUserId === source.actorUserId,
+    canManage: canManageProjectTeam(source, team),
     assignedHours: team.assignedHours,
     memberCount: team.memberCount,
     maxMembers: team.maxMembers,
