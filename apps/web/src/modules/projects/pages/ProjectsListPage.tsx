@@ -11,7 +11,6 @@ import {
   projectKindOf,
   type ProjectKind,
   type ProjectPhase,
-  type ProjectQuotationListStatus,
   type ProjectSortField,
   type ProjectStatus,
   type ProjectSummary,
@@ -56,14 +55,6 @@ const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_STATUS_FILTER
   label: PROJECT_STATUS_LABELS[status],
 }));
 const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
-const QUOTATION_LABELS: Record<ProjectQuotationListStatus, string> = {
-  none: 'Sin cotización',
-  draft: 'En cotización',
-  sent: 'Enviada al cliente',
-  approved_pending: 'Traspaso pendiente',
-  transferred: 'Traspasada',
-  planning_applied: 'Planificación preliminar aplicada',
-};
 // Igual que en Estado, "Finalizado" no se ofrece como filtro de Tipo de proyecto.
 const KIND_OPTIONS = PROJECT_KINDS.filter((kind) => kind !== 'finished').map((kind) => ({
   value: kind,
@@ -245,14 +236,6 @@ export function ProjectsListPage() {
       header: 'Etapa',
       sortable: true,
       render: (p) => (p.phase ? PROJECT_PHASE_LABELS[p.phase] : <span className={styles.empty}>—</span>),
-    },
-    {
-      key: 'quotationStatus', header: 'Cotización', sortable: true,
-      render: (p) => p.quotationStatus
-        ? <span className={styles.quotationStatus} data-state={p.quotationStatus}>
-            {QUOTATION_LABELS[p.quotationStatus]}
-          </span>
-        : <span className={styles.empty}>—</span>,
     },
     {
       key: 'startDate',
