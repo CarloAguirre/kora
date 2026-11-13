@@ -9,6 +9,7 @@ import type {
   QuotationTransferResult,
   ProjectQuotation,
   QuotationVersion,
+  QuotationTeamCatalogEntry,
   QuotationTransferPreview,
   QuotationCommercialPreflight,
   QuotationCommercialDossier,
@@ -18,13 +19,16 @@ import type {
   SavedQuotationReviewAssessment,
   UpdateQuotationDraftInput,
 } from '@kora/contracts';
-import { api } from '@/shared/lib/api-client';
+import { api, apiEventStream } from '@/shared/lib/api-client';
 
 const base = (projectId: string) => '/estimations/projects/' + projectId + '/quotation';
 
 export const quotationApi = {
   get(projectId: string): Promise<ProjectQuotation | null> {
     return api.get<ProjectQuotation | null>(base(projectId));
+  },
+  activeTeams(projectId: string): Promise<QuotationTeamCatalogEntry[]> {
+    return api.get<QuotationTeamCatalogEntry[]>(base(projectId) + '/active-teams');
   },
   appliedPlan(projectId: string): Promise<AppliedQuotationPlanning | null> {
     return api.get<AppliedQuotationPlanning | null>(base(projectId) + '/applied-plan');
@@ -89,6 +93,37 @@ export const quotationApi = {
     return api.post<QuotationTransferResult>(
       base(projectId) + '/versions/' + versionId + '/transfer-approved', input);
   },
+  /** Actividad del backend, heartbeat SSE y resúmenes oficiales del modelo. */
+  generateAiDemoDraftStream(
+    projectId: string, input: GenerateAiDemoQuotationInput,
+    onThoughtSummary: (text: string) => void,
+    onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void,
+    onActivity?: (step: string, text: string, at: string) => void,
+    onHeartbeat?: (seconds: number, phase: string) => void,
+  ): Promise<QuotationVersion> {
+    return apiEventStream<QuotationVersion>(
+      base(projectId) + '/versions/ai-poc/stream', input,
+      (event, payload) => {
+        if (!payload || typeof payload !== 'object') return;
+        if (event === 'thought') {
+          const text = (payload as { text?: unknown }).text;
+          if (typeof text === 'string' && text.length) onThoughtSummary(text);
+        } else if (event === 'phase') {
+          const phase = (payload as { phase?: unknown }).phase;
+          if (phase === 'proposal' || phase === 'edt' || phase === 'saving') onPhase?.(phase);
+        } else if (event === 'activity') {
+          const { step, text, at } = payload as Record<string, unknown>;
+          if (typeof step === 'string' && typeof text === 'string' &&
+            typeof at === 'string') onActivity?.(step, text, at);
+        } else if (event === 'heartbeat') {
+          const { elapsedSeconds, phase } = payload as Record<string, unknown>;
+          if (typeof elapsedSeconds === 'number' && typeof phase === 'string') {
+            onHeartbeat?.(elapsedSeconds, phase);
+          }
+        }
+      },
+    );
+  },
   generateAiDemoDraft(projectId: string, input: GenerateAiDemoQuotationInput): Promise<QuotationVersion> {
     return api.post<QuotationVersion>(base(projectId) + '/versions/ai-poc', input);
   },
@@ -109,6 +144,7 @@ export const quotationApi = {
 export const quotationKeys = {
   all: ['quotations'] as const,
   project: (projectId: string) => [...quotationKeys.all, projectId] as const,
+  activeTeams: (projectId: string) => [...quotationKeys.project(projectId), 'active-teams'] as const,
   reconciliationReviews: (projectId: string, versionId: string) =>
     [...quotationKeys.project(projectId), 'reconciliation-reviews', versionId] as const,
   reconciliationAssessments: (projectId: string, versionId: string) =>

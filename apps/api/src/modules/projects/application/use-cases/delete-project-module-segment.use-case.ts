@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
+import { CLOCK, UNIT_OF_WORK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
@@ -18,6 +18,7 @@ import {
 } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 
 export interface DeleteProjectModuleSegmentCommand {
   readonly projectId: string;
@@ -38,6 +39,7 @@ export class DeleteProjectModuleSegmentUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(command: DeleteProjectModuleSegmentCommand): Promise<Result<void, ApplicationError>> {
@@ -57,10 +59,19 @@ export class DeleteProjectModuleSegmentUseCase
       return err(new CannotManageProjectError());
     }
 
+    // No convertir una entrega o tarea vigente en huérfana al borrar el bloque.
+    if (module.tasks.some((task) => task.segmentId === command.segmentId) ||
+      module.deliveries.some((delivery) => delivery.segmentId === command.segmentId)) {
+      return err(new ForbiddenError(
+        'Desvincula las tareas y la entrega de cierre antes de eliminar este bloque.',
+        'PROJECT_SEGMENT_HAS_DEPENDENCIES',
+      ));
+    }
     // Las filas del tramo se van en cascada; las tareas que cubría vuelven a sumar en el Forecast.
     await this.unitOfWork.run(async (tx) => {
       await this.modules.removeSegment(command.segmentId, tx);
       await this.forecastSync.syncModuleTasks(project, command.moduleId, this.clock.now(), tx);
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({

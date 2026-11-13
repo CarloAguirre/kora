@@ -40,8 +40,7 @@ async function bootstrap(): Promise<void> {
     // La API no sirve HTML: la CSP la aplica el front en su propio despliegue.
     contentSecurityPolicy: false,
   });
-  // Solo lo usa el importador de datos legacy por archivo (`admin/legacy-import`)
-  // — el dump de hoy pesa ~8 MB, el límite deja margen holgado para que crezca.
+  // El importador legacy admite 50 MB; las facturas aplican su propio limite de 5 MB.
   await app.register(fastifyMultipart, { limits: { fileSize: 50 * 1024 * 1024 } });
 
   app.setGlobalPrefix(config.http.prefix);

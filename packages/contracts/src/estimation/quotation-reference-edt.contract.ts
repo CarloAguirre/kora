@@ -10,6 +10,9 @@ import { uuidSchema } from '../common/primitives';
 export const quotationReferenceRoleEffortSchema = z.object({
   role: z.string().trim().min(1).max(120),
   hours: z.number().positive().max(1000000),
+  /** Instrucción ejecutable propia del perfil. Opcional en EDT históricas. */
+  taskName: z.string().trim().min(1).max(300).optional(),
+  taskDescription: z.string().trim().min(1).optional(),
 });
 
 export const quotationReferenceStageSchema = z.object({
@@ -23,14 +26,18 @@ export const quotationReferenceStageSchema = z.object({
 export const quotationReferenceTaskSchema = z.object({
   wbs: z.string().trim().min(1).max(40),
   name: z.string().trim().min(1).max(300),
-  description: z.string().trim().max(3000).default(''),
+  description: z.string().trim().default(''),
   /** Perfil predominante. Mantiene consumidores v1 (traspaso y conciliación). */
   role: z.string().trim().min(1).max(120),
   /** Suma de roleEffort en v2; valor persistido sin prorrateos de IA. */
   hours: z.number().positive().max(1000000),
   stageCode: z.string().trim().min(1).max(40).optional(),
   submodule: z.string().trim().max(300).optional(),
-  referenceIds: z.array(z.string().trim().min(1).max(100)).max(30).optional(),
+  /** Citas y coordenadas del documento de origen, sin truncamiento de texto.
+   * El tamaño de respuesta del proveedor IA está limitado globalmente.
+   * El máximo de entradas se mantiene para proteger la estructura de la EDT.
+   */
+  referenceIds: z.array(z.string().trim().min(1)).max(30).optional(),
   classification: z.string().trim().max(40).optional(),
   roleEffort: z.array(quotationReferenceRoleEffortSchema).min(1).max(12).optional(),
 });
@@ -46,8 +53,8 @@ export const quotationReferenceEdtSchema = z.object({
     'kora.quotation.reference-edt.v1',
     'kora.quotation.reference-edt.v2',
   ]),
-  source: z.literal('kdm_demo'),
-  provider: z.literal('gemini'),
+  source: z.enum(['kdm_demo', 'drive']),
+  provider: z.enum(['gemini', 'openai']),
   modules: z.array(quotationReferenceModuleSchema).min(1).max(30),
   /** Horas base, sin reserva técnica. */
   totalHours: z.number().positive().max(1000000),
@@ -120,7 +127,7 @@ export const appliedQuotationPlanningSchema = z.object({
   revision: z.number().int().positive(),
   appliedAt: z.string().datetime(),
   appliedByUserId: uuidSchema.nullable(),
-  source: z.enum(['kdm_demo', 'manual', 'copy']),
+  source: z.enum(['kdm_demo', 'drive', 'manual', 'copy']),
   status: z.enum(['accepted_for_planning_only', 'transferred']),
   commercialApproval: z.boolean(),
   totalHours: z.number().positive(),

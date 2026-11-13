@@ -1,46 +1,53 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
-  PROJECT_MODULE_STAGES,
-  PROJECT_MODULE_STAGE_LABELS,
-  PROJECT_MODULE_TASK_SCOPE_LABELS,
-  PROJECT_MODULE_TASK_STATUS_LABELS,
+  type CreateProjectModuleSegmentInput,
+  type UpdateProjectModuleSegmentInput,
   type HourEntrySummary,
   type AppliedQuotationPlanning,
   type ProjectDetail,
   type ProjectModule,
   type ProjectModuleDelivery,
   type ProjectModuleSegment,
-  type ProjectModuleStage,
   type ProjectModuleTask,
 } from '@kora/contracts';
 import styles from './ProjectModulesCard.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Modal } from '@/shared/components/ui/Modal';
+import { TextField } from '@/shared/components/ui/TextField';
 import { Button } from '@/shared/components/ui/Button';
-import { Select } from '@/shared/components/ui/Select';
-import { Avatar } from '@/shared/components/ui/Avatar';
+import { PillSwitcher } from '@/shared/components/ui/PillSwitcher';
 import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
-import { CloseIcon, PencilIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { PhaseRoadmap, type PhaseRoadmapSelection } from '@/modules/client-portal/components/PhaseRoadmap';
+import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
-import { PHASE_ROADMAP_ROLE_COLORS } from '@/modules/client-portal/types';
-import { useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useUpdateProjectModule, useUpdateProjectModuleDelivery, useUpdateProjectModuleSegment } from '../api/projects.queries';
+import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleSegment, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
+import { useExcludeRoadmapReference, useRoadmapReferenceExclusions } from '../api/projects.queries';
 import { QuotationReferenceTaskModal } from './QuotationReferenceTaskModal';
+import { ExecutionTaskModal } from './ExecutionTaskModal';
+import { DuplicateTaskModal } from './DuplicateTaskModal';
+import { NewWorkBlockModal, type WorkBlockFormInput } from './NewWorkBlockModal';
+import { AssignBlockTasksModal } from './AssignBlockTasksModal';
+import { NewOperationalTaskModal } from './NewOperationalTaskModal';
+import { SegmentDrawer } from './SegmentDrawer';
+import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
+import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
+import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
+import { ProjectPhaseTasksTable } from './ProjectPhaseTasksTable';
+import { phaseHeaderMeta } from '../lib/phase-header-meta';
 import {
-  EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
-  ExecutionSegmentModal,
-  segmentToModalValues,
-  toSegmentInput,
-  type ExecutionSegmentModalValues,
-} from './ExecutionSegmentModal';
+  ProjectRoadmapTaskDetail, DetailPanel, Facts, Fact, Description,
+} from './ProjectRoadmapTaskDetail';
 
-const STAGE_OPTIONS = PROJECT_MODULE_STAGES.map((stage) => ({ value: stage, label: PROJECT_MODULE_STAGE_LABELS[stage] }));
 const DAY_MS = 24 * 60 * 60 * 1000;
+const ROADMAP_MODE_OPTIONS = [
+  { value: 'view', label: 'Ver' },
+  { value: 'plan', label: 'Planificar' },
+] as const;
 
 const formatDate = (value: string | null) =>
   value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—';
@@ -52,19 +59,16 @@ const today = () => {
 };
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-/** Días corridos entre dos fechas ISO, inclusive. */
-const calendarDays = (start: string, end: string) =>
-  Math.round((parseDate(end).getTime() - parseDate(start).getTime()) / DAY_MS) + 1;
 
-/** Color del equipo — el mismo que el Roadmap (`PHASE_ROADMAP_ROLE_COLORS`, Figma), no el de `getTeamStyle`. */
-const teamColor = (teamName: string | null) => PHASE_ROADMAP_ROLE_COLORS[roleFromTeamName(teamName)];
+/** Paleta de los chips del Roadmap operativo v5.02. No modifica el portal cliente. */
+const operationalTeamColor = (teamName: string | null) => ({
+  dev: '#ea7a1f', pmo: '#64748b', qa: '#3b82f6',
+  ux: '#22a55a', ia: '#e0526b', rpa: '#14a3a0',
+})[roleFromTeamName(teamName)];
 
-const TASK_STATUS_TONE: Record<ProjectModuleTask['status'], BadgeTone> = {
-  todo: 'neutral',
-  in_progress: 'info',
-  in_review: 'warning',
-  done: 'success',
-};
+/** La tabla usa el tamaño original de "Por asignar" para TODOS sus chips.
+ *  Las cuatro clases existen en el CSS Module; el ! resuelve la firma
+ *  string | undefined generada con noUncheckedIndexedAccess. */
 
 const DELIVERY_STATUS_TONE: Record<ProjectModuleDelivery['status'], BadgeTone> = {
   planned: 'neutral',
@@ -78,12 +82,6 @@ const deliveryDelayDays = (delivery: ProjectModuleDelivery) => {
   return Math.max(0, Math.round((today().getTime() - parseDate(delivery.estimatedDate).getTime()) / DAY_MS));
 };
 
-function segmentState(segment: ProjectModuleSegment): { label: string; tone: BadgeTone } {
-  if (parseDate(segment.endDate) < today()) return { label: 'Terminado', tone: 'success' };
-  if (parseDate(segment.startDate) <= today()) return { label: 'En curso', tone: 'info' };
-  return { label: 'Próximo', tone: 'neutral' };
-}
-
 interface ProjectModulesCardProps {
   project: ProjectDetail;
   /** Registros de horas del proyecto (incluye `hasBlocker`/`blockerDescription`) — detalle de los incidentes de cada fase. */
@@ -91,75 +89,142 @@ interface ProjectModulesCardProps {
   /** Equipos asignados al proyecto — opciones de equipo al editar un tiempo de ejecución desde el detalle (mismo criterio que `EditProjectDialog`). */
   teamOptions: ReadonlyArray<{ value: string; label: string }>;
   canManage: boolean;
+  /** Lleva a Resumen → Equipos asignados cuando la fase no puede planificarse. */
+  onNavigateToTeams?: () => void;
 }
 
 /**
  * Roadmap interno del proyecto — el MISMO "Roadmap por Fases" del portal de cliente
  * (`PhaseRoadmap` + `toPhaseRoadmap`), para que ambas vistas se vean idénticas (el del cliente es
- * el fiel al Figma). Lo propio de la vista interna entra por sus slots: la etapa editable de cada
- * fase y el detalle del ítem seleccionado (tramo con lápiz para editarlo sin pasar por "Editar
- * proyecto", tarea, entrega o incidentes). Crear/quitar fases y entregas sigue en "Editar
- * proyecto"; aprobar/rechazar tareas, en la vista de líder de equipo.
+ * el fiel al Figma). Lo propio de la vista interna entra por sus slots: los datos de cada fase y el
+ * detalle del ítem seleccionado (tramo con lápiz para editarlo sin pasar por "Editar proyecto",
+ * tarea, entrega o incidentes). La etapa actual se muestra pero no se cambia acá — un select que
+ * guardaba al elegir hacía fácil cambiarla sin querer —; se cambia en "Editar proyecto", igual que
+ * crear/quitar fases y entregas. La revisión de tareas está disponible aquí y
+ * también en la vista del líder de equipo; ambas usan el mismo endpoint y modal.
  */
-export function ProjectModulesCard({ project, hourEntries, teamOptions, canManage }: ProjectModulesCardProps) {
+export function ProjectModulesCard({
+  project, hourEntries, teamOptions, canManage, onNavigateToTeams,
+}: ProjectModulesCardProps) {
   const toast = useToast();
+  const createModule = useCreateProjectModule();
   const updateModule = useUpdateProjectModule();
   const deleteModule = useDeleteProjectModule();
   const updateSegment = useUpdateProjectModuleSegment();
   const createSegment = useCreateProjectModuleSegment();
   const deleteSegment = useDeleteProjectModuleSegment();
+  const deleteTask = useDeleteProjectModuleTask();
+  const updateTask = useUpdateProjectModuleTask();
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const appliedPlanning = useAppliedQuotationPlanning(project.id);
+  const roadmapExclusions = useRoadmapReferenceExclusions(project.id);
+  const excludeRoadmapReference = useExcludeRoadmapReference();
   const phaseRoadmap = useMemo(() => toPhaseRoadmap(project), [project]);
   const modulesById = useMemo(() => new Map(project.modules.map((module) => [module.id, module])), [project.modules]);
+  const blockProgressById = useMemo(() => indexTeamBlockProgress(project), [project]);
+  const pendingReview = useMemo(() => project.modules.flatMap((module) =>
+    module.tasks.filter((task) => !task.cancelledAt && task.status === 'in_review')
+      .map((task) => ({ moduleId: module.id, moduleName: module.name, task })),
+  ), [project.modules]);
+  const [reviewTarget, setReviewTarget] = useState<{
+    moduleId: string; taskId: string; action: ReviewAction;
+  } | null>(null);
+  const reviewing = reviewTarget ? project.modules.find((module) =>
+    module.id === reviewTarget.moduleId)?.tasks.find((task) => task.id === reviewTarget.taskId) : null;
+  const confirmReview = async (reason?: string) => {
+    if (!reviewTarget || !reviewing || reviewing.status !== 'in_review') return;
+    try {
+      await updateTask.mutateAsync({
+        projectId: project.id, moduleId: reviewTarget.moduleId, taskId: reviewTarget.taskId,
+        input: reviewTarget.action === 'approve'
+          ? { status: 'done', rejectionReason: null }
+          : { status: 'in_progress', rejectionReason: reason ?? '' },
+      });
+      toast.success(reviewTarget.action === 'approve' ? 'Tarea aprobada.' : 'Tarea devuelta al colaborador.');
+      setReviewTarget(null);
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message :
+        'No fue posible revisar la tarea.');
+    }
+  };
+  const reviewActions = (moduleId: string, task: ProjectModuleTask) =>
+    <div className={styles.reviewActions}>
+      <Button size="sm" disabled={updateTask.isPending}
+        onClick={() => setReviewTarget({ moduleId, taskId: task.id, action: 'approve' })}>Aprobar</Button>
+      <Button size="sm" variant="outline" disabled={updateTask.isPending}
+        onClick={() => setReviewTarget({ moduleId, taskId: task.id, action: 'reject' })}>Devolver</Button>
+    </div>;
 
   /** Tiempo de ejecución que se está editando (`null` = modal cerrado). */
   const [editingSegment, setEditingSegment] = useState<{ moduleId: string; segment: ProjectModuleSegment } | null>(null);
-  const [planningBlock, setPlanningBlock] = useState<{ moduleId: string; teamId: string; name: string } | null>(null);
-  const [planningMode, setPlanningMode] = useState(false);
+  const [assigningTasks, setAssigningTasks] = useState<{
+    moduleId: string; teamId: string; focusKey?: string;
+  } | null>(null);
+  const [planningBlock, setPlanningBlock] = useState<{
+    moduleId: string; teamId: string; name: string; estimatedHours?: number | null;
+    initialStartDate?: string; initialEndDate?: string;
+    /** Fase recién creada: permite mostrar el modal sin esperar el refetch del proyecto. */
+    phaseName?: string;
+  } | null>(null);
+  const [planningMode, setPlanningMode] = useState(
+    () => canManage && project.modules.length === 0,
+  );
+  const [addingPhase, setAddingPhase] = useState(false);
+  const [needsTeamsModal, setNeedsTeamsModal] = useState(false);
+  const [addingTask, setAddingTask] = useState<{ moduleId: string; segmentId?: string } | null>(null);
+  const [editingTask, setEditingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
+  const [duplicatingTask, setDuplicatingTask] = useState<{ moduleId: string; task: ProjectModuleTask } | null>(null);
+  const [newPhaseName, setNewPhaseName] = useState('');
   const [phaseNameDrafts, setPhaseNameDrafts] = useState<Record<string, string>>({});
   const [creatingFromReference, setCreatingFromReference] = useState<{
     moduleId: string | null;
     task: AppliedQuotationPlanning['modules'][number]['tasks'][number];
+    mode?: 'create' | 'edit' | 'duplicate';
   } | null>(null);
-  // Estable mientras el modal está abierto: `ExecutionSegmentModal` reinicia su formulario cuando cambia `initialValues`,
-  // y un refetch del proyecto (re-render de esta tarjeta) no debe borrar lo que se está escribiendo.
-  const segmentModalInitialValues = useMemo<ExecutionSegmentModalValues>(
-    () => editingSegment ? segmentToModalValues(editingSegment.segment) : planningBlock
-      ? { ...EMPTY_EXECUTION_SEGMENT_MODAL_VALUES, teamId: planningBlock.teamId, name: planningBlock.name }
-      : EMPTY_EXECUTION_SEGMENT_MODAL_VALUES,
-    [editingSegment, planningBlock],
-  );
-  // El equipo actual del tramo siempre es elegible, aunque ya no figure entre los equipos del proyecto.
-  const segmentModalTeamOptions = useMemo(() => {
-    if (!editingSegment || teamOptions.some((option) => option.value === editingSegment.segment.teamId)) return [...teamOptions];
-    return [{ value: editingSegment.segment.teamId, label: editingSegment.segment.teamName }, ...teamOptions];
-  }, [editingSegment, teamOptions]);
-
-  const onConfirmSegmentEdit = async (values: ExecutionSegmentModalValues) => {
-    if (!editingSegment && !planningBlock) return;
+  const onCreateWorkBlock = async (input: WorkBlockFormInput) => {
+    if (!planningBlock) return;
+    const { closingDelivery, ...data } = input;
+    const createInput: CreateProjectModuleSegmentInput = {
+      ...data, members: [], ...(closingDelivery ? { closingDelivery } : {}),
+    };
     try {
-      if (editingSegment) {
-        await updateSegment.mutateAsync({
-          projectId: project.id,
-          moduleId: editingSegment.moduleId,
-          segmentId: editingSegment.segment.id,
-          input: toSegmentInput(values),
-        });
-      } else if (planningBlock) {
-        // La cotización informa semanas relativas. Solo aquí el usuario elige
-        // fechas reales; desde entonces el bloque aparece en el Gantt de Kora.
-        await createSegment.mutateAsync({
-          projectId: project.id,
-          moduleId: planningBlock.moduleId,
-          input: toSegmentInput(values),
-        });
-      }
-      setEditingSegment(null);
+      await createSegment.mutateAsync({
+        projectId: project.id, moduleId: planningBlock.moduleId, input: createInput,
+      });
       setPlanningBlock(null);
-      toast.success(editingSegment ? 'Bloque actualizado.' : 'Bloque planificado en el Roadmap.');
+      toast.success('Bloque de trabajo creado.');
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo guardar el bloque.');
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo crear el bloque.');
+    }
+  };
+
+  const onEditWorkBlock = async (input: WorkBlockFormInput) => {
+    if (!editingSegment) return;
+    const updateInput: UpdateProjectModuleSegmentInput = input;
+    try {
+      await updateSegment.mutateAsync({
+        projectId: project.id, moduleId: editingSegment.moduleId,
+        segmentId: editingSegment.segment.id, input: updateInput,
+      });
+      setEditingSegment(null);
+      toast.success('Bloque de trabajo actualizado.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar el bloque.');
+    }
+  };
+
+  const changeClosure = async (
+    moduleId: string, segment: ProjectModuleSegment, action: 'close' | 'reopen', close: () => void,
+  ) => {
+    try {
+      await updateSegment.mutateAsync({
+        projectId: project.id, moduleId, segmentId: segment.id,
+        input: { closureAction: action },
+      });
+      close();
+      toast.success(action === 'reopen' ? 'Bloque reabierto.' : 'Bloque cerrado.');
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo cambiar el cierre.');
     }
   };
 
@@ -181,11 +246,48 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     }
   };
 
-  const onChangeStage = async (moduleId: string, currentStage: ProjectModuleStage) => {
+  const onRemoveTask = async (module: ProjectModule, task: ProjectModuleTask) => {
+    if (!await confirm({
+      title: 'Eliminar tarea',
+      description: 'Se eliminará «' + task.name + '», ' +
+        (task.assigneeName ? 'asignada a ' + task.assigneeName + '.' : 'sin asignar.') +
+        ' Las referencias de cotización, si existen, se conservan.',
+      confirmLabel: 'Eliminar tarea', cancelLabel: 'Volver', confirmVariant: 'secondary',
+    })) return;
     try {
-      await updateModule.mutateAsync({ projectId: project.id, moduleId, input: { currentStage } });
+      await deleteTask.mutateAsync({ projectId: project.id, moduleId: module.id, taskId: task.id });
+      toast.success('Tarea eliminada.');
     } catch (error) {
-      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo actualizar la etapa.');
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar la tarea.');
+    }
+  };
+
+  /** Primero se crea la fase macro SIN HH ficticias; después se planifica
+   * su primer bloque con fechas y HH reales, como el prototipo v5. */
+  const onCreatePhase = async () => {
+    const name = newPhaseName.trim();
+    if (!name) return toast.error('Escribe el nombre de la fase.');
+    try {
+      const created = await createModule.mutateAsync({
+        projectId: project.id,
+        input: { name, initialStage: 'discovery' },
+      });
+      setAddingPhase(false);
+      setNewPhaseName('');
+      if (teamOptions.length > 0) {
+        setPlanningBlock({
+          moduleId: created.id,
+          phaseName: name,
+          teamId: teamOptions[0]!.value,
+          name: '',
+        });
+        toast.success('Fase creada. Ahora agrega su primer bloque de trabajo.');
+      } else {
+        setNeedsTeamsModal(true);
+        toast.success('Fase creada. Ahora asigna un equipo para planificar bloques de trabajo.');
+      }
+    } catch (error) {
+      toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo agregar la fase.');
     }
   };
 
@@ -208,7 +310,7 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
 
   const onAddPhaseBlock = (module: ProjectModule) => {
     if (teamOptions.length === 0) {
-      toast.error('Primero asigna un equipo real al proyecto antes de crear un bloque de trabajo.');
+      setNeedsTeamsModal(true);
       return;
     }
     setPlanningBlock({
@@ -246,31 +348,36 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     }
   };
 
+  /** Periodo real de los bloques cuando existen; estimaciones del módulo como respaldo.
+   * HH del módulo si están registradas, o suma de bloques SOLO si todos tienen HH. */
   const renderPhaseHeaderName = (phase: { id: string }) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
-    if (!canManage || !planningMode) return <strong className={styles.headerPhaseName}>{module.name}</strong>;
-    return (
-      <input
-        aria-label={'Nombre de la fase ' + module.name}
-        className={styles.headerPhaseInput}
-        value={phaseNameDrafts[module.id] ?? module.name}
-        maxLength={300}
-        disabled={updateModule.isPending}
-        onChange={(event) => setPhaseNameDrafts((current) => ({
-          ...current, [module.id]: event.target.value,
-        }))}
-        onBlur={(event) => void onRenamePhase(module, event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-          if (event.key === 'Escape') {
-            event.currentTarget.value = module.name;
-            setPhaseNameDrafts((current) => ({ ...current, [module.id]: module.name }));
-            event.currentTarget.blur();
-          }
-        }}
-      />
-    );
+    return <span className={[styles.phaseHeadingIdentity,
+      planningMode && canManage ? styles.phaseHeadingIdentityPlanning : ''].filter(Boolean).join(' ')}>
+      {!canManage || !planningMode
+        ? <strong className={styles.headerPhaseName}>{module.name}</strong>
+        : <input
+            aria-label={'Nombre de la fase ' + module.name}
+            className={styles.headerPhaseInput}
+            value={phaseNameDrafts[module.id] ?? module.name}
+            maxLength={300}
+            disabled={updateModule.isPending}
+            onChange={(event) => setPhaseNameDrafts((current) => ({
+              ...current, [module.id]: event.target.value,
+            }))}
+            onBlur={(event) => void onRenamePhase(module, event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === 'Escape') {
+                event.currentTarget.value = module.name;
+                setPhaseNameDrafts((current) => ({ ...current, [module.id]: module.name }));
+                event.currentTarget.blur();
+              }
+            }}
+          />}
+      <span className={styles.phaseHeadingMeta}>{phaseHeaderMeta(module)}</span>
+    </span>;
   };
 
   const renderPhaseHeaderActions = (phase: { id: string }) => {
@@ -286,12 +393,6 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
         item.moduleId === module.id && (item.tasks.length || item.relativeTeamBlocks?.length)));
     return (
       <div className={styles.phaseHeadingActions}>
-        <span className={styles.phaseHeadingMeta}>
-          {module.estimatedStartDate && module.estimatedEndDate
-            ? formatDate(module.estimatedStartDate) + ' → ' + formatDate(module.estimatedEndDate)
-            : 'Sin fechas'},
-          {' '}{module.estimatedHours == null ? '—' : module.estimatedHours} HH
-        </span>
         <span className={styles.phaseHeadingProgress}
           title="Avances automáticos del Roadmap de Kora, no porcentajes editables manualmente.">
           <span className={styles.phaseHeadingBar} aria-hidden="true">
@@ -319,151 +420,193 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
     );
   };
 
-  if (project.modules.length === 0) {
-    return (
-      <Card>
-        <p className={styles.empty}>Aún no hay fases. Se agregan desde "Editar proyecto".</p>
-      </Card>
-    );
-  }
+  /** En v5.02 los bloques/HH de la cotización siguen siendo referencias hasta
+   * crear el segmento real. No asignamos fechas, responsables ni estados falsos. */
+  const referenceIsConverted = (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => module.tasks.some((task) => task.description?.includes(
+    'Referencia cotización ' + appliedPlanning.data?.versionId +
+    ' · WBS ' + reference.wbs + ' · ' + reference.role,
+  ));
 
-  const renderPhaseExtras = (phase: { id: string }) => {
-    const module = modulesById.get(phase.id);
-    if (!module) return null;
-    return (
-      <div className={styles.moduleFields}>
-        <Select
-          className={styles.moduleStageField}
-          label="Etapa actual"
-          options={STAGE_OPTIONS}
-          value={module.currentStage}
-          disabled={!canManage}
-          onChange={(event) => void onChangeStage(module.id, event.target.value as ProjectModuleStage)}
-        />
-        <Meta label="Etapa inicial" value={PROJECT_MODULE_STAGE_LABELS[module.initialStage]} />
-        <Meta label="Horas estimadas" value={module.estimatedHours != null ? `${module.estimatedHours} hh` : 'Sin definir'} />
-        <Meta label="Fechas estimadas" value={`${formatDate(module.estimatedStartDate)} — ${formatDate(module.estimatedEndDate)}`} />
-        {module.progress.actual != null && (
-          <Meta label="Avance real · esperado" value={`${module.progress.actual}% · ${module.progress.expected ?? 0}%`} />
-        )}
-      </div>
-    );
+  const referenceIsExcluded = (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => roadmapExclusions.data?.some((item) =>
+    item.moduleId === module.id && item.versionId === appliedPlanning.data?.versionId &&
+    item.wbs === reference.wbs && item.role === reference.role,
+  ) ?? false;
+
+  const referenceIsPending = (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => !referenceIsConverted(module, reference) && !referenceIsExcluded(module, reference);
+
+  const onDiscardReference = async (
+    module: ProjectModule,
+    reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
+  ) => {
+    if (!appliedPlanning.data || !await confirm({
+      title: 'Eliminar tarea',
+      description: 'Se quitará «' + reference.name +
+        '», sin asignar, del Roadmap operativo. La cotización original se conserva.',
+      confirmLabel: 'Eliminar tarea', cancelLabel: 'Volver', confirmVariant: 'secondary',
+    })) return;
+    try {
+      await excludeRoadmapReference.mutateAsync({
+        projectId: project.id, moduleId: module.id,
+        input: { versionId: appliedPlanning.data.versionId,
+          wbs: reference.wbs, role: reference.role },
+      });
+      toast.success('Tarea quitada del Roadmap. La referencia comercial permanece intacta.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No fue posible quitar la referencia.');
+    }
   };
 
-  /** Las referencias vienen DESPUÉS del cronograma, como en el HTML v5.
-   * Nunca convertimos semanas relativas en fechas operativas sin planificar. */
-  const renderPhaseReferences = (phase: { id: string }) => {
+  const getOperationalRows = (phase: { id: string }): readonly OperationalRoadmapRow[] => {
+    const module = modulesById.get(phase.id);
+    const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === phase.id);
+    if (!module || !reference?.relativeTeamBlocks) return [];
+    return reference.relativeTeamBlocks
+      .filter((block) => !module.segments.some((segment) => segment.teamId === block.teamId))
+      .map((block) => {
+        const teamName = project.teams.find((team) => team.teamId === block.teamId)?.teamName ??
+          teamOptions.find((team) => team.value === block.teamId)?.label ?? 'Equipo por vincular';
+        return {
+          id: block.teamId,
+          label: module.name + ' · ' + teamName,
+          role: roleFromTeamName(teamName),
+          hours: block.hours,
+          missingBlockMessage: appliedPlanning.data?.status === 'accepted_for_planning_only'
+            ? 'La estimación aún es planificación preliminar: falta aprobación comercial y traspaso.'
+            : project.status === 'active' && (project.startDate || project.hito0At)
+              ? 'Bloque de cotización traspasada pendiente de materializar. Revisa el evento del calendario.'
+              : 'Se generará automáticamente al iniciar el proyecto.',
+        };
+      });
+  };
+
+  /** Contadores de la vista operativa: tareas existentes + referencias EDT
+   * no convertidas. Nunca contamos dos veces una referencia ya creada. */
+  const operationalCounts = project.modules.reduce((total, module) => {
+    const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
+    total.tasks += module.tasks.length +
+      (reference?.tasks.filter((task) => referenceIsPending(module, task)).length ?? 0);
+    total.blocks += module.segments.length + getOperationalRows({ id: module.id }).length;
+    return total;
+  }, { tasks: 0, blocks: 0 });
+
+  /** Roadmap y Avance del equipo presentan el mismo avance operativo por bloque. */
+  const getOperationalMetrics = (phase: { id: string }, row: { id?: string }) => {
+    const segment = modulesById.get(phase.id)?.segments.find((item) => item.id === row.id);
+    return roadmapBlockMetrics(segment ? blockProgressById.get(segment.id) : undefined);
+  };
+
+  const renderOperationalContent = (phase: { id: string }) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
-    const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
-    if (!reference || (!reference.tasks.length && !reference.relativeTeamBlocks?.length)) return null;
-    const versionId = appliedPlanning.data!.versionId;
-    const converted = (task: typeof reference.tasks[number]) =>
-      module.tasks.some((existing) => existing.description?.includes(
-        'Referencia cotización ' + versionId + ' · WBS ' + task.wbs + ' · ' + task.role,
-      ));
-    return (
-      <div className={styles.commercialReferences}>
-        {!!reference.relativeTeamBlocks?.length && (
-          <details className={styles.referenceBlocks}>
-            <summary>
-              {reference.relativeTeamBlocks.length} bloques por equipo de referencia
-              {' · '}{reference.relativeTeamBlocks.filter((block) =>
-                module.segments.some((segment) => segment.teamId === block.teamId)).length}
-              {' equipos con bloque operativo · '}{reference.totalHours} HH · semanas de referencia
-            </summary>
-            <div className={styles.referenceBlockList}>
-              {reference.relativeTeamBlocks.map((block) => {
-                const team = teamOptions.find((option) => option.value === block.teamId);
-                const teamLabel = team?.label ?? 'Equipo no disponible';
-                const proposedName = module.name + ' · ' + teamLabel;
-                // Una referencia comercial es un único bloque por equipo y fase.
-                // El segmento no tiene FK hacia esa referencia: coincidencia exacta
-                // de nombre/equipo confirma el bloque sugerido; si el usuario lo
-                // renombró, solo afirmamos que el equipo ya tiene bloques operativos.
-                const teamSegments = module.segments.filter((segment) => segment.teamId === block.teamId);
-                const matchingSegment = teamSegments.find((segment) =>
-                  segment.name.trim().toLocaleLowerCase('es-CL') ===
-                  proposedName.trim().toLocaleLowerCase('es-CL'));
-                return (
-                  <div key={block.teamId} className={styles.referenceBlockRow}>
-                    <span className={styles.referenceTaskDot}
-                      style={{ background: teamColor(teamLabel) }} aria-hidden="true" />
-                    <span className={styles.referenceTaskName}>{teamLabel}</span>
-                    <span className={styles.referenceTaskMeta}>
-                      {block.hours} HH · semanas {block.startWeek} a
-                      {' '}{block.startWeek + block.durationWeeks - 1}
-                    </span>
-                    {matchingSegment ? (
-                      <span className={styles.referenceConverted}>Bloque planificado</span>
-                    ) : teamSegments.length > 0 ? (
-                      <span className={styles.referenceConverted}>
-                        {teamSegments.length} {teamSegments.length === 1 ? 'bloque operativo existente' : 'bloques operativos existentes'}
-                      </span>
-                    ) : canManage && team ? (
-                      <Button variant="ghost" size="sm"
-                        onClick={() => setPlanningBlock({
-                          moduleId: module.id, teamId: block.teamId,
-                          name: proposedName,
-                        })}>
-                        Planificar bloque
-                      </Button>
-                    ) : null}
-                    {canManage && teamSegments.length === 1 && (
-                      <Button variant="ghost" size="sm"
-                        onClick={() => setEditingSegment({
-                          moduleId: module.id,
-                          segment: teamSegments[0]!,
-                        })}>
-                        Editar bloque
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </details>
-        )}
-        {reference.tasks.length > 0 && (
-          <details className={styles.referenceTasks} open>
-            <summary>
-              {reference.tasks.length} tareas de referencia de la cotización
-              {' '}(sin fechas ni asignados)
-            </summary>
-            <ul className={styles.referenceTaskList}>
-              {reference.tasks.map((task) => {
-                const team = teamOptions.find((option) => option.value === task.teamId);
-                const teamLabel = team?.label ?? task.role;
-                return (
-                  <li key={task.wbs + ':' + task.role} className={styles.referenceTaskRow}>
-                    <span className={styles.referenceTaskDot}
-                      style={{ background: teamColor(teamLabel) }} aria-hidden="true" />
-                    <span className={styles.referenceTaskName}>{task.name}</span>
-                    <span className={styles.referenceTaskMeta}>
-                      · {teamLabel} · {task.hours} HH
-                    </span>
-                    {converted(task) ? (
-                      <span className={styles.referenceConverted}>Tarea creada</span>
-                    ) : canManage ? (
-                      <Button variant="ghost" size="sm"
-                        onClick={() => setCreatingFromReference({ moduleId: module.id, task })}>
-                        Crear tarea
-                      </Button>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </details>
-        )}
-      </div>
-    );
+    const commercial = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
+    const references = commercial?.tasks.filter((task) => referenceIsPending(module, task)) ?? [];
+    const unassignedActual = module.tasks.filter((task) => !task.assigneeUserId);
+    const pending = [
+      ...unassignedActual.map((task) => ({
+        id: task.id, teamId: task.teamId, hours: task.estimatedHours ?? 0,
+      })),
+      ...references.map((task) => ({
+        id: task.wbs + ':' + task.role, teamId: task.teamId, hours: task.hours,
+      })),
+    ];
+    const groups = new Map<string, { count: number; hours: number }>();
+    for (const row of pending) {
+      const id = row.teamId ?? '';
+      const group = groups.get(id) ?? { count: 0, hours: 0 };
+      group.count += 1;
+      group.hours += row.hours;
+      groups.set(id, group);
+    }
+    return <div className={styles.operationalContent}>
+      {Array.from(groups, ([id, group]) => {
+        const team = project.teams.find((entry) => entry.teamId === id);
+        const teamName = team?.teamName ?? teamOptions.find((entry) => entry.value === id)?.label ??
+          'Equipo sin vincular';
+        const members = project.members.filter((member) =>
+          member.teamId === id && member.userStatus === 'active' && !member.blockedAt);
+        return <div className={styles.awaitingAssignment} key={id || 'unmapped'}>
+          <span className={styles.awaitingBadge}
+            style={{ background: operationalTeamColor(teamName) }} aria-hidden="true">
+            {teamName.slice(0, 3).toUpperCase()}
+          </span>
+          <div className={styles.awaitingText}>
+            <strong>{module.name}: {group.count} {group.count === 1 ? 'tarea espera' : 'tareas esperan'} asignación</strong>
+            <span>{members.length === 0 ?
+              'No hay colaboradores activos de este equipo asignados al proyecto.' +
+                (team?.leader?.fullName ? ' Esperando que ' + team.leader.fullName + ' asigne colaboradores.' : '')
+              : group.hours + ' HH estimadas. Las referencias EDT deben convertirse en tareas antes de asignarlas.'}
+            </span>
+          </div>
+          {canManage && members.length > 0 && <Button size="sm" variant="secondary"
+            onClick={() => setAssigningTasks({ moduleId: module.id, teamId: id })}>
+            Asignar tareas
+          </Button>}
+        </div>;
+      })}
+      <ProjectPhaseTasksTable
+        module={module} teams={project.teams} teamOptions={teamOptions}
+        commercial={commercial} quotationVersionId={appliedPlanning.data?.versionId}
+        references={references} canManage={canManage}
+        referenceDeletePending={excludeRoadmapReference.isPending}
+        onReviewTask={(task) => reviewActions(module.id, task)}
+        onEditTask={(task) => setEditingTask({ moduleId: module.id, task })}
+        onDuplicateTask={(task) => setDuplicatingTask({ moduleId: module.id, task })}
+        onDeleteTask={(task) => void onRemoveTask(module, task)}
+        onEditReference={(task) => setCreatingFromReference({ moduleId: module.id, task, mode: 'edit' })}
+        onDeleteReference={(task) => void onDiscardReference(module, task)}
+        onAddTask={() => setAddingTask({ moduleId: module.id })}
+      />
+    </div>;
   };
 
   const renderSelectionDetail = (phase: { id: string }, selection: PhaseRoadmapSelection, close: () => void) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
     if (selection.kind === 'incident') return <IncidentsDetail module={module} hourEntries={hourEntries} onClose={close} />;
+    if (selection.kind === 'reference-block') {
+      const commercial = appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id);
+      const block = commercial?.relativeTeamBlocks?.find((entry) => entry.teamId === selection.id);
+      return block && commercial && appliedPlanning.data ? (
+        <ReferenceBlockDrawer project={project} module={module}
+          block={block} reference={{ ...commercial,
+            tasks: commercial.tasks.filter((task) => referenceIsPending(module, task)),
+          }} versionId={appliedPlanning.data.versionId}
+          onClose={close}
+          onPlan={canManage ? () => {
+            setPlanningBlock({ moduleId: module.id, teamId: block.teamId,
+              name: module.name + ' · ' + (teamOptions.find((item) =>
+                item.value === block.teamId)?.label ?? 'Equipo'), estimatedHours: block.hours });
+            close();
+          } : undefined}
+          onCreateReference={canManage ? (task) => {
+            setAssigningTasks({ moduleId: module.id, teamId: block.teamId,
+              focusKey: 'ref:' + task.wbs + ':' + task.role });
+            close();
+          } : undefined}
+          onEditTask={canManage ? (task) => { setEditingTask({ moduleId: module.id, task }); close(); } : undefined}
+          onDuplicateTask={canManage ? (task) => {
+            setDuplicatingTask({ moduleId: module.id, task }); close();
+          } : undefined}
+          onDeleteTask={canManage ? (task) => { void onRemoveTask(module, task); close(); } : undefined}
+          onEditReference={canManage ? (task) => {
+            setCreatingFromReference({ moduleId: module.id, task, mode: 'edit' }); close();
+          } : undefined}
+          onDuplicateReference={canManage ? (task) => {
+            setCreatingFromReference({ moduleId: module.id, task, mode: 'duplicate' }); close();
+          } : undefined}
+          onDeleteReference={canManage ? (task) => { void onDiscardReference(module, task); } : undefined}
+        />
+      ) : null;
+    }
     if (selection.kind === 'segment') {
       const segment = module.segments.find((s) => s.id === selection.id);
       return segment ? (
@@ -472,18 +615,33 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           module={module}
           segment={segment}
           reference={appliedPlanning.data?.modules.find((entry) => entry.moduleId === module.id)}
+          blockProgress={blockProgressById.get(segment.id)}
           onClose={close}
           onEdit={canManage ? () => {
+            // El formulario se abre sobre el panel lateral, que debe continuar
+            // visible para conservar el contexto del bloque seleccionado.
             setEditingSegment({ moduleId: module.id, segment });
+          } : undefined}
+          onChangeClosure={canManage ? (action) => void changeClosure(module.id, segment, action, close) : undefined}
+          onDelete={canManage ? () => void onDeleteSegment(module.id, segment, close) : undefined}
+          onEditTask={canManage ? (task) => { setEditingTask({ moduleId: module.id, task }); close(); } : undefined}
+          onDuplicateTask={canManage ? (task) => {
+            setDuplicatingTask({ moduleId: module.id, task }); close();
+          } : undefined}
+          onDeleteTask={canManage ? (task) => { void onRemoveTask(module, task); close(); } : undefined}
+          onAddTask={canManage ? () => {
+            setAddingTask({ moduleId: module.id, segmentId: segment.id }); close();
+          } : undefined}
+          onAssignTasks={canManage ? () => {
+            setAssigningTasks({ moduleId: module.id, teamId: segment.teamId });
             close();
           } : undefined}
-          onDelete={canManage ? () => void onDeleteSegment(module.id, segment, close) : undefined}
         />
       ) : null;
     }
     if (selection.kind === 'task') {
       const task = module.tasks.find((t) => t.id === selection.id);
-      return task ? <TaskDetail task={task} onClose={close} /> : null;
+      return task ? <ProjectRoadmapTaskDetail task={task} onClose={close} /> : null;
     }
     const delivery = module.deliveries.find((d) => d.id === selection.id);
     return delivery ? <DeliveryDetail delivery={delivery} label={selection.label} onClose={close} /> : null;
@@ -519,18 +677,96 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           </details>
         </Card>
       )}
-      <PhaseRoadmap alwaysExpanded borderlessSummary phaseRoadmap={phaseRoadmap} renderPhaseExtras={renderPhaseExtras}
-        renderPhaseReferences={renderPhaseReferences} renderSelectionDetail={renderSelectionDetail}
-        renderPhaseHeaderName={canManage && planningMode ? renderPhaseHeaderName : undefined}
+      {project.modules.length === 0 ? (
+        <section className={styles.emptyRoadmap} aria-label="Roadmap sin fases">
+          <header className={styles.emptyRoadmapTop}>
+            <div className={styles.emptyRoadmapCounters} aria-label="Resumen del plan">
+              <span>0 fases</span>
+              <span>0 bloques de trabajo</span>
+              <span>0 tareas</span>
+            </div>
+            {canManage && (
+              <PillSwitcher aria-label="Modo del Roadmap"
+                options={ROADMAP_MODE_OPTIONS}
+                value={planningMode ? 'plan' : 'view'}
+                onChange={(value) => setPlanningMode(value === 'plan')} />
+            )}
+          </header>
+          <p className={styles.emptyRoadmapDefinition}>
+            <strong>Bloque de trabajo:</strong> periodo en que un equipo trabaja en una fase, con sus horas estimadas.
+            Cada bloque cierra con una sola entrega; si se necesita otra entrega, se crea otro bloque.
+          </p>
+          <Card className={styles.emptyRoadmapCard}>
+            <h2>Arma el plan del proyecto</h2>
+            <ol className={styles.emptyRoadmapSteps}>
+              <li>
+                <span className={styles.emptyRoadmapStepNumber}>1</span>
+                <strong>Crea una fase</strong>
+                <p>La etapa macro del proyecto, por ejemplo «Calculadora de estimaciones».</p>
+              </li>
+              <li>
+                <span className={styles.emptyRoadmapStepNumber}>2</span>
+                <strong>Agrega bloques de trabajo</strong>
+                <p>Qué equipo trabaja, entre qué fechas, cuántas horas y qué entrega lo cierra.</p>
+              </li>
+              <li>
+                <span className={styles.emptyRoadmapStepNumber}>3</span>
+                <strong>Desglosa en tareas</strong>
+                <p>Opcional. Las tareas aprobadas mueven el avance antes de la entrega.</p>
+              </li>
+            </ol>
+            {canManage ? (
+              <div className={styles.emptyRoadmapActions}>
+                <Button onClick={() => {
+                  setPlanningMode(true);
+                  setAddingPhase(true);
+                }}>Crear la primera fase</Button>
+              </div>
+            ) : (
+              <p className={styles.emptyRoadmapReadOnly}>
+                El responsable del proyecto debe crear la primera fase para comenzar la planificación.
+              </p>
+            )}
+          </Card>
+        </section>
+      ) : (
+      <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
+        operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
+        operationalPresaleHours={project.prospectPhaseHours}
+        operationalRows={getOperationalRows}
+        operationalMetrics={getOperationalMetrics}
+        operationalNotice={canManage && pendingReview.length > 0 ? (
+          <section className={styles.reviewNotice} aria-label="Tareas por aprobar">
+            <header className={styles.reviewNoticeHead}>
+              <strong>Tareas por aprobar ({pendingReview.length})</strong>
+              <small>El colaborador las marcó como terminadas. Al aprobarlas, suman al avance.</small>
+            </header>
+            {pendingReview.map(({ moduleId, moduleName, task }) => (
+              <div className={styles.reviewNoticeRow} key={task.id}>
+                <div>
+                  <strong>{task.name}</strong>
+                  <small>{task.assigneeName ?? 'Sin responsable'} · {moduleName}.
+                    {task.estimatedHours == null ? '' : ' ' + task.estimatedHours + ' HH estimadas.'}
+                  </small>
+                </div>
+                {reviewActions(moduleId, task)}
+              </div>
+            ))}
+          </section>
+        ) : undefined}
+        operationalFooter={canManage && planningMode ? <Button variant="tertiary" size="sm"
+          onClick={() => setAddingPhase(true)}>+ Agregar fase</Button> : undefined}
+        renderPhaseReferences={renderOperationalContent}
+        renderSelectionDetail={renderSelectionDetail}
+        renderPhaseHeaderName={renderPhaseHeaderName}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         toolbarActions={canManage ? (
-          <div className={styles.roadmapModeSwitch} role="group" aria-label="Modo del Roadmap">
-            <Button size="sm" variant={!planningMode ? 'secondary' : 'ghost'}
-              aria-pressed={!planningMode} onClick={() => setPlanningMode(false)}>Ver</Button>
-            <Button size="sm" variant={planningMode ? 'secondary' : 'ghost'}
-              aria-pressed={planningMode} onClick={() => setPlanningMode(true)}>Planificar</Button>
-          </div>
+          <PillSwitcher aria-label="Modo del Roadmap"
+            options={ROADMAP_MODE_OPTIONS}
+            value={planningMode ? 'plan' : 'view'}
+            onChange={(value) => setPlanningMode(value === 'plan')} />
         ) : undefined} />
+      )}
       {creatingFromReference && appliedPlanning.data && (
         <QuotationReferenceTaskModal
           key={creatingFromReference.task.wbs + ':' + creatingFromReference.task.role}
@@ -539,298 +775,123 @@ export function ProjectModulesCard({ project, hourEntries, teamOptions, canManag
           versionId={appliedPlanning.data.versionId}
           versionNumber={appliedPlanning.data.versionNumber}
           reference={creatingFromReference.task}
+          mode={creatingFromReference.mode ?? 'create'}
           onClose={() => setCreatingFromReference(null)}
         />
       )}
+      {assigningTasks && appliedPlanning.data && modulesById.get(assigningTasks.moduleId) && (
+        <AssignBlockTasksModal
+          key={assigningTasks.moduleId + ':' + assigningTasks.teamId + ':' + (assigningTasks.focusKey ?? '')}
+          project={project} module={modulesById.get(assigningTasks.moduleId)!}
+          teamId={assigningTasks.teamId}
+          referenceTasks={(appliedPlanning.data.modules.find((item) => item.moduleId === assigningTasks.moduleId)
+            ?.tasks ?? []).filter((task) => task.teamId === assigningTasks.teamId &&
+              referenceIsPending(modulesById.get(assigningTasks.moduleId)!, task))}
+          versionId={appliedPlanning.data.versionId}
+          focusKey={assigningTasks.focusKey}
+          onClose={() => setAssigningTasks(null)}
+        />
+      )}
       {confirmationDialog}
-      <ExecutionSegmentModal
-        open={editingSegment !== null || planningBlock !== null}
-        mode={editingSegment ? 'edit' : 'create'}
-        teamOptions={segmentModalTeamOptions}
-        initialValues={segmentModalInitialValues}
-        segmentId={editingSegment?.segment.id ?? null}
-        submitting={updateSegment.isPending || createSegment.isPending}
-        onCancel={() => { setEditingSegment(null); setPlanningBlock(null); }}
-        onConfirm={(values) => void onConfirmSegmentEdit(values)}
-      />
-    </>
-  );
-}
-
-function Meta({ label, value }: { label: string; value: string }) {
-  return (
-    <span className={styles.moduleMeta}>
-      <b className={styles.moduleMetaLabel}>{label}</b>
-      {value}
-    </span>
-  );
-}
-
-/** El Gantt de Kora mantiene su selección y sus fechas; la vista interna
- * presenta los bloques existentes en el lateral como el prototipo v5.
- * No infiere consumo por bloque: los registros horarios solo indican módulo. */
-function SegmentDrawer({
-  project, module, segment, reference, onClose, onEdit, onDelete,
-}: {
-  project: ProjectDetail;
-  module: ProjectModule;
-  segment: ProjectModuleSegment;
-  reference?: AppliedQuotationPlanning['modules'][number];
-  onClose: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-}) {
-  const toast = useToast();
-  const updateDelivery = useUpdateProjectModuleDelivery();
-  const [comment, setComment] = useState('');
-  const team = project.teams.find((item) => item.teamId === segment.teamId);
-  const projected = reference?.relativeTeamBlocks?.filter(
-    (block) => block.teamId === segment.teamId,
-  ) ?? [];
-  const hours = projected.length === 1 ? projected[0]!.hours : null;
-  // Solo asociamos una entrega si hay correspondencia ÚNICA de equipo y
-  // fecha final. No se crean entregas ficticias para bloques sin planificación.
-  const deliveries = module.deliveries.filter((delivery) =>
-    delivery.teamId === segment.teamId && delivery.estimatedDate === segment.endDate);
-  const delivery = deliveries.length === 1 ? deliveries[0]! : null;
-  const teamTasks = module.tasks.filter((task) => task.teamId === segment.teamId);
-  const deliver = async () => {
-    if (!delivery || delivery.status !== 'planned' || !comment.trim()) return;
-    try {
-      await updateDelivery.mutateAsync({
-        projectId: project.id, moduleId: module.id, deliveryId: delivery.id,
-        input: { status: 'delivered', comment: comment.trim() },
-      });
-      toast.success('Entrega marcada como realizada; queda pendiente de aprobación.');
-      onClose();
-    } catch (error) {
-      toast.error(error instanceof ApiRequestError
-        ? error.message : 'No se pudo registrar la entrega.');
-    }
-  };
-  return (
-    <Modal open side title={segment.name}
-      description={'Fase · ' + module.name}
-      headerExtra={<Badge tone={segmentState(segment).tone}>{segmentState(segment).label}</Badge>}
-      onClose={onClose}
-      footer={(onEdit || onDelete) ? (
-        <div className={styles.drawerFooter}>
-          {onDelete && <Button variant="outline" onClick={onDelete}>Eliminar bloque</Button>}
-          {onEdit && <Button onClick={onEdit}>Editar bloque</Button>}
-        </div>
-      ) : undefined}>
-      <div className={styles.drawerScroll}>
-        <p className={styles.drawerTeam}>
-          <span className={styles.referenceTaskDot}
-            style={{ background: teamColor(segment.teamName) }} />
-          <strong>{segment.teamName}</strong>
-          <span>Líder: {team?.leader?.fullName ?? 'Sin líder asignado'}</span>
-        </p>
-        <Facts>
-          <Fact label="Inicio" value={formatDate(segment.startDate)} />
-          <Fact label="Término" value={formatDate(segment.endDate)} />
-          <Fact label="Duración" value={plural(calendarDays(segment.startDate, segment.endDate), 'día')} />
-          <Fact label="Colaboradores" value={segment.members.length ? String(segment.members.length) : 'Sin asignar'} />
-        </Facts>
-        <div className={styles.drawerSection}>
-          <div className={styles.drawerFacts}>
-            <span>Fechas <b>{formatDate(segment.startDate)} – {formatDate(segment.endDate)}</b></span>
-            <span>HH estimadas (cotización) <b>{hours ?? '—'}</b></span>
-            <span>HH consumidas del bloque <b>Sin desglose por bloque</b></span>
-          </div>
-          <p className={styles.drawerHint}>
-            Las HH reales se registran en Kora por módulo. No se atribuyen
-            automáticamente a un bloque sin una relación verificable.
-          </p>
-        </div>
-        {segment.members.length > 0 && (
-          <div className={styles.drawerSection}>
-            <h4>Colaboradores del bloque</h4>
-            <ul className={styles.members}>
-              {segment.members.map((member) => (
-                <li key={member.teamMemberId} className={styles.member}>
-                  <Avatar name={member.fullName} size={30} />
-                  <div className={styles.memberInfo}>
-                    <span className={styles.memberName}>{member.fullName}</span>
-                    <span className={styles.memberMeta}>
-                      {member.dailyPercent != null
-                        ? member.dailyPercent + '% de dedicación diaria'
-                        : 'Sin porcentaje de dedicación'}
-                    </span>
-                  </div>
-                  <span className={styles.memberPercent}>
-                    {member.dailyPercent != null ? member.dailyPercent + '%' : '—'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className={styles.drawerSection}>
-          <h4>Entrega de cierre</h4>
-          {delivery ? (
-            <>
-              <div className={styles.drawerDelivery}>
-                <strong>{delivery.name ?? module.name + ' · ' + segment.teamName}</strong>
-                <span>Fecha planificada: {formatDate(delivery.estimatedDate)}</span>
-                <Badge tone={DELIVERY_STATUS_TONE[delivery.status]}>
-                  {PROJECT_MODULE_DELIVERY_STATUS_LABELS[delivery.status]}
-                </Badge>
-              </div>
-              {delivery.status === 'planned' && onEdit && delivery.assigneeUserId && (
-                <div className={styles.drawerDeliveryAction}>
-                  <label htmlFor={'delivery-comment-' + delivery.id}>
-                    Comentario obligatorio de entrega
-                  </label>
-                  <textarea id={'delivery-comment-' + delivery.id}
-                    value={comment} maxLength={1000} rows={2}
-                    onChange={(event) => setComment(event.target.value)}
-                    placeholder="Describe la entrega realizada" />
-                  <Button disabled={!comment.trim() || updateDelivery.isPending}
-                    onClick={() => void deliver()}>Marcar como entregada</Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className={styles.drawerHint}>
-              No hay una entrega única vinculada a este equipo y fecha.
-              Puedes configurarla desde el editor existente del proyecto.
-            </p>
-          )}
-        </div>
-        <div className={styles.drawerSection}>
-          <h4>Tareas del equipo en esta fase ({teamTasks.length})</h4>
-          {teamTasks.length ? (
-            <ul className={styles.drawerTaskList}>
-              {teamTasks.map((task) => <li key={task.id}>
-                {task.name} · {task.estimatedHours ?? '—'} HH
-              </li>)}
-            </ul>
-          ) : <p className={styles.drawerHint}>Aún no hay tareas operativas de este equipo.</p>}
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-/**
- * Tarjeta de detalle del ítem seleccionado en el Roadmap: cabecera (tipo, nombre, equipo y estado,
- * con sus acciones), una fila de datos clave y, si hay, la descripción aparte.
- */
-function DetailPanel({
-  eyebrow,
-  title,
-  teamName,
-  subtitle,
-  badges,
-  onEdit,
-  editLabel,
-  onClose,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  teamName?: string | null;
-  subtitle?: string | null;
-  badges?: ReactNode;
-  onEdit?: () => void;
-  editLabel?: string;
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <section className={styles.detail} aria-label={`${eyebrow}: ${title}`}>
-      <header className={styles.detailHead}>
-        <span className={styles.detailAccent} style={{ background: teamColor(teamName ?? null) }} aria-hidden="true" />
-        <div className={styles.detailHeadText}>
-          <span className={styles.detailEyebrow}>{eyebrow}</span>
-          <h4 className={styles.detailTitle}>{title}</h4>
-          {(teamName || subtitle) && (
-            <span className={styles.detailSubtitle}>
-              {teamName && (
-                <span className={styles.detailTeam}>
-                  <i className={styles.detailTeamDot} style={{ background: teamColor(teamName) }} />
-                  {teamName}
-                </span>
-              )}
-              {teamName && subtitle && <span aria-hidden="true">·</span>}
-              {subtitle}
-            </span>
-          )}
-        </div>
-        <div className={styles.detailActions}>
-          {badges}
-          {onEdit && (
-            <Button type="button" variant="outline" size="sm" onClick={onEdit} title={editLabel}>
-              <PencilIcon size={14} /> Editar
-            </Button>
-          )}
-          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar detalle">
-            <CloseIcon size={14} />
+      <ReviewActionModal open={Boolean(reviewTarget && reviewing)}
+        action={reviewTarget?.action ?? 'approve'}
+        title={reviewTarget?.action === 'reject' ? 'Devolver tarea' : 'Aprobar tarea'}
+        confirmLabel={reviewTarget?.action === 'reject' ? 'Devolver' : 'Aprobar'}
+        summary={[
+          { label: 'Tarea', value: reviewing?.name ?? '—' },
+          { label: 'Colaborador', value: reviewing?.assigneeName ?? 'Sin responsable' },
+          { label: 'HH estimadas', value: reviewing?.estimatedHours == null ?
+            'Sin definir' : reviewing.estimatedHours + ' HH' },
+        ]}
+        submitting={updateTask.isPending}
+        onCancel={() => setReviewTarget(null)}
+        onConfirm={(reason) => void confirmReview(reason)} />
+      {addingTask && <NewOperationalTaskModal
+        key={addingTask.moduleId + ':' + (addingTask.segmentId ?? '')}
+        project={project} moduleId={addingTask.moduleId}
+        initialSegmentId={addingTask.segmentId}
+        onClose={() => setAddingTask(null)} />}
+      {editingTask && <ExecutionTaskModal
+        key={editingTask.task.id} project={project} moduleId={editingTask.moduleId}
+        task={editingTask.task} onClose={() => setEditingTask(null)}
+        onDuplicate={() => {
+          setDuplicatingTask(editingTask);
+          setEditingTask(null);
+        }} />}
+      {duplicatingTask && <DuplicateTaskModal
+        key={duplicatingTask.task.id} project={project} moduleId={duplicatingTask.moduleId}
+        task={duplicatingTask.task} onClose={() => setDuplicatingTask(null)} />}
+      <Modal open={addingPhase} title="Nueva fase"
+        className={styles.phaseCreationModal}
+        description="La etapa macro del plan. Después le agregas bloques de trabajo por equipo."
+        onClose={() => setAddingPhase(false)}
+        dismissible={!createModule.isPending}
+        footer={<>
+          <Button variant="outline" onClick={() => setAddingPhase(false)}
+            disabled={createModule.isPending}>Cancelar</Button>
+          <Button onClick={() => void onCreatePhase()} loading={createModule.isPending}
+            disabled={!newPhaseName.trim()}>
+            Crear fase
           </Button>
+        </>}>
+        <div className={styles.phaseCreationForm}>
+          <TextField label="Nombre de la fase" required maxLength={300}
+            placeholder="Ej. Calculadora de estimaciones" value={newPhaseName}
+            onChange={(event) => setNewPhaseName(event.target.value)} />
         </div>
-      </header>
-      <div className={styles.detailBody}>{children}</div>
-    </section>
-  );
-}
-
-function Facts({ children }: { children: ReactNode }) {
-  return <dl className={styles.facts}>{children}</dl>;
-}
-
-function Fact({ label, value, hint, danger }: { label: string; value: string; hint?: string; danger?: boolean }) {
-  return (
-    <div className={styles.fact}>
-      <dt className={styles.factLabel}>{label}</dt>
-      <dd className={[styles.factValue, danger ? styles.factValueDanger : ''].filter(Boolean).join(' ')}>{value}</dd>
-      {hint && <dd className={styles.factHint}>{hint}</dd>}
-    </div>
-  );
-}
-
-function Description({ text }: { text: string | null }) {
-  if (!text?.trim()) return null;
-  return (
-    <div className={styles.description}>
-      <span className={styles.factLabel}>Descripción</span>
-      <p className={styles.descriptionText}>{text}</p>
-    </div>
-  );
-}
-
-function TaskDetail({ task, onClose }: { task: ProjectModuleTask; onClose: () => void }) {
-  const late = task.status !== 'done' && parseDate(task.date) < today();
-  return (
-    <DetailPanel
-      eyebrow="Tarea"
-      title={task.name}
-      teamName={task.teamName}
-      subtitle={task.assigneeName}
-      badges={
-        <>
-          {late && <Badge tone="danger">Atrasada</Badge>}
-          <Badge tone={TASK_STATUS_TONE[task.status]}>{PROJECT_MODULE_TASK_STATUS_LABELS[task.status]}</Badge>
-        </>
-      }
-      onClose={onClose}
-    >
-      <Facts>
-        {task.startDate && <Fact label="Inicio" value={formatDate(task.startDate)} />}
-        <Fact label="Fecha límite" value={formatDate(task.date)} danger={late} />
-        <Fact label="Ámbito" value={PROJECT_MODULE_TASK_SCOPE_LABELS[task.scope]} />
-        <Fact label="Horas estimadas" value={task.estimatedHours != null ? `${task.estimatedHours} hh` : 'Sin definir'} />
-        {/* Solo si hay fecha real: "Aprobada" + "Completada: Aún no" se contradecían en tareas antiguas sin `completedAt`. */}
-        {task.completedAt && (
-          <Fact
-            label="Completada"
-            value={new Date(task.completedAt).toLocaleDateString('es-CL')}
-            hint={new Date(task.completedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
-          />
-        )}
-      </Facts>
-      <Description text={task.description} />
-    </DetailPanel>
+      </Modal>
+      <Modal open={needsTeamsModal} title="Primero agrega equipos"
+        className={styles.missingTeamsModal}
+        onClose={() => setNeedsTeamsModal(false)}
+        footer={<>
+          {onNavigateToTeams && (
+            <Button onClick={() => {
+              setNeedsTeamsModal(false);
+              onNavigateToTeams();
+            }}>Ir a Equipos asignados</Button>
+          )}
+          <Button variant="outline" onClick={() => setNeedsTeamsModal(false)}>
+            Entendido
+          </Button>
+        </>}>
+        <p>El proyecto no tiene equipos asignados. Agrégalos en Equipos asignados
+          antes de crear bloques de trabajo.</p>
+      </Modal>
+      {planningBlock && (modulesById.get(planningBlock.moduleId) || planningBlock.phaseName) && (
+        <NewWorkBlockModal
+          key={planningBlock.moduleId + ':' + planningBlock.teamId}
+          project={project}
+          module={modulesById.get(planningBlock.moduleId) ?? {
+            id: planningBlock.moduleId,
+            name: planningBlock.phaseName!,
+          }}
+          teamOptions={teamOptions}
+          initialTeamId={planningBlock.teamId}
+          initialName={planningBlock.name}
+          initialEstimatedHours={planningBlock.estimatedHours}
+          initialStartDate={planningBlock.initialStartDate}
+          initialEndDate={planningBlock.initialEndDate}
+          submitting={createSegment.isPending}
+          onCancel={() => setPlanningBlock(null)}
+          onConfirm={(input) => void onCreateWorkBlock(input)}
+        />
+      )}
+      {editingSegment && modulesById.get(editingSegment.moduleId) && (
+        <NewWorkBlockModal
+          mode="edit"
+          key={'edit:' + editingSegment.segment.id}
+          project={project}
+          module={modulesById.get(editingSegment.moduleId)!}
+          teamOptions={teamOptions}
+          initialSegment={editingSegment.segment}
+          initialDelivery={modulesById.get(editingSegment.moduleId)!.deliveries.find(
+            (delivery) => delivery.segmentId === editingSegment.segment.id)}
+          submitting={updateSegment.isPending}
+          onCancel={() => setEditingSegment(null)}
+          onConfirm={(input) => void onEditWorkBlock(input)}
+        />
+      )}
+    </>
   );
 }
 

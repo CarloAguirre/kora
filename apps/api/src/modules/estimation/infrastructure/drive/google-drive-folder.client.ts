@@ -1,6 +1,9 @@
 import { createSign } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { AppConfigService } from '../../../../config/app-config.service';
+import {
+  extractXlsxSourceText, MAX_XLSX_SOURCE_BYTES, XLSX_ANALYSIS_MIME,
+} from './xlsx-source-extractor';
 import type {
   DriveFolderClient,
   DriveFolderFile,
@@ -33,7 +36,10 @@ interface GoogleDriveFileResponse {
 
 interface GoogleDriveListResponse {
   files?: GoogleDriveFileResponse[];
+  nextPageToken?: string;
 }
+/** Evita asumir que la primera página de Drive contiene todo el levantamiento. */
+const MAX_LIST_PAGES = 10;
 
 /**
  * Adaptador server-to-server para Google Drive mediante cuenta de servicio.
@@ -46,10 +52,13 @@ interface GoogleDriveListResponse {
 export class GoogleDriveFolderClient implements DriveFolderClient {
   private cachedToken: { value: string; expiresAtMs: number } | null = null;
 
-  constructor(private readonly config: AppConfigService) {}
+  constructor(
+    private readonly config: AppConfigService,
+    @Optional() private readonly delegatedAccessToken?: string,
+  ) {}
 
   isConfigured(): boolean {
-    return this.config.googleDrive.enabled;
+    return Boolean(this.delegatedAccessToken) || this.config.googleDrive.enabled;
   }
 
   async listFiles(folderId: string): Promise<readonly DriveFolderFile[]> {
@@ -99,6 +108,11 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
       );
       if (!response.ok) throw driveError(response.status);
 
+      if (exportMimeType === XLSX_ANALYSIS_MIME) {
+        const bytes = await readXlsxBytes(response);
+        return { mimeType: 'text/plain', text: await extractXlsxSourceText(bytes) };
+      }
+
       if (exportMimeType === 'application/pdf') {
         const bytes = Buffer.from(await response.arrayBuffer());
         return {
@@ -111,6 +125,15 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
         mimeType: exportMimeType,
         text: await response.text(),
       };
+    }
+
+    if (mimeType === XLSX_ANALYSIS_MIME) {
+      const response = await this.authorizedFetch(
+        `${DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`,
+      );
+      if (!response.ok) throw driveError(response.status);
+      const bytes = await readXlsxBytes(response);
+      return { mimeType: 'text/plain', text: await extractXlsxSourceText(bytes) };
     }
 
     if (mimeType === 'application/pdf') {
@@ -179,26 +202,35 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
   ): Promise<readonly DriveFolderItem[]> {
     this.assertConfigured();
     const accessToken = await this.getAccessToken();
-    const url = new URL(DRIVE_FILES_ENDPOINT);
-    url.searchParams.set('q', query);
-    url.searchParams.set('fields', `files(${FILE_FIELDS})`);
-    url.searchParams.set('pageSize', String(pageSize));
-    url.searchParams.set('supportsAllDrives', 'true');
-    url.searchParams.set('includeItemsFromAllDrives', 'true');
-    if (orderBy) url.searchParams.set('orderBy', orderBy);
-
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!response.ok) {
-      throw driveError(response.status);
+    const files: DriveFolderItem[] = [];
+    let nextPageToken: string | undefined;
+    const seenPages = new Set<string>();
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      const url = new URL(DRIVE_FILES_ENDPOINT);
+      url.searchParams.set('q', query);
+      url.searchParams.set('fields', `nextPageToken,files(${FILE_FIELDS})`);
+      url.searchParams.set('pageSize', String(pageSize));
+      url.searchParams.set('supportsAllDrives', 'true');
+      url.searchParams.set('includeItemsFromAllDrives', 'true');
+      if (orderBy) url.searchParams.set('orderBy', orderBy);
+      if (nextPageToken) url.searchParams.set('pageToken', nextPageToken);
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!response.ok) throw driveError(response.status);
+      const body = (await response.json()) as GoogleDriveListResponse;
+      files.push(...(body.files ?? [])
+        .filter(isUsableDriveFile)
+        .map(toDriveFolderItem));
+      if (!body.nextPageToken) return files;
+      if (seenPages.has(body.nextPageToken)) {
+        throw new Error('Google Drive devolvió una paginación repetida. Intenta nuevamente.');
+      }
+      seenPages.add(body.nextPageToken);
+      nextPageToken = body.nextPageToken;
     }
-
-    const body = (await response.json()) as GoogleDriveListResponse;
-    return (body.files ?? [])
-      .filter(isUsableDriveFile)
-      .map(toDriveFolderItem);
+    // No tratar un listado incompleto como si la carpeta estuviera vacía.
+    throw new Error('La carpeta supera el máximo de páginas de Drive. Reduce el alcance o selecciona una subcarpeta.');
   }
 
   private async authorizedFetch(url: string): Promise<Response> {
@@ -215,6 +247,7 @@ export class GoogleDriveFolderClient implements DriveFolderClient {
   }
 
   private async getAccessToken(): Promise<string> {
+    if (this.delegatedAccessToken) return this.delegatedAccessToken;
     const nowMs = Date.now();
     if (this.cachedToken && this.cachedToken.expiresAtMs > nowMs + 60_000) {
       return this.cachedToken.value;
@@ -320,7 +353,8 @@ function googleExportMimeType(mimeType: string): string | null {
     case 'application/vnd.google-apps.document':
       return 'text/plain';
     case 'application/vnd.google-apps.spreadsheet':
-      return 'text/csv';
+      // CSV pierde pestañas; XLSX conserva todas las hojas visibles.
+      return XLSX_ANALYSIS_MIME;
     case 'application/vnd.google-apps.presentation':
       return 'application/pdf';
     default:
@@ -339,4 +373,29 @@ function isPlainTextMime(mimeType: string): boolean {
     'text/rtf',
     'application/json',
   ]).has(mimeType);
+}
+
+/** Límite de descarga previo al parseo para evitar respuestas enormes de Drive. */
+async function readXlsxBytes(response: Response): Promise<Buffer> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_XLSX_SOURCE_BYTES) {
+    throw new Error('Excel: el archivo supera 5 MB.');
+  }
+  if (!response.body) throw new Error('Excel: Google Drive devolvió un archivo vacío.');
+  const chunks: Uint8Array[] = [];
+  const reader = response.body.getReader();
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_XLSX_SOURCE_BYTES) {
+        await reader.cancel();
+        throw new Error('Excel: el archivo supera 5 MB.');
+      }
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)), size);
 }

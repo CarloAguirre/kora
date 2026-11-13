@@ -1,0 +1,14 @@
+.card { gap: var(--kora-space-4); }
+.filters { display: flex; flex-wrap: wrap; gap: var(--kora-space-3); align-items: start; }
+.types { display: flex; flex-wrap: wrap; gap: var(--kora-space-1); border-radius: var(--kora-radius-md);
+  background: var(--kora-surface-muted); padding: 4px; align-self: center; }
+.types button { border: 0; background: none; font: inherit; color: var(--kora-blue-700);
+  padding: 8px; border-radius: var(--kora-radius-sm); cursor: pointer; font-size: var(--kora-text-xs); }
+.types button[aria-pressed="true"] { background: var(--kora-surface); color: var(--kora-navy);
+  font-weight: var(--kora-weight-semibold); box-shadow: var(--kora-shadow-sm); }
+.search { flex: 1 1 200px; }
+.date { flex: 0 1 155px; }
+.notice { margin: 0; font-size: var(--kora-text-xs); color: var(--kora-warning-text); }
+.detail { display: grid; grid-template-columns: 110px 1fr; gap: var(--kora-space-3); }
+.detail dt { color: var(--kora-blue-700); }
+.detail dd { margin: 0; overflow-wrap: anywhere; }

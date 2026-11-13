@@ -37,13 +37,14 @@ import { DATABASE } from '../../../../shared/infrastructure/database/database.mo
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
 import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
-import { hasOnlyCommercialPreparationHours } from '../../domain/commercial-preparation-transfer';
-import { buildQuotationTransferReferences } from '../../domain/quotation-transfer-references';
+import { hasOnlyCommercialPreparationHours, planCommercialPreparationTransfer } from '../../domain/commercial-preparation-transfer';
+import { buildQuotationTransferReferences, matchingCopiedQuotationReferenceSource } from '../../domain/quotation-transfer-references';
+import { copyQuotationDraft } from '../../domain/copy-quotation-draft';
 import { InvalidCommercialQuotation, assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from '../../domain/quotation-commercial-eligibility';
 import type { QuotationProjectScope, QuotationRepository } from '../../domain/repositories/quotation.repository';
 
 /** Mantener Nest fuera del dominio y traducir a HTTP 400 en infraestructura. */
-function validateCommercial(action: () => void): void {
+export function validateCommercial(action: () => void): void {
   try {
     action();
   } catch (error) {
@@ -183,12 +184,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const ids = rows.map((row) => row.id);
     const [transfer] = ids.length ? await this.db.select({
       versionId: quotationEvents.versionId,
+      occurredAt: quotationEvents.occurredAt,
     }).from(quotationEvents).where(and(
       inArray(quotationEvents.versionId, ids),
       eq(quotationEvents.action, 'quotation_transferred'),
     )).orderBy(desc(quotationEvents.occurredAt)).limit(1) : [];
     return { ...quotation, versions: rows.map(toVersion),
-      transferredVersionId: transfer?.versionId ?? null };
+      transferredVersionId: transfer?.versionId ?? null,
+      transferredAt: transfer?.occurredAt.toISOString() ?? null };
   }
 
   /** Sólo consulta de actas inmutables relacionadas con ESTA cotización. */
@@ -334,23 +337,25 @@ export class DrizzleQuotationRepository implements QuotationRepository {
   async createAiPocDraft(projectId: string, userId: string, proposal: EstimationPocProposal,
     answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
-    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion> {
-    if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
-        proposal.sourceMode !== 'poc_simulated' || proposal.documentsAnalyzed < 1 ||
+    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>,
+    selectedTeamIds: readonly string[] = []): Promise<QuotationVersion> {
+    if (proposal.projectId !== projectId || !['gemini', 'openai'].includes(proposal.provider) ||
+        !['poc_simulated', 'drive'].includes(proposal.sourceMode) || proposal.documentsAnalyzed < 1 ||
         proposal.totalHours <= 0 || proposal.roles.some((role) => role.totalHours <= 0) ||
         Math.abs(proposal.roles.reduce((total, role) => total + role.totalHours, 0) - proposal.totalHours) > 0.011 ||
         Math.abs(edt.totalHours - proposal.totalHours) > 0.011 ||
-        edt.source !== 'kdm_demo' || edt.provider !== 'gemini') {
-      throw new BadRequestException('Propuesta Gemini KDM inválida o sin trazabilidad documental.');
+        edt.source !== (proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo') || edt.provider !== proposal.provider) {
+      throw new BadRequestException('Propuesta IA sin trazabilidad documental coherente o HH conciliadas.');
     }
-    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds });
+    return this.createVersionInternal(projectId, userId, {}, { proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds, selectedTeamIds });
   }
 
   private async createVersionInternal(
     projectId: string, userId: string, input: CreateQuotationVersionInput,
     aiPoc?: { proposal: EstimationPocProposal; answers: readonly SubmitEstimationAnswerInput[];
       dynamicQuestions: readonly EstimationQuestion[]; edt: QuotationReferenceEdt;
-      confirmedUnderstanding?: string; roleTeamIds?: Readonly<Record<string, string>> },
+      confirmedUnderstanding?: string; roleTeamIds?: Readonly<Record<string, string>>;
+      selectedTeamIds?: readonly string[] }, 
   ): Promise<QuotationVersion> {
     return this.db.transaction(async (tx) => {
       await tx.insert(projectQuotations).values({ projectId, createdByUserId: userId }).onConflictDoNothing();
@@ -359,6 +364,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (!quotation) throw new NotFoundException('No se pudo crear la cotización del proyecto.');
       // Serializa los números v1, v2, ... por proyecto y evita carreras entre peticiones.
       await tx.execute(sql`SELECT id FROM project_quotations WHERE id = ${quotation.id} FOR UPDATE`);
+      // Una cotización que ya se traspasó es inmutable, incluso si quedan
+      // borradores históricos. Esta comprobación comparte el lock del proyecto.
+      const [closedEvent] = await tx.select({ id: quotationEvents.id }).from(quotationEvents)
+        .innerJoin(quotationVersions, eq(quotationEvents.versionId, quotationVersions.id))
+        .where(and(eq(quotationVersions.quotationId, quotation.id),
+          eq(quotationEvents.action, 'quotation_transferred'))).limit(1);
+      if (closedEvent) {
+        throw new ConflictException('La cotización ya fue traspasada y está cerrada. No se pueden crear nuevas versiones.');
+      }
       const [last] = await tx.select({ versionNumber: quotationVersions.versionNumber })
         .from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id))
         .orderBy(desc(quotationVersions.versionNumber)).limit(1);
@@ -378,15 +392,18 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           paymentPlan: [],
           assumptions: aiPoc.proposal.assumptions,
           exclusions: [],
-          sourceRefs: ['demo:kdm_fixture'],
+          sourceRefs: aiPoc.proposal.sourceMode === 'drive'
+            ? [...new Set(aiPoc.dynamicQuestions.flatMap((question) => question.sourceRefs.map((ref) => ref.sourceId)))]
+            : ['demo:kdm_fixture'],
           answers: Object.fromEntries(aiPoc.answers.map((answer) => [
             answer.questionId, answer.value,
           ])),
           aiPoc: quotationAiPocSnapshotSchema.parse({
-            source: 'kdm_demo', proposal: aiPoc.proposal,
+            source: aiPoc.proposal.sourceMode === 'drive' ? 'drive' : 'kdm_demo', proposal: aiPoc.proposal,
             answers: aiPoc.answers, dynamicQuestions: aiPoc.dynamicQuestions,
             confirmedUnderstanding: aiPoc.confirmedUnderstanding,
             edt: aiPoc.edt, roleTeamIds: aiPoc.roleTeamIds ?? {},
+            selectedTeamIds: aiPoc.selectedTeamIds ?? [],
           }),
         });
         if (aiPoc.roleTeamIds) {
@@ -435,16 +452,12 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           .where(and(eq(quotationVersions.id, input.sourceVersionId),
             eq(quotationVersions.quotationId, sourceQuotation.id))).limit(1);
         if (!source) throw new NotFoundException('La versión no pertenece a la cotización de origen.');
-        // Una copia MANUAL desde una propuesta IA no hereda fuentes ni respuestas IA.
+        // Copiar una versión IA del MISMO proyecto conserva su EDT WBS,
+        // asignaciones por perfil y ediciones comerciales, sin crear una
+        // nueva generación IA ni perder las tareas al traspasar la v2.
+        // Copias entre proyectos y fuentes demo siguen sin heredar evidencia.
         const previous = quotationDraftDataSchema.parse(source.draft);
-        draft = {
-          ...previous, sourceRefs: [], answers: {}, analysis: null, aiPoc: null,
-          analysisProjectionStatus: undefined,
-          edtHourAdjustments: undefined, edtTaskSettings: undefined,
-          edtRoleCollaborators: undefined, edtStageSettings: undefined,
-          edtCommercialStages: undefined, edtCommercialTasks: undefined,
-          edtTaskNames: undefined,
-        };
+        draft = copyQuotationDraft(previous, sourceProjectId, projectId);
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
         currency = source.currency as typeof currency;
         tax = source.tax as typeof tax;
@@ -455,7 +468,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const [created] = await tx.insert(quotationVersions).values({
         quotationId: quotation.id,
         versionNumber: next,
-        name: aiPoc ? `IA KDM (demo) · versión ${next}` : input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client.slice(0, 170)}` : `Versión ${next}`,
+        name: aiPoc ? `IA ${aiPoc.proposal.sourceMode === 'drive' ? 'Drive' : 'KDM (demo)'} · versión ${next}` : input.simulation ? `Simulación IA · ${input.simulation.analysis.project.client.slice(0, 170)}` : `Versión ${next}`,
         status: 'draft',
         origin,
         aiReviewStatus,
@@ -473,7 +486,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId: created.id, actorUserId: userId, action: 'draft_created',
         metadata: { origin, sourceVersionId: input.sourceVersionId ?? null,
           sourceProjectId: input.sourceVersionId ? (input.sourceProjectId ?? projectId) : null,
-          simulation: input.simulation ? 'simulated_fixture' : aiPoc ? 'kdm_demo' : null,
+          simulation: input.simulation ? 'simulated_fixture' : aiPoc ? (aiPoc.proposal.sourceMode === 'drive' ? null : 'kdm_demo') : null,
           provider: aiPoc?.proposal.provider ?? null,
           proposedHours: aiPoc?.proposal.totalHours ?? null },
       });
@@ -503,6 +516,51 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     const draft = quotationDraftDataSchema.parse(version.draft);
     const edt = draft.aiPoc?.edt;
     if (!metadata.moduleIds) return null;
+    // Recuperar referencias de copias comerciales locales que perdieron la EDT
+    // al clonarse. La evidencia IA sigue en la versión fuente; nunca se modifica
+    // el snapshot histórico aprobado ni se crean tareas con fechas ficticias.
+    let referenceDraft = draft;
+    if (version.origin === 'copy' && !edt) {
+      let cursorVersionId = version.id;
+      const visited = new Set<string>();
+      for (let hops = 0; hops < 8 && !visited.has(cursorVersionId); hops++) {
+        visited.add(cursorVersionId);
+        const [creation] = await this.db.select({ metadata: quotationEvents.metadata })
+          .from(quotationEvents)
+          .where(and(
+            eq(quotationEvents.versionId, cursorVersionId),
+            eq(quotationEvents.action, 'draft_created'),
+          ))
+          .orderBy(desc(quotationEvents.occurredAt)).limit(1);
+        const lineage = creation?.metadata as {
+          sourceVersionId?: unknown; sourceProjectId?: unknown;
+        } | undefined;
+        // No utilizar referencias procedentes de otra cotización/proyecto.
+        if (lineage?.sourceProjectId !== projectId ||
+            typeof lineage.sourceVersionId !== 'string') break;
+        const [source] = await this.db.select({
+          id: quotationVersions.id,
+          origin: quotationVersions.origin,
+          draft: quotationVersions.draft,
+          totalHours: quotationVersions.totalHours,
+        }).from(quotationVersions).where(and(
+          eq(quotationVersions.id, lineage.sourceVersionId),
+          eq(quotationVersions.quotationId, quotation.id),
+        )).limit(1);
+        if (!source) break;
+        const parsed = quotationDraftDataSchema.safeParse(source.draft);
+        if (!parsed.success) break;
+        if (source.origin === 'ai' &&
+            matchingCopiedQuotationReferenceSource(
+              draft, parsed.data, Number(version.totalHours), Number(source.totalHours),
+            )) {
+          referenceDraft = parsed.data;
+          break;
+        }
+        if (source.origin !== 'copy' || parsed.data.aiPoc?.edt) break;
+        cursorVersionId = source.id;
+      }
+    }
     const commercialModules = draft.mode === 'phases' && draft.phases.length
       ? draft.phases.map((phase) => ({
           name: phase.name,
@@ -513,11 +571,21 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         }));
     const positive = commercialModules.filter((module) => module.hours > 0);
     if (metadata.moduleIds.length !== positive.length) return null;
-    const references = buildQuotationTransferReferences(draft,
-      positive.map((module, index) => ({
-        moduleId: metadata.moduleIds![index]!,
-        name: module.name, totalHours: module.hours,
-      })));
+    // El reparto vigente por equipo y sus bloques procede siempre de la
+    // versión transferida, aunque las tareas sean referencias de su origen IA.
+    const targets = positive.map((module, index) => ({
+      moduleId: metadata.moduleIds![index]!,
+      name: module.name, totalHours: module.hours,
+    }));
+    const commercialReferences = buildQuotationTransferReferences(draft, targets);
+    const originalReferences = referenceDraft === draft ? commercialReferences
+      : buildQuotationTransferReferences(referenceDraft, targets);
+    const references = {
+      modules: commercialReferences.modules.map((module, index) => ({
+        ...module, tasks: originalReferences.modules[index]?.tasks ?? [],
+      })),
+      unassignedTasks: originalReferences.unassignedTasks,
+    };
     return appliedQuotationPlanningSchema.parse({
       projectId, versionId: version.id, versionNumber: version.versionNumber,
       revision: metadata.revision ?? metadata.versionRevision ?? version.revision,
@@ -611,12 +679,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const draft = quotationDraftDataSchema.parse(version.draft);
       const snapshot = draft.aiPoc;
       const edt = snapshot?.edt;
-      if (!snapshot || !edt || snapshot.source !== 'kdm_demo' ||
-          edt.source !== 'kdm_demo' || edt.provider !== 'gemini' ||
-          snapshot.proposal.provider !== 'gemini' ||
+      if (!snapshot || !edt || !['kdm_demo', 'drive'].includes(snapshot.source) ||
+          edt.source !== snapshot.source ||
+          !['gemini', 'openai'].includes(edt.provider) ||
+          snapshot.proposal.provider !== edt.provider ||
           snapshot.proposal.projectId !== projectId ||
           draft.analysisProjectionStatus !== 'synced') {
-        throw new BadRequestException('EDT no conciliada o sin evidencia Gemini/KDM.');
+        throw new BadRequestException('EDT no conciliada o sin evidencia IA de la fuente declarada.');
       }
       const roles = snapshot.proposal.roles;
       const roleNames = roles.map((role) => role.role);
@@ -692,7 +761,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId, actorUserId: actorId, action: 'planning_baseline_applied',
         metadata: {
           status: 'accepted_for_planning_only', commercialApproval: false,
-          source: 'kdm_demo', moduleIds, revision: input.revision,
+          source: snapshot.source, moduleIds, revision: input.revision,
           totalHours: edt.totalHours,
         },
       }).returning();
@@ -700,7 +769,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       return appliedQuotationPlanningSchema.parse({
         projectId, versionId, versionNumber: version.versionNumber,
         revision: input.revision, appliedAt: event.occurredAt.toISOString(),
-        appliedByUserId: actorId, source: 'kdm_demo',
+        appliedByUserId: actorId, source: snapshot.source,
         status: 'accepted_for_planning_only', commercialApproval: false,
         totalHours: edt.totalHours,
         modules: edt.modules.map((module, index) => ({
@@ -857,7 +926,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       validateCommercial(() => assertDirectClientApprovalAcknowledged(
         current.status as 'draft' | 'sent', input.confirmWithoutSend,
       ));
-      assertQuotationReadyForClient(toVersion(current));
+      validateCommercial(() => assertQuotationReadyForClient(toVersion(current)));
       if (process.env.NODE_ENV === 'production' &&
           quotationDraftDataSchema.parse(current.draft).aiPoc?.source === 'kdm_demo') {
         throw new ConflictException('No se puede registrar aprobación comercial con documentación KDM de demostración.');
@@ -891,8 +960,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     });
   }
 
-  /** Traspaso SOLO de una versión aprobada, a proyecto nuevo sin ejecución.
-   * La recotización histórica debe reconciliarse con un proceso distinto. */
+  /** Traspaso inicial de una versión aprobada, sin reemplazar ejecución.
+   * Admite un proyecto Activo SOLO cuando aún contiene exclusivamente preparación
+   * comercial. La ejecución operativa exige conciliación separada. */
   async transferApproved(projectId: string, versionId: string, userId: string,
     input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
     return this.db.transaction(async (tx) => {
@@ -901,8 +971,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         eq(projects.id, projectId), isNull(projects.deletedAt),
       )).limit(1);
       if (!project || project.type !== 'development') throw new NotFoundException('Proyecto no encontrado.');
-      if (project.status !== 'draft' || project.salesStage !== 'approved') {
-        throw new ConflictException('Este traspaso inicial requiere proyecto aprobado y No iniciado.');
+      if (!['draft', 'active'].includes(project.status) || project.salesStage !== 'approved') {
+        throw new ConflictException('El traspaso requiere aprobación comercial y un proyecto No iniciado o Activo sin ejecución operativa.');
       }
       const [quotation] = await tx.select({ id: projectQuotations.id })
         .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
@@ -962,7 +1032,17 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       const commercialPreparationOnly = existingModules.length === 0 &&
         project.contractAmount === null &&
         hasOnlyUntouchedDefaultPaymentMilestones(existingPayments) &&
-        hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours));
+        ((existingHours.length === 0 && Number(project.usedHours) === 0) ||
+          hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours)));
+      // Un prospecto Activo puede registrar preventa sin ejecución. El estado
+      // Activo por sí solo no basta: se requiere ausencia de fases, horas
+      // operativas y pagos alterados para utilizar el traspaso inicial.
+      if (project.status === 'active' && !commercialPreparationOnly) {
+        throw new ConflictException(
+          'Proyecto Activo con ejecución o compromisos previos: requiere conciliación. ' +
+          'No se modificaron HH, equipos, Roadmap ni pagos.',
+        );
+      }
       const unresolvedBlockers = commercialPreparationOnly
         ? transferBlockers.filter((reason) => !(
             reason === 'HH vendidas existentes' ||
@@ -1008,19 +1088,38 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (Math.abs(sum - Number(version.totalHours)) > 0.011) {
         throw new BadRequestException('Las HH por equipo difieren del total aprobado.');
       }
+      // Fase 1 (prospecto/cotización) NO tiene calendario ni módulos.
+      // Sus HH de equipo se preservan; las HH nuevas se suman y se
+      // mantienen las filas de equipos históricos ajenos a esta cotización.
+      let transferPlan: ReturnType<typeof planCommercialPreparationTransfer>;
+      try {
+        transferPlan = planCommercialPreparationTransfer({
+          previousSoldHours: Number(project.soldHours),
+          approvedQuotationHours: Number(version.totalHours),
+          existingTeams,
+          quotationTeams: [...byTeam].map(([teamId, quotedHours]) => ({
+            teamId, quotedHours,
+          })),
+        });
+      } catch (error) {
+        throw new ConflictException(error instanceof Error ? error.message :
+          'No se pudo conciliar la Fase 1 con la cotización aprobada.');
+      }
+      const allocations = new Map(transferPlan.teamAllocations.map((row) =>
+        [row.teamId, row]));
       for (const team of draft.teams) {
+        const allocation = allocations.get(team.teamId)!;
         await tx.insert(projectTeams).values({
           projectId, teamId: team.teamId, memberCount: team.collaborators,
-          assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
+          assignedHours: allocation.combinedHours.toFixed(2),
         }).onConflictDoUpdate({
           target: [projectTeams.projectId, projectTeams.teamId],
           set: {
-            assignedHours: (byTeam.get(team.teamId) ?? 0).toFixed(2),
-            memberCount: team.collaborators,
+            // No sobrescribir el cupo, líder ni miembros del equipo histórico.
+            assignedHours: allocation.combinedHours.toFixed(2),
             updatedAt: new Date(),
           },
         });
-        // ON CONFLICT no toca leaderUserId ni project_team_members.
       }
       // Las fases comercialmente aceptadas son la fuente de verdad del
       // Roadmap inicial y de los hitos. No usar nombres de módulos Gemini que
@@ -1091,7 +1190,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new BadRequestException('Moneda de la cotización incompatible con el contrato del proyecto.');
       }
       await tx.update(projects).set({
-        soldHours: Number(version.totalHours).toFixed(2),
+        soldHours: transferPlan.projectSoldHours.toFixed(2),
         contractAmount: targetTotal.toFixed(2),
         contractCurrency: version.currency,
         updatedAt: new Date(),
@@ -1100,6 +1199,17 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId, actorUserId: userId, action: 'quotation_transferred',
         metadata: { moduleIds, versionRevision: input.revision,
           totalHours: Number(version.totalHours),
+          totalProjectHours: transferPlan.projectSoldHours,
+          uncalendarizedProspectPhase: {
+            priorSoldHours: Number(project.soldHours),
+            phase1AssignedHours: transferPlan.phase1AssignedHours,
+            existingTeams: existingTeams.map((row) => ({
+              teamId: row.teamId,
+              assignedHours: row.assignedHours === null ? null : Number(row.assignedHours),
+              memberCount: row.memberCount,
+            })),
+          },
+          phase2QuotationAllocations: transferPlan.teamAllocations,
           paymentCount: draft.paymentPlan.length,
           preservedStartDate: true,
           commercialPreparationOnly,
@@ -1115,7 +1225,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       }).returning();
       return {
         projectId, versionId, transferredAt: event!.occurredAt.toISOString(),
-        projectHours: Number(version.totalHours), teamCount: draft.teams.length,
+        projectHours: transferPlan.projectSoldHours,
+        teamCount: new Set([...existingTeams.map((team) => team.teamId), ...ids]).size,
         moduleCount: moduleIds.length,
         paymentMilestoneCount: draft.paymentPlan.length,
       };

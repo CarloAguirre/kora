@@ -32,6 +32,12 @@
   color: var(--kora-text-muted);
 }
 
+.activityHint {
+  margin: 0;
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+}
+
 /* ── Aviso de datos faltantes ─────────────────────────── */
 
 .alert {

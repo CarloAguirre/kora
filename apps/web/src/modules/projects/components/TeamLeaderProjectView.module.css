@@ -389,3 +389,19 @@
   color: var(--kora-danger);
   margin-top: 2px;
 }
+
+
+/* Solo cuando la tabla del PM presenta tareas de la cotización aún no asignadas. */
+.badgeUnassigned {
+  background: #eee9ff;
+  color: #6233bc;
+}
+
+.rowPendingBlock { opacity: .7; background: #f6f7f9; }
+.blockMessage { display: block; font-size: 11px; color: #69758a; margin-top: 5px; font-weight: 400; line-height: 1.4; }
+.blockUndo { border: 0; background: transparent; text-decoration: underline; color: #546276; cursor: pointer; font-size: 12px; }
+.blockUndo:hover { color: #182840; }
+
+/* Vista de entregas alineada con el prototipo de seis columnas. */
+.deliverySubtitle{margin:1px 0 9px;color:var(--kora-text-muted);font-size:12px;line-height:1.5}
+.deliveryDateInput{border:1px solid var(--kora-border);border-radius:var(--kora-radius-sm);padding:9px 11px;font:inherit;background:var(--kora-surface);color:var(--kora-navy);max-width:250px}

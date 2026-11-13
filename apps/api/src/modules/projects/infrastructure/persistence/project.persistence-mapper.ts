@@ -29,6 +29,7 @@ export interface ProjectRow {
   estimatedDeliveryDate: Date | null;
   soldHours: string;
   usedHours: string;
+  historicalHoursAdjustment: string;
   expectedProgress: number | null;
   actualProgress: number | null;
   supportPlanDescription: string | null;
@@ -64,6 +65,7 @@ export interface ProjectRow {
   periodReportAchievements: string[] | null;
   contractAmount: string | null;
   contractCurrency: ProjectContractCurrency;
+  isInternal: boolean;
   pendingManagementApproval: boolean;
   hito0At: Date | null;
   hito0Source: string | null;
@@ -93,6 +95,7 @@ export function toDomain(row: ProjectRow): Project {
     estimatedDeliveryDate: row.estimatedDeliveryDate,
     soldHours: Number(row.soldHours),
     usedHours: Number(row.usedHours),
+    historicalHoursAdjustment: Number(row.historicalHoursAdjustment),
     expectedProgress: row.expectedProgress,
     actualProgress: row.actualProgress,
     supportPlanDescription: row.supportPlanDescription,
@@ -128,6 +131,7 @@ export function toDomain(row: ProjectRow): Project {
     periodReportAchievements: row.periodReportAchievements,
     contractAmount: row.contractAmount === null ? null : Number(row.contractAmount),
     contractCurrency: row.contractCurrency,
+    isInternal: row.isInternal,
     pendingManagementApproval: row.pendingManagementApproval,
     hito0At: row.hito0At,
     hito0Source: row.hito0Source as ProjectHito0Source | null,
@@ -159,6 +163,7 @@ export function toPersistence(project: Project) {
     estimatedDeliveryDate: snapshot.estimatedDeliveryDate,
     soldHours: String(snapshot.soldHours),
     usedHours: String(snapshot.usedHours),
+    historicalHoursAdjustment: String(snapshot.historicalHoursAdjustment),
     expectedProgress: snapshot.expectedProgress,
     actualProgress: snapshot.actualProgress,
     supportPlanDescription: snapshot.supportPlanDescription,
@@ -194,6 +199,7 @@ export function toPersistence(project: Project) {
     periodReportAchievements: snapshot.periodReportAchievements,
     contractAmount: snapshot.contractAmount === null ? null : String(snapshot.contractAmount),
     contractCurrency: snapshot.contractCurrency,
+    isInternal: snapshot.isInternal,
     pendingManagementApproval: snapshot.pendingManagementApproval,
     hito0At: snapshot.hito0At,
     hito0Source: snapshot.hito0Source,

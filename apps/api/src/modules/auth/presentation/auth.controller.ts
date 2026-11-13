@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Optional, Post, Req, Res } from '@nestjs/common';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import {
   AUTH_ERROR_CODES,
@@ -32,6 +32,7 @@ import { SetPasswordUseCase } from '../application/use-cases/set-password.use-ca
 import { RequestPasswordResetUseCase } from '../application/use-cases/request-password-reset.use-case';
 import { GetCurrentUserUseCase } from '../application/use-cases/get-current-user.use-case';
 import { AppConfigService } from '../../../config/app-config.service';
+import { GoogleDriveOAuthPocService, renderDriveOAuthPocResult } from '../../../shared/infrastructure/auth/google-drive-oauth-poc.service';
 import {
   GOOGLE_OAUTH_CLIENT,
   type GoogleOAuthClient,
@@ -39,6 +40,7 @@ import {
 
 const REFRESH_COOKIE = 'kora_refresh';
 const GOOGLE_STATE_COOKIE = 'kora_google_state';
+const DRIVE_POC_STATE_COOKIE = 'kora_drive_poc_state';
 
 /**
  * Endpoints de autenticación.
@@ -63,6 +65,8 @@ export class AuthController {
     private readonly currentUser: GetCurrentUserUseCase,
     private readonly config: AppConfigService,
     @Inject(GOOGLE_OAUTH_CLIENT) private readonly googleClient: GoogleOAuthClient,
+    // Optional para que los tests antiguos de login sigan construyendo el controlador.
+    @Optional() private readonly driveOAuthPoc?: GoogleDriveOAuthPocService,
   ) {}
 
   @Public()
@@ -123,6 +127,26 @@ export class AuthController {
     @Res({ passthrough: false }) reply: FastifyReply,
   ): Promise<void> {
     const query = request.query as Record<string, string | undefined>;
+    // La prueba Drive conserva este mismo callback registrado en Google Cloud,
+    // pero NUNCA canjea su código por sesión de Kora ni toca la cookie de login.
+    if (query.state?.startsWith('kora-drive-poc-')) {
+      const pocCookie = readCookie(request, DRIVE_POC_STATE_COOKIE);
+      void reply.clearCookie(DRIVE_POC_STATE_COOKIE, { path: '/' });
+      const result = this.driveOAuthPoc
+        ? await this.driveOAuthPoc.finish({
+          state: query.state,
+          stateCookie: pocCookie,
+          code: query.code,
+          error: query.error,
+        })
+        : { status: 'error' as const, code: 'POC_DISABLED', message: 'Prueba Drive no habilitada.' };
+      void reply.header('Cache-Control', 'no-store');
+      void reply.header('X-Content-Type-Options', 'nosniff');
+      void reply.header('Content-Security-Policy',
+        "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'");
+      void reply.type('text/html; charset=utf-8').send(renderDriveOAuthPocResult(result));
+      return;
+    }
     const stateCookie = readCookie(request, GOOGLE_STATE_COOKIE);
     void reply.clearCookie(GOOGLE_STATE_COOKIE, { path: '/' });
 

@@ -76,7 +76,7 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
         <div className={estimationStyles.options}>
         {([
           ['ai', '✦ Con el agente IA',
-            'Gemini analiza el documento KDM de ejemplo. Preguntas y HH reales; fuente Drive simulada.'],
+            'Gemini lee la documentación real del proyecto en Drive y prepara preguntas, EDT y HH.'],
           ['blank', 'En blanco',
             'Crea un borrador versionado en PostgreSQL con equipos y horas por definir.'],
           ['copy', 'Copiar otra cotización',
@@ -94,9 +94,8 @@ export function NewProjectQuotationModal({ project, versions, onClose }: {
       </fieldset>
 
       {mode === 'ai' && <p className={styles.demo}>
-        <strong>Fuente temporal de demostración: Requerimiento_KDM.pdf.</strong>
-        {' '}No se lee la carpeta real del proyecto. Se requiere Gemini configurado;
-        no se hará pasar un resultado simulado por uno generado por IA.
+        Kora utilizará el enlace de documentación de Extras. Si no existe, el
+        asistente solicitará una carpeta de Google Drive antes del análisis.
       </p>}
 
       {mode === 'copy' && (

@@ -98,7 +98,8 @@ export class CreateProjectUseCase
       quotationLink: data.quotationLink,
       contractLink: data.contractLink,
       additionalLinks: data.additionalLinks,
-      contractAmount: data.contractAmount ?? null,
+      isInternal: data.isInternal,
+      contractAmount: data.isInternal ? null : (data.contractAmount ?? null),
       ...(data.contractCurrency ? { contractCurrency: data.contractCurrency } : {}),
       phase: data.phase,
       status: data.status,
@@ -123,7 +124,8 @@ export class CreateProjectUseCase
             tx,
           );
         }
-        if (project.type === 'development') {
+        // Un proyecto interno no se cobra: nace sin plan de pago.
+        if (project.type === 'development' && !project.isInternal) {
           await syncPaymentPlan(
             this.paymentMilestones,
             project.id,
@@ -145,7 +147,7 @@ export class CreateProjectUseCase
       action: 'create',
       entityType: 'project',
       entityId: project.id,
-      metadata: { name: data.name, type: data.type },
+      metadata: { name: data.name, type: data.type, isInternal: project.isInternal },
     });
 
     await this.paymentTriggers.notify(project, promoted);

@@ -1,0 +1,17 @@
+.dialog[open]{max-width:min(680px,calc(100vw - 32px));border-radius:14px}
+.description{font-size:13px;line-height:1.55;color:var(--kora-text,#17263c);margin:0 0 12px}
+.summary{display:flex;flex-wrap:wrap;gap:8px 16px;padding:10px 12px;border:1px solid var(--kora-border-soft,#e3e9f0);border-radius:9px;background:var(--kora-surface-muted,#f7f9fc);font-size:12px;margin-bottom:12px}
+.scroll{max-height:min(43vh,380px);overflow:auto;border:1px solid var(--kora-border-soft,#e3e9f0);border-radius:9px}
+.table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:12px}
+.table th{position:sticky;top:0;background:var(--kora-surface-muted,#f7f9fc);color:var(--kora-text-muted,#657186);font-size:11px;font-weight:650;text-align:right;padding:10px 9px;border-bottom:1px solid var(--kora-border-soft,#e3e9f0)}
+.table th:first-child{text-align:left;width:52%}
+.table td{padding:9px;border-bottom:1px solid var(--kora-border-soft,#e3e9f0);text-align:right;font-variant-numeric:tabular-nums}
+.table tr:last-child td{border-bottom:0}
+.table td:first-child{text-align:left;overflow-wrap:anywhere}
+.table td strong{font-weight:650}
+.table small{display:block;font-size:10px;margin-top:4px;color:var(--kora-text-muted,#657186)}
+.changed{color:var(--kora-text,#17263c);font-weight:700}
+.unchanged{color:var(--kora-text-muted,#657186)}
+.footnote{font-size:11px;color:var(--kora-text-muted,#657186);margin:10px 0 0}
+.actions{display:flex;justify-content:flex-end;gap:9px;width:100%}
+@media(max-width:570px){.table th:first-child{width:45%}.table th,.table td{padding:8px 5px}.actions button{flex:1}}

@@ -4,6 +4,7 @@ import { router } from './router/routes';
 import { AuthProvider } from '@/modules/auth/context/AuthContext';
 import { ToastProvider } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
+import { SpellcheckLayer } from '@/shared/spellcheck/SpellcheckLayer';
 
 /**
  * Composición de la aplicación.
@@ -38,6 +39,7 @@ export function App() {
       <AuthProvider>
         <ToastProvider>
           <RouterProvider router={router} />
+          <SpellcheckLayer />
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>

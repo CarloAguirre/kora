@@ -122,8 +122,6 @@ export function QuotationCommercialSummary({
         {recurringYearly > 0 && <p className={styles.recurring}>
           Recurrentes: + {fmtMoney(recurringYearly)} {currency} / año
         </p>}
-        {(hourlyRate === null || hourlyRate <= 0) && hoursShown > 0 &&
-          <p className={styles.warning}>Falta el valor HH del proyecto.</p>}
         {referenceOnly && pendingProfileCount > 0 && (
           <p className={styles.warning}>
             {pendingProfileCount} perfil(es) IA aún sin equipo Kora.

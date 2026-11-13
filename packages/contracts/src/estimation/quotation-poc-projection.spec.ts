@@ -3,6 +3,8 @@ import { quotationDraftDataSchema } from './quotation.contract';
 import { effectiveQuotationEdt } from './quotation-edt-adjustments';
 import {
   projectPocRolesToQuotationDraft,
+  synchronizeQuotationEdtTeamLoad,
+  reconcilePocCommercialDraft,
   validatePocDraftIntegrity,
 } from './quotation-poc-projection';
 
@@ -41,6 +43,102 @@ const original = () => quotationDraftDataSchema.parse({
 });
 
 describe('Proyección IA Gemini KDM a cotización', () => {
+  it('proyecta una EDT Gemini real de Drive y conserva HH, documentos y origen al guardarla', () => {
+    const originalDraft = original();
+    const draft = quotationDraftDataSchema.parse({
+      ...originalDraft,
+      sourceRefs: ['drive:requerimientos-funcionales'],
+      aiPoc: {
+        ...originalDraft.aiPoc!,
+        source: 'drive',
+        proposal: {
+          ...originalDraft.aiPoc!.proposal,
+          sourceMode: 'drive',
+          summary: 'Gemini revisó documentos de Drive',
+        },
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'drive',
+          provider: 'gemini',
+          totalHours: 80,
+          reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [{
+            code: 'T01', name: 'Implementación y pruebas',
+            startWeek: 1, durationWeeks: 2, totalHours: 80,
+          }],
+          modules: [{
+            name: 'Módulo documental',
+            totalHours: 80,
+            tasks: [{
+              wbs: 'T01.01', name: 'Integración de Drive', description: 'Leer documentación real',
+              role: 'Desarrollo', hours: 80, stageCode: 'T01',
+              roleEffort: [
+                { role: 'Desarrollo', hours: 40 },
+                { role: 'QA', hours: 40 },
+              ],
+            }],
+          }],
+        },
+      },
+    });
+    const savedDraft = projectPocRolesToQuotationDraft(draft, { Desarrollo: t1, QA: t2 });
+    expect(savedDraft.aiPoc?.source).toBe('drive');
+    expect(savedDraft.aiPoc?.proposal.sourceMode).toBe('drive');
+    expect(savedDraft.aiPoc?.edt?.source).toBe('drive');
+    expect(savedDraft.sourceRefs).toEqual(['drive:requerimientos-funcionales']);
+    expect(savedDraft.analysisProjectionStatus).toBe('synced');
+    expect(savedDraft.teams).toHaveLength(2);
+    expect(savedDraft.phases).toHaveLength(1);
+    expect(savedDraft.phases[0]?.teamHours).toEqual([
+      { teamId: t1, hours: 40 },
+      { teamId: t2, hours: 40 },
+    ]);
+    expect(() => validatePocDraftIntegrity(draft, savedDraft)).not.toThrow();
+    const forged = structuredClone(savedDraft);
+    forged.aiPoc!.source = 'kdm_demo';
+    expect(() => projectPocRolesToQuotationDraft(forged, { Desarrollo: t1, QA: t2 }))
+      .toThrow(/procedencia documental coherente/);
+    const inconsistentEdt = structuredClone(savedDraft);
+    inconsistentEdt.aiPoc!.edt!.source = 'kdm_demo';
+    expect(() => projectPocRolesToQuotationDraft(inconsistentEdt, { Desarrollo: t1, QA: t2 }))
+      .toThrow(/procedencia documental coherente/);
+  });
+
+
+  it('proyecta fase OpenAI de 300 caracteres sin romper el guardado comercial', () => {
+    const name = 'Validación documental y auditoría de operaciones '.repeat(10).slice(0, 300);
+    const draft = original();
+    const withEdt = quotationDraftDataSchema.parse({
+      ...draft,
+      aiPoc: {
+        ...draft.aiPoc!,
+        source: 'drive',
+        proposal: { ...draft.aiPoc!.proposal, provider: 'openai', sourceMode: 'drive' },
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'drive', provider: 'openai',
+          totalHours: 80, reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [{ code: 'T01', name, startWeek: 1, durationWeeks: 2, totalHours: 80 }],
+          modules: [{ name: 'Portal', totalHours: 80, tasks: [{
+            wbs: 'T01.01', name: 'Construir integración', role: 'Desarrollo', hours: 80,
+            stageCode: 'T01',
+            roleEffort: [{ role: 'Desarrollo', hours: 40 }, { role: 'QA', hours: 40 }],
+          }] }],
+        },
+      },
+    });
+    const result = projectPocRolesToQuotationDraft(withEdt, { Desarrollo: t1, QA: t2 });
+    expect(result.phases).toHaveLength(1);
+    expect(result.phases[0]?.name.length).toBeLessThanOrEqual(300);
+    expect(result.phases[0]?.name).toMatch(/^T01 · /);
+    expect(result.phases[0]?.name).toContain('…');
+    expect(result.phases[0]?.teamHours).toEqual([
+      { teamId: t1, hours: 40 }, { teamId: t2, hours: 40 },
+    ]);
+    expect(result.aiPoc?.edt?.stages?.[0]?.name).toBe(name);
+    expect(() => validatePocDraftIntegrity(withEdt, result)).not.toThrow();
+  });
+
   it('conserva 80 HH, incluso si dos roles usan el mismo equipo Kora', () => {
     const draft = original();
     const before = structuredClone(draft);
@@ -54,6 +152,125 @@ describe('Proyección IA Gemini KDM a cotización', () => {
     expect(mapped.analysisProjectionStatus).toBe('synced');
     expect(() => validatePocDraftIntegrity(draft, mapped)).not.toThrow();
     expect(draft).toEqual(before);
+  });
+
+
+  it('actualiza hh/sem por persona al cambiar dotación y plazo sin modificar las HH EDT', () => {
+    // El método solo deriva carga de EDT auténticas. El antiguo fixture de
+    // esta prueba omitía aiPoc.edt y nunca entraba en la rama que se quería probar.
+    const source = original();
+    const sourceWithEdt = quotationDraftDataSchema.parse({
+      ...source,
+      aiPoc: {
+        ...source.aiPoc!,
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'kdm_demo', provider: 'gemini',
+          totalHours: 80, reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [
+            { code: 'DEV', name: 'Desarrollo', startWeek: 1, durationWeeks: 2, totalHours: 40 },
+            { code: 'QA', name: 'QA', startWeek: 3, durationWeeks: 1, totalHours: 40 },
+          ],
+          modules: [{ name: 'Portal', totalHours: 80, tasks: [
+            { wbs: 'DEV.01', name: 'Construir API', role: 'Desarrollo',
+              hours: 40, stageCode: 'DEV',
+              roleEffort: [{ role: 'Desarrollo', hours: 40 }] },
+            { wbs: 'QA.01', name: 'Verificar flujo', role: 'QA',
+              hours: 40, stageCode: 'QA',
+              roleEffort: [{ role: 'QA', hours: 40 }] },
+          ] }],
+        },
+      },
+    });
+    const mapped = projectPocRolesToQuotationDraft(sourceWithEdt, {
+      Desarrollo: t1, QA: t2,
+    });
+    const expectedTotal = mapped.phases.flatMap((phase) => phase.teamHours)
+      .reduce((sum, item) => sum + item.hours, 0);
+    const changed = quotationDraftDataSchema.parse({
+      ...mapped,
+      teams: mapped.teams.map((team) => team.teamId === t1 ? {
+        ...team, collaborators: 4, duration: 2, hoursPerWeek: 90,
+        dedicationPercent: 50,
+      } : team),
+    });
+    const normalized = synchronizeQuotationEdtTeamLoad(changed);
+    const dev = normalized.teams.find((team) => team.teamId === t1)!;
+    expect(dev.hoursPerWeek).toBe(40); // base jornada, no media de tareas
+    expect(dev.dedicationPercent).toBe(100);
+    expect(normalized.phases.flatMap((phase) => phase.teamHours)
+      .reduce((sum, item) => sum + item.hours, 0)).toBe(expectedTotal);
+    expect(normalized.aiPoc).toEqual(mapped.aiPoc);
+    expect(changed.teams.find((team) => team.teamId === t1)?.hoursPerWeek).toBe(90);
+    const reconciled = reconcilePocCommercialDraft(changed);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.hoursPerWeek).toBe(40);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.collaborators).toBe(4);
+    expect(reconciled.teams.find((team) => team.teamId === t1)?.dedicationPercent).toBe(100);
+  });
+
+  it('no altera la fórmula de cotizaciones manuales sin EDT', () => {
+    const manual = quotationDraftDataSchema.parse({
+      mode: 'team', teams: [{
+        teamId: t1, collaborators: 3, unit: 'week', duration: 1,
+        hoursPerWeek: 33.33, dedicationPercent: 100,
+      }],
+    });
+    expect(synchronizeQuotationEdtTeamLoad(manual)).toBe(manual);
+  });
+
+
+  it('proyecta un equipo común sin sumar personas de perfiles secuenciales', () => {
+    const source = original();
+    const shared = quotationDraftDataSchema.parse({
+      ...source,
+      aiPoc: {
+        ...source.aiPoc!,
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v2',
+          source: 'kdm_demo', provider: 'gemini',
+          totalHours: 80, reservePercent: 0, reserveHours: 0, totalWithReserve: 80,
+          stages: [
+            { code: 'A', name: 'API', startWeek: 1, durationWeeks: 1, totalHours: 40 },
+            { code: 'B', name: 'QA', startWeek: 2, durationWeeks: 1, totalHours: 40 },
+          ],
+          modules: [{ name: 'Portal', totalHours: 80, tasks: [
+            { wbs: 'A.01', name: 'Construir API', role: 'Desarrollo',
+              hours: 40, stageCode: 'A',
+              roleEffort: [{ role: 'Desarrollo', hours: 40 }] },
+            { wbs: 'B.01', name: 'Validar API', role: 'QA',
+              hours: 40, stageCode: 'B',
+              roleEffort: [{ role: 'QA', hours: 40 }] },
+          ] }],
+        },
+      },
+    });
+    const sequential = projectPocRolesToQuotationDraft(shared, {
+      Desarrollo: t1, QA: t1,
+    });
+    expect(sequential.teams).toHaveLength(1);
+    expect(sequential.teams[0]?.collaborators).toBe(1);
+    expect(sequential.teams[0]?.duration).toBe(2);
+    expect(sequential.phases.map((phase) => phase.teamHours[0]?.hours)).toEqual([40, 40]);
+
+    const concurrentDraft = quotationDraftDataSchema.parse({
+      ...shared,
+      aiPoc: {
+        ...shared.aiPoc!,
+        edt: {
+          ...shared.aiPoc!.edt!,
+          stages: [
+            { code: 'A', name: 'API', startWeek: 1, durationWeeks: 1, totalHours: 40 },
+            { code: 'B', name: 'QA', startWeek: 1, durationWeeks: 1, totalHours: 40 },
+          ],
+        },
+      },
+    });
+    const parallel = projectPocRolesToQuotationDraft(concurrentDraft, {
+      Desarrollo: t1, QA: t1,
+    });
+    expect(parallel.teams[0]?.collaborators).toBe(2);
+    expect(parallel.phases.flatMap((stage) => stage.teamHours)
+      .reduce((acc, row) => acc + row.hours, 0)).toBe(80);
   });
 
   it('permite mapear distintos equipos sin perder duración original por perfil', () => {

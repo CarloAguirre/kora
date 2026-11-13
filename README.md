@@ -59,6 +59,32 @@ ejemplo, `pnpm clients && pnpm verify-clients`).
 > En PowerShell, las variables van antes del comando:
 > `$env:DATABASE_URL="postgres://..."; pnpm migrate`
 
+El journal conserva las migraciones de `master` y de calculadora, incluso cuando
+comparten prefijo numérico; no se deben renombrar ni eliminar las ya aplicadas.
+Si una base recibió migraciones de ambas ramas por separado, revisa sus hashes
+en `drizzle.__drizzle_migrations` y el esquema antes de migrar: Drizzle decide
+lo pendiente por fecha y puede omitir cambios anteriores a la última registrada.
+No borres el historial ni vuelvas a ejecutar SQL sin comprobar qué falta.
+
+La migración correctiva `0067_reconcile_quotation_roadmap_history` completa las
+tablas y columnas de cotizaciones/Roadmap omitidas por ese salto de fechas.
+Es aditiva, conserva el journal anterior y puede ejecutarse sobre bases donde
+los cambios originales ya existen. El backfill original de vínculos solo corre
+si `0051_work_block_links_and_closure` no figura aplicada; no inventa horas,
+pagos ni fechas de cierre.
+
+Antes de aplicarla en producción, crea y verifica un respaldo y ensaya en una
+copia aislada con el migrador normal. La regresión SQL comprueba preservación de
+registros e historial y una segunda ejecución sin cambios:
+
+```sh
+psql -X -v ON_ERROR_STOP=1 -d <base_de_pruebas> -f packages/db/tests/0067_reconcile_quotation_roadmap_history.sql
+```
+
+La prueba revierte su transacción; no debe ejecutarse contra producción porque
+toma bloqueos de esquema. No renumeres ni cambies las fechas de migraciones
+históricas para forzar su repetición.
+
 ### 3. Variables de entorno de la API
 
 ```sh
@@ -140,7 +166,7 @@ docs/           Arquitectura, migración y decisiones
 | M8 · Notificaciones | Implementado, con recordatorios diarios de horas |
 | M9 · Facturación | Implementado, con el rol Finanzas. Ver [`docs/DECISION-FACTURACION-PROYECTOS.md`](docs/DECISION-FACTURACION-PROYECTOS.md) |
 | Portal de cliente | Implementado. Ver [`docs/DECISION-PORTAL-CLIENTE.md`](docs/DECISION-PORTAL-CLIENTE.md) |
-| Importación de datos v1 | Desde la app, en Administración → Importar datos |
+| Importación de datos v1 | Oculta en el menú lateral; acceso directo en `/administracion/importar-datos` con el permiso correspondiente |
 
 [`docs/PLAN-MODULOS.md`](docs/PLAN-MODULOS.md) tiene el plan original de construcción y las reglas a portar de cada módulo.
 

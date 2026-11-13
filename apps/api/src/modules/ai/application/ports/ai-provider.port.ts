@@ -29,5 +29,8 @@ export interface AiStructuredRequest {
  */
 export interface AiProvider {
   readonly name: string;
-  generateStructured(input: AiStructuredRequest): Promise<unknown>;
+  /** Observador opcional de RESÚMENES provistos por Gemini; jamás razonamiento interno.
+   * Cuando se proporciona, la generación puede utilizar streaming en la misma llamada.
+   * El proveedor puede no enviar resúmenes. No persistir ni inventar fragmentos. */
+  generateStructured(input: AiStructuredRequest, onThoughtSummary?: (text: string) => void): Promise<unknown>;
 }

@@ -8,6 +8,8 @@ import type {
   UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { supportPlanApi, supportPlanKeys } from './support-plan.api';
+import { projectKeys } from './projects.api';
+import { ticketKeys } from '@/modules/tickets/api/tickets.api';
 
 export function useSupportPlanSummary(projectId: string | null) {
   return useQuery({
@@ -46,6 +48,8 @@ function useInvalidateSupportPlans(clientId?: string) {
     // El resumen de la ficha de proyecto se cachea por proyecto, no por contrato — cambiar horas o
     // proyectos cubiertos lo deja desactualizado.
     void queryClient.invalidateQueries({ queryKey: ['support-plan', 'summary'] });
+    // Registrar o anular una factura enlaza/desenlaza tickets ("Facturado"/"Por facturar").
+    void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
   };
 }
 
@@ -72,9 +76,15 @@ export function useUpdateSupportPlan(planId: string, clientId?: string) {
 
 export function useCloseSupportPlan(planId: string, clientId?: string) {
   const invalidate = useInvalidateSupportPlans(clientId);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CloseSupportPlanInput) => supportPlanApi.close(planId, input),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      // El cierre también termina el proyecto contenedor si no queda otro contrato activo.
+      void queryClient.invalidateQueries({ queryKey: projectKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -91,6 +101,23 @@ export function useMarkSupportInvoicePaid(planId: string, clientId?: string) {
   return useMutation({
     mutationFn: ({ invoiceId, input }: { invoiceId: string; input: MarkSupportInvoicePaidInput }) =>
       supportPlanApi.markInvoicePaid(invoiceId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUploadSupportInvoiceAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, file }: { invoiceId: string; file: File }) =>
+      supportPlanApi.uploadInvoiceAttachment(invoiceId, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: supportPlanKeys.details() }),
+  });
+}
+
+export function useVoidSupportInvoice(clientId?: string) {
+  const invalidate = useInvalidateSupportPlans(clientId);
+  return useMutation({
+    mutationFn: (invoiceId: string) => supportPlanApi.voidInvoice(invoiceId),
     onSuccess: () => invalidate(),
   });
 }

@@ -8,6 +8,9 @@ import { getProjectStageLabel } from '@/modules/projects/lib/project-stage-displ
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { formatMoney } from '@/shared/lib/format-money';
 import { paymentTriggerLabel } from '@/modules/projects/lib/payment-milestone-display';
+import { ProjectInvoiceDocumentButton } from '@/modules/projects/components/ProjectInvoiceDocumentButton';
+import { ProjectPaymentReceiptButton } from '@/modules/projects/components/ProjectPaymentReceiptButton';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
 
@@ -35,6 +38,7 @@ export interface ProjectMilestoneDetailPanelProps {
  * usaba la tabla — este panel no duplica esa lógica.
  */
 export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, onIssue, onMarkPaid }: ProjectMilestoneDetailPanelProps) {
+  const { can } = usePermissions();
   const { data: project } = useProjectDetail(projectId);
   const milestone = project?.paymentMilestones.find((m) => m.id === milestoneId);
 
@@ -73,10 +77,26 @@ export function ProjectMilestoneDetailPanel({ projectId, milestoneId, onClose, o
                     · vence el <strong>{formatDate(milestone.dueAt)}</strong>
                   </>
                 )}
+                {invoiced && project && (
+                  <ProjectInvoiceDocumentButton
+                    projectId={project.id}
+                    milestoneId={milestone.id}
+                    hasAttachment={milestone.hasAttachment}
+                    canManageBilling={can('billing:manage')}
+                  />
+                )}
               </p>
             )}
             {milestone.isOverdue && (
               <Badge tone="danger">Pago atrasado</Badge>
+            )}
+            {milestone.status === 'paid' && project && (
+              <ProjectPaymentReceiptButton
+                projectId={project.id}
+                milestoneId={milestone.id}
+                hasPaymentReceipt={milestone.hasPaymentReceipt}
+                canManageBilling={can('billing:manage')}
+              />
             )}
             {milestone.status === 'paid' && (
               <p className={styles.record}>

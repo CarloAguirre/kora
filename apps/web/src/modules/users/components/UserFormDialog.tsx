@@ -18,6 +18,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { AlertIcon, TrashIcon } from '@/shared/components/icons/Icons';
 import { useChangeUserStatus, useCreateUser, useUpdateUser } from '../api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { teamRequirementFor } from '../lib/team-requirement';
 
@@ -93,6 +94,7 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
       lastName: '',
       role: 'collaborator',
       teamId: null,
+      clientId: null,
       isCommercialManager: false,
       grantAccess: true,
     },
@@ -100,6 +102,10 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
 
   const selectedRole = watch('role') as RoleCode;
   const teamRequirement = teamRequirementFor(selectedRole);
+  const { data: availableClients, isLoading: loadingClients, isError: clientsError } = useClientsList({
+    page: 1, pageSize: 100, status: 'active',
+    sortField: 'companyName', sortDirection: 'asc',
+  }, { enabled: open && !isEditing && selectedRole === 'cliente' });
 
   // Al abrir, el formulario refleja al usuario que toque (o queda limpio para
   // un alta). Sin esto, reabrir el diálogo mostraría los datos del anterior.
@@ -114,6 +120,7 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
             lastName: user.lastName,
             role: user.role,
             teamId: user.team?.id ?? null,
+            clientId: null,
             isCommercialManager: user.isCommercialManager,
             grantAccess: user.hasAccountAccess,
           }
@@ -123,6 +130,7 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
             lastName: '',
             role: 'collaborator',
             teamId: null,
+            clientId: null,
             isCommercialManager: false,
             grantAccess: true,
           },
@@ -137,6 +145,10 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
     // El servidor ignora el equipo en los roles que no lo admiten; enviarlo a
     // null aquí evita mandar datos que se van a descartar.
     const teamId = teamRequirement === 'forbidden' ? null : (values.teamId ?? null);
+    if (!isEditing && values.role === 'cliente' && !values.clientId) {
+      setError('clientId', { message: 'Selecciona la empresa de este usuario cliente.' });
+      return;
+    }
 
     try {
       if (isEditing) {
@@ -168,11 +180,17 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
             : `Se actualizaron los datos de ${values.firstName} ${values.lastName}.`,
         );
       } else {
-        const created = await createUser.mutateAsync({ ...values, teamId });
+        const created = await createUser.mutateAsync({
+          ...values, teamId,
+          clientId: values.role === 'cliente' ? values.clientId : null,
+          isCommercialManager: values.role === 'cliente' ? false : values.isCommercialManager,
+        });
         onSuccess(
-          created.invitationSent
-            ? `Se creó a ${values.firstName} y se le envió la invitación.`
-            : `Se creó a ${values.firstName}, pero no se pudo enviar la invitación. Reenvíala desde el listado.`,
+          values.role === 'cliente'
+            ? `Se creó la cuenta de ${values.firstName} y se vinculó como contacto de la empresa. Los proyectos y contratos se autorizan desde su ficha en Clientes.`
+            : created.invitationSent
+              ? `Se creó a ${values.firstName} y se le envió la invitación.`
+              : `Se creó a ${values.firstName}, pero no se pudo enviar la invitación. Reenvíala desde el listado.`,
         );
       }
 
@@ -190,7 +208,9 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
           }
         }
 
-        if (error.code === 'USER_EMAIL_ALREADY_IN_USE') {
+        if (error.code === 'USER_CLIENT_COMPANY_REQUIRED') {
+          setError('clientId', { message: error.message });
+        } else if (error.code === 'USER_EMAIL_ALREADY_IN_USE') {
           setError('email', { message: error.message });
         } else if (!issues) {
           setServerError(error.message);
@@ -290,7 +310,26 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
           )}
         </div>
 
-        <div className={styles.checkboxRow}>
+        {selectedRole === 'cliente' && !isEditing && (
+          <div className={styles.portalCompany}>
+            <Select
+              label="Empresa"
+              required
+              placeholder={loadingClients ? 'Cargando empresas…' : 'Selecciona una empresa'}
+              options={(availableClients?.items ?? []).map((client) => ({
+                value: client.id, label: client.companyName,
+              }))}
+              errorText={errors.clientId?.message}
+              helperText={clientsError
+                ? 'No se pudo cargar el catálogo de empresas. Verifica tus permisos.'
+                : 'Se creará un contacto con este nombre y correo si aún no existe.'}
+              disabled={loadingClients || clientsError}
+              {...register('clientId', { setValueAs: (value: string) => value || null })}
+            />
+          </div>
+        )}
+
+        {selectedRole !== 'cliente' && <div className={styles.checkboxRow}>
           <input
             id="isCommercialManager"
             type="checkbox"
@@ -303,7 +342,7 @@ export function UserFormDialog({ open, user, teams, onClose, onSuccess, onDelete
               Aparecerá como opción al asignar la cartera comercial de un cliente.
             </span>
           </label>
-        </div>
+        </div>}
 
         {isEditing && canChangeStatus && (
           <div className={styles.checkboxRow}>

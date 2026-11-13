@@ -81,7 +81,7 @@ function chipClass(hours: number, myPendingHours: number, otherPendingHours: num
  * en v2 cuelga de `/horas/aprobaciones` por el mismo motivo.
  */
 export function TeamAvailabilityHeatmap({ teamId, teamMemberId }: { teamId: string; teamMemberId?: string | null }) {
-  const [viewMode, setViewMode] = useState<ViewMode>('weekly');
+  const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [selectedWeek, setSelectedWeek] = useState(() => currentLaborWeek());
 
   const columns = useMemo(

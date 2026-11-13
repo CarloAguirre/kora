@@ -3,6 +3,7 @@ import type { UnitOfWork } from '@kora/core';
 import { IssueProjectPaymentMilestoneInvoiceUseCase } from './issue-project-payment-milestone-invoice.use-case';
 import { Project } from '../../domain/entities/project.entity';
 import {
+  ProjectIsInternalError,
   ProjectNotApprovedForInvoicingError,
   ProjectQuotationTransferRequiredError,
   ProjectPaymentMilestoneAlreadyIssuedError,
@@ -39,7 +40,9 @@ function milestone(overrides: Partial<ProjectPaymentMilestoneRecord> = {}): Proj
   };
 }
 
-function buildProject(overrides: { salesStage?: 'prospect' | 'quoted' | 'approved'; status?: 'draft' | 'on_hold' } = {}) {
+function buildProject(
+  overrides: { salesStage?: 'prospect' | 'quoted' | 'approved'; status?: 'draft' | 'on_hold'; isInternal?: boolean } = {},
+) {
   const salesStage = overrides.salesStage ?? 'approved';
   const project = Project.create({
     id: 'project-1',
@@ -48,6 +51,7 @@ function buildProject(overrides: { salesStage?: 'prospect' | 'quoted' | 'approve
     type: 'development',
     salesStage,
     status: salesStage === 'approved' ? 'draft' : undefined,
+    isInternal: overrides.isInternal,
     now: NOW,
   }).unwrap();
   if (overrides.status === 'on_hold') project.changeStatus('on_hold', NOW);
@@ -108,6 +112,28 @@ function buildUseCase(options: {
 }
 
 describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
+  it('pasa el PDF a la misma transaccion que registra la factura y conserva Hito 0', async () => {
+    const { useCase, milestones, projects } = buildUseCase({});
+    const attachment = { name: 'factura.pdf', content: 'JVBERi0xLjQ=' };
+    const result = await useCase.execute({
+      projectId: 'project-1', milestoneId: 'milestone-1', attachment,
+      data: { folio: 'F-1', issuedAt: '2026-09-24' }, actor: ACTOR,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(milestones.markIssued).toHaveBeenCalledWith('milestone-1', expect.objectContaining({ attachment }), expect.anything());
+    expect(projects.save).toHaveBeenCalled();
+  });
+
+  it('rechaza subir la factura de un tramo que pertenece a otro proyecto', async () => {
+    const { useCase, milestones } = buildUseCase({});
+    const result = await useCase.execute({
+      projectId: 'other-project', milestoneId: 'milestone-1',
+      data: { folio: 'F-1', issuedAt: '2026-09-24' }, actor: ACTOR,
+    });
+    expect(result.isErr()).toBe(true);
+    expect(milestones.markIssued).not.toHaveBeenCalled();
+  });
+
   it('bloquea facturar si el proyecto de desarrollo no está Aprobado, y avisa a Gerencia/PMO igual', async () => {
     const { useCase, milestones, notifications } = buildUseCase({ project: buildProject({ salesStage: 'quoted' }) });
 
@@ -123,6 +149,22 @@ describe('IssueProjectPaymentMilestoneInvoiceUseCase', () => {
     expect(notifications.sendProjectInvoiceBlocked).toHaveBeenCalledWith(
       expect.objectContaining({ recipientEmail: 'gerente@kabeli.cl', projectId: 'project-1' }),
     );
+  });
+
+  it('rechaza facturar un tramo de un proyecto interno: sin Hito 0 ni correos', async () => {
+    const { useCase, milestones, projects, notifications } = buildUseCase({ project: buildProject({ isInternal: true }) });
+
+    const result = await useCase.execute({
+      milestoneId: 'milestone-1',
+      data: { folio: 'F-1', issuedAt: '2026-09-24' },
+      actor: ACTOR,
+    });
+
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectIsInternalError);
+    expect(milestones.markIssued).not.toHaveBeenCalled();
+    expect(projects.save).not.toHaveBeenCalled();
+    expect(notifications.sendProjectInvoiceBlocked).not.toHaveBeenCalled();
+    expect(notifications.sendProjectAutoActivated).not.toHaveBeenCalled();
   });
 
   it('rechaza un tramo que ya fue facturado', async () => {

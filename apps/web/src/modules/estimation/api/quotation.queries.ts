@@ -11,6 +11,17 @@ export function useProjectQuotation(projectId: string | null, enabled = true) {
   });
 }
 
+/** Solo se consulta cuando el usuario elige perfiles específicos en F03. */
+export function useQuotationActiveTeams(projectId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: quotationKeys.activeTeams(projectId),
+    queryFn: () => quotationApi.activeTeams(projectId),
+    enabled,
+    retry: false,
+    staleTime: 30_000,
+  });
+}
+
 export function useCreateQuotationVersion(projectId: string) {
   const client = useQueryClient();
   return useMutation({
@@ -19,11 +30,20 @@ export function useCreateQuotationVersion(projectId: string) {
   });
 }
 
-/** Gemini real + KDM como fuente de demostración, guardado en PostgreSQL. */
+/** La ruta normal conserva REST; con observador abre SSE para la actividad real. */
+export interface GenerateQuotationWithSummaries extends GenerateAiDemoQuotationInput {
+  readonly onThoughtSummary?: (text: string) => void;
+  readonly onPhase?: (phase: 'proposal' | 'edt' | 'saving') => void;
+  readonly onActivity?: (step: string, text: string, at: string) => void;
+  readonly onHeartbeat?: (seconds: number, phase: string) => void;
+}
 export function useGenerateAiDemoQuotationVersion(projectId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: GenerateAiDemoQuotationInput) => quotationApi.generateAiDemoDraft(projectId, input),
+    mutationFn: ({ onThoughtSummary, onPhase, onActivity, onHeartbeat, ...input }: GenerateQuotationWithSummaries) =>
+      onThoughtSummary
+        ? quotationApi.generateAiDemoDraftStream(projectId, input, onThoughtSummary, onPhase, onActivity, onHeartbeat)
+        : quotationApi.generateAiDemoDraft(projectId, input),
     onSuccess: () => client.invalidateQueries({ queryKey: quotationKeys.project(projectId) }),
   });
 }
@@ -165,7 +185,12 @@ export function useQuotationLifecycle(projectId: string) {
       quotationApi.transferApproved(projectId, versionId, {
         revision, confirmation: 'TRASPASAR_COTIZACION_APROBADA',
       }),
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh();
+      // Tras el traspaso, el líder efectivo ve de inmediato el pendiente de
+      // incorporación de colaboradores en la campanita (sin esperar al polling).
+      void client.invalidateQueries({ queryKey: ['notifications', 'reminders'] });
+    },
   });
   return { acceptAi, markSent, approveClient, transferApproved };
 }

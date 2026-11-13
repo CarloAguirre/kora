@@ -5,20 +5,26 @@ import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { useToast } from '@/shared/components/ui/Toast';
+import type { DashboardMyTask } from '@kora/contracts';
+import { useUpdateProjectModuleTask } from '@/modules/projects/api/projects.queries';
+import { ApiRequestError } from '@/shared/lib/api-client';
 import { ClockIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { HourEntryFormDialog } from '@/modules/hours/components/HourEntryFormDialog';
 import { useDashboardSummary } from '../api/dashboard.queries';
 import { DashboardMySummary } from '../components/DashboardMySummary';
-import { MyActivityPanel } from '../components/MyActivityPanel';
+import { CollaboratorDashboard } from '../components/CollaboratorDashboard';
 import { DashboardProjectsTab } from './DashboardProjectsTab';
 import { DashboardSupportTab } from './DashboardSupportTab';
+import { OvertimeReportSection } from '../components/OvertimeReportSection';
 
 const ALL_TABS = [
   { id: 'proyectos', label: 'Proyectos' },
   { id: 'soporte', label: 'Soporte' },
+  { id: 'horas-extras', label: 'Horas extra' },
 ] as const;
+type DashboardTab = (typeof ALL_TABS)[number]['id'];
 
 /**
  * Panel principal — replica la disposición del `Dashboard` admin de la v1
@@ -36,16 +42,22 @@ export function DashboardPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const toast = useToast();
+  const completeAfterHours = useUpdateProjectModuleTask();
   const isCollaborator = user?.role === 'collaborator';
   // `leader` ya no tiene `billing:read` (no debe entrar a Facturación), pero esta tab es
   // de métricas de soporte, no de facturación — se mantiene visible para ese rol aparte.
   const showSupportTab = can('billing:read') || user?.role === 'leader';
-  const tabs = showSupportTab ? ALL_TABS : ALL_TABS.filter((t) => t.id !== 'soporte');
-  const [tab, setTab] = useState<'proyectos' | 'soporte'>('proyectos');
+  // Horas extra de las personas a cargo: PMO/admin ya tienen la vista general en Administración.
+  const showOvertimeTab = user?.role === 'leader';
+  const tabs = ALL_TABS.filter(
+    (t) => (t.id !== 'soporte' || showSupportTab) && (t.id !== 'horas-extras' || showOvertimeTab),
+  );
+  const [tab, setTab] = useState<DashboardTab>('proyectos');
   const [weekStart, setWeekStart] = useState<string | undefined>(undefined);
   const [registerHoursOpen, setRegisterHoursOpen] = useState(false);
+  const [taskAfterHours, setTaskAfterHours] = useState<DashboardMyTask | null>(null);
   const { data: summary, isLoading } = useDashboardSummary(weekStart);
-  const activeTab = tab === 'soporte' && !showSupportTab ? 'proyectos' : tab;
+  const activeTab = tabs.some((t) => t.id === tab) ? tab : 'proyectos';
 
   // `cliente` no tiene ningún permiso de este dashboard interno (KPIs,
   // aprobaciones, forecast…): su "inicio" es el portal de solo-lectura de su
@@ -62,31 +74,40 @@ export function DashboardPage() {
   return (
     <DashboardLayout title="Dashboard Principal">
       <div className={styles.page}>
-        <div className={styles.topRow}>
-          {isCollaborator ? <div /> : <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setTab(id as 'proyectos' | 'soporte')} />}
-          <div className={styles.actions}>
-            {can('hours:register') && (
-              <Button iconLeft={<ClockIcon size={16} />} onClick={() => setRegisterHoursOpen(true)}>
-                Registrar Horas
-              </Button>
-            )}
+        {!isCollaborator && (
+          <div className={styles.topRow}>
+            <Tabs tabs={tabs} activeId={activeTab} onSelect={(id) => setTab(id as DashboardTab)} />
+            <div className={styles.actions}>
+              {can('hours:register') && (
+                <Button iconLeft={<ClockIcon size={16} />} onClick={() => setRegisterHoursOpen(true)}>
+                  Registrar Horas
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {isCollaborator ? (
-          <>
-            <DashboardMySummary hours={null} approvals={null} tickets={summary?.tickets ?? null} loading={isLoading} />
-            <MyActivityPanel
-              hours={summary?.hours ?? null}
-              myActiveProjects={summary?.myActiveProjects ?? []}
-              myTasks={summary?.myTasks ?? []}
-              myDeliveries={summary?.myDeliveries ?? []}
-              planning={summary?.planning ?? null}
-              loading={isLoading}
-              weekStart={weekStart}
-              onWeekStartChange={setWeekStart}
-            />
-          </>
+          <CollaboratorDashboard
+            firstName={user?.firstName ?? ''}
+            teamName={summary?.planning?.teamName ?? null}
+            activeProjectCount={summary?.myActiveProjects.length ?? 0}
+            tasks={summary?.myTasks ?? []}
+            hours={summary?.hours ?? null}
+            planning={summary?.planning ?? null}
+            weekStart={weekStart}
+            onWeekStartChange={setWeekStart}
+            loading={isLoading}
+            canRegisterHours={can('hours:register')}
+            onRegisterHours={() => {
+              setTaskAfterHours(null);
+              setRegisterHoursOpen(true);
+            }}
+            onRegisterHoursAndComplete={(task) => {
+              setTaskAfterHours(task);
+              setRegisterHoursOpen(true);
+            }}
+          />
         ) : (
           <>
             {user?.role === 'leader' && (
@@ -100,7 +121,7 @@ export function DashboardPage() {
               />
             )}
 
-            {activeTab === 'proyectos' ? (
+            {activeTab === 'proyectos' && (
               <DashboardProjectsTab
                 projects={summary?.projects ?? null}
                 capacity={summary?.capacity ?? null}
@@ -108,9 +129,9 @@ export function DashboardPage() {
                 weekStart={weekStart}
                 onWeekStartChange={setWeekStart}
               />
-            ) : (
-              <DashboardSupportTab support={summary?.support ?? null} loading={isLoading} />
             )}
+            {activeTab === 'soporte' && <DashboardSupportTab support={summary?.support ?? null} loading={isLoading} />}
+            {activeTab === 'horas-extras' && <OvertimeReportSection scope="team" />}
           </>
         )}
       </div>
@@ -118,10 +139,36 @@ export function DashboardPage() {
       <HourEntryFormDialog
         open={registerHoursOpen}
         entry={null}
-        onClose={() => setRegisterHoursOpen(false)}
-        onSuccess={(message) => {
-          toast.success(message);
+        initialTask={taskAfterHours ? {
+          projectId: taskAfterHours.projectId,
+          moduleId: taskAfterHours.moduleId,
+          taskId: taskAfterHours.id,
+          taskTitle: taskAfterHours.title,
+        } : undefined}
+        onClose={() => {
           setRegisterHoursOpen(false);
+          setTaskAfterHours(null);
+        }}
+        onSuccess={(message) => {
+          setRegisterHoursOpen(false);
+          const pendingTask = taskAfterHours;
+          setTaskAfterHours(null);
+          if (!pendingTask) {
+            toast.success(message);
+            return;
+          }
+          // No modificar la tarea si el registro se cancela o falla.
+          // El alta ya quedó persistida: si falla el cambio de estado, avisar explícitamente.
+          void completeAfterHours.mutateAsync({
+            projectId: pendingTask.projectId,
+            moduleId: pendingTask.moduleId,
+            taskId: pendingTask.id,
+            input: { status: 'in_review' },
+          }).then(
+            () => toast.success('Horas registradas y tarea enviada a aprobación.'),
+            (error: unknown) => toast.error('Las horas quedaron registradas, pero no se pudo completar la tarea: ' +
+              (error instanceof ApiRequestError ? error.message : 'vuelve a intentarlo.')),
+          );
         }}
       />
     </DashboardLayout>

@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
-import type { SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
-import { SUPPORT_INVOICE_REPOSITORY, type SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
+import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
+import {
+  SUPPORT_INVOICE_REPOSITORY,
+  type SupportInvoiceRecord,
+  type SupportInvoiceRepository,
+} from '../../domain/repositories/support-invoice.repository';
 import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
 
 export interface SupportBillingCalculation {
@@ -24,9 +28,9 @@ export interface SupportBillingCalculation {
  * aprobada que aún no entró en una factura (no solo las del mes calendario —
  * si no, las horas de un mes que se cerró sin facturar quedaban sin cobrar);
  * en `bundle`, la bolsa completa de una vez en su primera factura, más el
- * excedente NUEVO desde la última; en `monthly`, reutiliza el mismo árbol de
- * decisión que `GetSupportPlanSummaryUseCase` para la cuota y el excedente
- * del período activo.
+ * excedente NUEVO desde la última; en `monthly`, la cuota del período (HH del
+ * período × valor hora) más el excedente aún no facturado de ese período y los
+ * anteriores (ver `calculateMonthly`).
  */
 @Injectable()
 export class SupportBillingCalculator {
@@ -41,10 +45,11 @@ export class SupportBillingCalculator {
     plan: SupportPlanRecord,
     linkedProjectIds: readonly string[],
     today: Date,
+    options: { readonly monthlyPeriodId?: string } = {},
   ): Promise<SupportBillingCalculation | null> {
     if (plan.planType === 'on_demand') return this.calculateOnDemand(plan, linkedProjectIds, today);
     if (plan.planType === 'bundle') return this.calculateBundle(plan, linkedProjectIds, today);
-    return this.calculateMonthly(plan, today);
+    return this.calculateMonthly(plan, today, options.monthlyPeriodId);
   }
 
   private async calculateOnDemand(
@@ -87,29 +92,124 @@ export class SupportBillingCalculator {
     };
   }
 
-  private async calculateMonthly(plan: SupportPlanRecord, today: Date): Promise<SupportBillingCalculation | null> {
+  /**
+   * Por defecto factura el período vigente; con `monthlyPeriodId`, también uno
+   * ya cerrado que quedó sin factura (nunca uno futuro: todavía no existe).
+   *
+   * Cuota del período + excedente aún no cobrado — ver `unbilledMonthlyOverageHours`.
+   */
+  private async calculateMonthly(plan: SupportPlanRecord, today: Date, monthlyPeriodId?: string): Promise<SupportBillingCalculation | null> {
     const day = toUtcDate(today);
     const periods = await this.periods.listPeriods(plan, today);
-    const current = periods.find(
-      (period) => period.status === 'active' && period.startDate.getTime() <= day.getTime() && day.getTime() < period.endDate.getTime(),
-    );
-    if (!current) return null;
+    const target = monthlyPeriodId
+      ? periods.find((period) => period.id === monthlyPeriodId && period.status !== 'cancelled' && period.startDate.getTime() <= day.getTime())
+      : periods.find(
+          (period) => period.status === 'active' && period.startDate.getTime() <= day.getTime() && day.getTime() < period.endDate.getTime(),
+        );
+    if (!target) return null;
 
-    /** Igual criterio que `GetSupportPlanSummaryUseCase.buildMonthlySummary`: el saldo reutilizado solo cuenta si la política es acumulable. */
-    const priorSurplus = plan.surplusPolicy === 'accumulate' ? current.reusedBalanceHours : 0;
-    const capacity = current.contractedHours + priorSurplus;
-    const overage = Math.max(0, current.consumedHoursPeriod - capacity);
+    const invoices = await this.invoices.listForPlan(plan.id);
+    const newOverage = unbilledMonthlyOverageHours(plan, periods, invoices, target);
 
-    const isLastPeriod = plan.endDate !== null && current.endDate.getTime() >= plan.endDate.getTime();
-    const billsOverageAsExtra = isLastPeriod && plan.surplusPolicy !== 'accumulate' && overage > 0;
+    const amountUf = round2(target.contractedHours * plan.planValueUf + newOverage * plan.extraHourValueUf);
+    if (amountUf <= 0) return null;
 
     return {
-      amountUf: round2(plan.planValueUf + (billsOverageAsExtra ? overage * plan.extraHourValueUf : 0)),
-      hoursBilled: billsOverageAsExtra ? overage : null,
-      periodKey: periodKeyOf(current.startDate),
-      monthlyPeriodId: current.id,
+      amountUf,
+      hoursBilled: newOverage > 0 ? newOverage : null,
+      periodKey: periodKeyOf(target.startDate),
+      monthlyPeriodId: target.id,
     };
   }
+}
+
+type MonthlyChargePlan = Pick<SupportPlanRecord, 'planValueUf' | 'extraHourValueUf' | 'surplusPolicy'>;
+type MonthlyChargePeriod = Pick<SupportMonthlyPeriodRecord, 'contractedHours' | 'reusedBalanceHours' | 'consumedHoursPeriod'>;
+
+/**
+ * HH de un período que superan su cupo y se cobran como hora extra. El cupo
+ * son las HH del período; con política acumulable, más el saldo no usado que
+ * arrastra de meses anteriores (igual criterio que
+ * `SupportPlanSummaryBuilder.buildMonthlySummary`).
+ */
+export function monthlyPeriodOverageHours(plan: MonthlyChargePlan, period: MonthlyChargePeriod): number {
+  const priorSurplus = plan.surplusPolicy === 'accumulate' ? period.reusedBalanceHours : 0;
+  return round2(Math.max(0, period.consumedHoursPeriod - (period.contractedHours + priorSurplus)));
+}
+
+/**
+ * Excedente que le toca cobrar a la factura de `target`: el de `target` y el
+ * del período anterior que no haya entrado en una factura.
+ *
+ * Por qué también el anterior: un mes se factura apenas empieza (o antes de
+ * terminar), cuando su excedente todavía no existe o está incompleto; lo que
+ * se registra después lo cobra la factura del mes siguiente. Por qué no más
+ * atrás: los meses viejos (también los migrados de la v1) ya están cerrados y
+ * conciliados — arrastrarlos cobraría de golpe excedentes que nadie esperaba.
+ *
+ * Se simula en orden: cada período suma su excedente a la bolsa; las facturas de
+ * cada período descuentan su `hours_billed` de lo pendiente de ese período y del
+ * anterior (primero lo más antiguo), y lo de períodos más viejos se descarta.
+ * Pura.
+ */
+export function unbilledMonthlyOverageHours(
+  plan: MonthlyChargePlan,
+  periods: readonly SupportMonthlyPeriodRecord[],
+  invoices: readonly Pick<SupportInvoiceRecord, 'monthlyPeriodId' | 'periodKey' | 'hoursBilled'>[],
+  target: SupportMonthlyPeriodRecord,
+): number {
+  const chain = periods
+    .filter((period) => period.status !== 'cancelled' && period.startDate.getTime() <= target.startDate.getTime())
+    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+  let previousPending = 0;
+  let pending = 0;
+  for (const period of chain) {
+    previousPending = pending;
+    pending = monthlyPeriodOverageHours(plan, period);
+    if (period.id === target.id) break;
+
+    let billed = invoicesOfMonthlyPeriod(invoices, period).reduce((total, invoice) => total + (invoice.hoursBilled ?? 0), 0);
+    const fromPrevious = Math.min(previousPending, billed);
+    previousPending -= fromPrevious;
+    billed -= fromPrevious;
+    pending = Math.max(0, pending - billed);
+  }
+  return round2(previousPending + pending);
+}
+
+/**
+ * Las facturas de un período mensual: las enlazadas a él por
+ * `monthlyPeriodId` o, si no hay ninguna (facturas migradas sin enlace), las
+ * de su mismo `periodKey`. Pueden ser varias — el total del período dividido.
+ */
+export function invoicesOfMonthlyPeriod<T extends Pick<SupportInvoiceRecord, 'monthlyPeriodId' | 'periodKey'>>(
+  invoices: readonly T[],
+  period: Pick<SupportMonthlyPeriodRecord, 'id' | 'startDate'>,
+): T[] {
+  const linked = invoices.filter((invoice) => invoice.monthlyPeriodId === period.id);
+  if (linked.length > 0) return linked;
+  const periodKey = periodKeyOf(period.startDate);
+  return invoices.filter((invoice) => invoice.periodKey === periodKey);
+}
+
+/**
+ * Lo que se cobra por UN período mensual, contado solo: la cuota (`planValueUf`
+ * es el valor de la HORA — así lo pide y lo muestra toda la UI, igual que en
+ * bolsa/a demanda —, así que la cuota son las HH del período × ese valor) más
+ * su excedente al valor de hora extra. Pura: la usa el calendario de
+ * facturación de la ficha del contrato para los meses sin factura; la factura
+ * real descuenta además el excedente ya cobrado (ver `calculateMonthly`).
+ */
+export function monthlyPeriodCharge(
+  plan: MonthlyChargePlan,
+  period: MonthlyChargePeriod,
+): { amountUf: number; hoursBilled: number | null } {
+  const overage = monthlyPeriodOverageHours(plan, period);
+  return {
+    amountUf: round2(period.contractedHours * plan.planValueUf + overage * plan.extraHourValueUf),
+    hoursBilled: overage > 0 ? overage : null,
+  };
 }
 
 function toUtcDate(date: Date): Date {

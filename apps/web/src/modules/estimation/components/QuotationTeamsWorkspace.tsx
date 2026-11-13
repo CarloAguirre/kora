@@ -2,8 +2,17 @@ import type { ReactNode } from 'react';
 import type { QuotationDraftData } from '@kora/contracts';
 import { quotationEdtAssignments } from '@kora/contracts';
 import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
+import { TextField } from '@/shared/components/ui/TextField';
+import { Select } from '@/shared/components/ui/Select';
+import { Badge } from '@/shared/components/ui/Badge';
+import type { QuotationTeamCapacityField } from '../lib/quotation-team-capacity-edit';
+import { quotationTeamWeeklyPlan } from './quotation-team-weekly-plan';
+import {
+  quotationTeamCapacity, KORA_QUOTATION_REFERENCE_WEEK_HOURS,
+} from './quotation-team-capacity';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
+import { QuotationCapacityInput } from './QuotationCapacityInput';
 import styles from './QuotationTeamsWorkspace.module.css';
 
 type Team = QuotationDraftData['teams'][number];
@@ -16,7 +25,8 @@ const teamName = (key: string, names: ReadonlyMap<string, string>) =>
 export function QuotationTeamsWorkspace({
   draft, editable, teamNames, activeTeams, view, onChangeView,
   onEditTeam, onToggleTeam, onEditGroupHours, onEditRoleCollaborators,
-  onEditMappedCollaborators, mappingAction,
+  onEditMappedCollaborators, onEditMappedDuration,
+  onEditTeamCapacity, mappingAction,
 }: {
   draft: QuotationDraftData;
   editable: boolean;
@@ -29,9 +39,15 @@ export function QuotationTeamsWorkspace({
   onEditGroupHours: (teamKey: string, hours: number) => void;
   onEditRoleCollaborators: (role: string, people: number) => void;
   onEditMappedCollaborators: (teamId: string, people: number) => void;
+  onEditMappedDuration: (teamId: string, weeks: number) => void;
+  onEditTeamCapacity: (teamId: string, field: QuotationTeamCapacityField, value: number) => void;
   mappingAction?: ReactNode;
 }) {
   const hasEdt = Boolean(draft.aiPoc?.edt);
+  // En blanco no hay equipos todavía: editar cualquier celda lo incorporará.
+  // La EDT IA conserva la activación explícita para proteger sus asignaciones.
+  const canStartManualTeam = !hasEdt;
+  const loadFromPlanning = hasEdt || draft.mode === 'phases';
   const all = hasEdt ? quotationEdtAssignments(draft) : [];
   const grouped = new Map<string, number>();
   for (const row of all) grouped.set(row.teamKey,
@@ -40,6 +56,7 @@ export function QuotationTeamsWorkspace({
     role.role, draft.edtRoleCollaborators?.find((item) =>
       item.role === role.role)?.collaborators ?? role.people,
   ]) ?? []);
+  const weeklyPlan = loadFromPlanning ? quotationTeamWeeklyPlan(draft) : null;
   const pendingProfiles = hasEdt
     ? [...grouped].filter(([key]) => key.startsWith('profile:')) : [];
   // Misma grilla del prototipo v5 en ambos modos: solo equipos Kora,
@@ -57,7 +74,20 @@ export function QuotationTeamsWorkspace({
     }
     const team = draft.teams.find((t) => t.teamId === teamId);
     return team ? team.collaborators * (team.unit === 'day' ? team.duration / 5 :
-      team.duration) * team.hoursPerWeek * team.dedicationPercent / 100 : 0;
+      team.duration) * team.hoursPerWeek : 0;
+  };
+  const capacityForTeam = (teamId: string) => {
+    const team = draft.teams.find((row) => row.teamId === teamId);
+    if (!team) return null;
+    const scheduled = weeklyPlan?.rows.find((row) => row.teamKey === teamId);
+    // La EDT define las semanas reales. team.duration puede venir de una
+    // versión antigua o de una edición todavía no aplicada al roadmap.
+    const effective = hasEdt && scheduled ? {
+      ...team, unit: 'week' as const,
+      duration: scheduled.lastWeek - scheduled.firstWeek + 1,
+    } : team;
+    return quotationTeamCapacity(effective, getHours(teamId),
+      scheduled, loadFromPlanning);
   };
   const columns = view === 'team' ? styles.detailedColumns : styles.compactColumns;
   return (
@@ -74,18 +104,26 @@ export function QuotationTeamsWorkspace({
       <p className={styles.caption}>
         {view === 'team'
           ? hasEdt
-            ? 'Las HH provienen de las tareas EDT. Dotación, unidad, duración, hh/semana y dedicación son referencias editables; sus cambios no multiplican ni sustituyen las HH de la EDT.'
-            : 'Horas = colaboradores × duración × hh/semana × dedicación.'
+            ? 'Las HH/sem, la dedicación y la duración del equipo se calculan desde las tareas y las fases de la EDT. Cambiar colaboradores replanifica el calendario; editar duración propone un plazo máximo que debe ser viable. Jornada de referencia: 40 HH/semana. Las HH de tareas se conservan.'
+            : 'Horas = colaboradores × duración × hh/semana. 40 hh/sem = 100% de dedicación.'
           : 'Las horas de cada equipo se suman desde las fases.'}
         {' '}Los líderes de equipo se asignan en Kora.
+        {canStartManualTeam && editable && (
+          <> Puedes marcar un equipo o editar directamente sus campos para incorporarlo.</>
+        )}
       </p>
       <div className={styles.tableScroll}>
         <div className={styles.columns + ' ' + columns}>
           <span>Equipo</span>
           <span>Nº colab.</span>
           {view === 'team' && <>
-            <span>Unidad</span><span>Duración</span><span>hh/sem</span>
-            <span>Dedicación</span>
+            <span>Unidad</span><span>Duración</span>
+            <span title={hasEdt
+              ? 'Esfuerzo de la EDT dividido por cantidad de colaboradores y semanas del equipo; media por persona, no disponibilidad máxima.'
+              : 'Horas semanales por colaborador'}>{hasEdt ? 'HH/sem reales' : 'hh/sem'}</span>
+            <span title={hasEdt
+              ? 'Carga promedio por persona sobre 40 HH semanales de referencia; no es la disponibilidad configurada.'
+              : '40 HH por semana equivale a 100%'}>{hasEdt ? 'Dedicación real %' : 'Dedicación %'}</span>
           </>}
           <span>Horas</span>
         </div>
@@ -94,6 +132,30 @@ export function QuotationTeamsWorkspace({
           const people = team?.collaborators ?? 1;
           const label = teamName(teamId, teamNames);
           const checked = Boolean(team);
+          const fieldsEditable = editable && (checked || canStartManualTeam);
+          const capacity = capacityForTeam(teamId);
+          const scheduled = weeklyPlan?.rows.find((row) => row.teamKey === teamId);
+          const effectiveDuration = hasEdt && scheduled
+            ? scheduled.lastWeek - scheduled.firstWeek + 1 : team?.duration ?? 0;
+          const warningParts: string[] = [];
+          if (capacity && loadFromPlanning && checked) {
+            if (capacity.overloadedWeeks.length) {
+              warningParts.push('Sobrecarga en semana(s) ' +
+                capacity.overloadedWeeks.join(', ') + ': pico ' +
+                fmt(capacity.peakPerPerson ?? 0) + ' HH/persona frente a ' +
+                fmt(capacity.capacityPerPerson) + ' HH/persona disponibles.');
+            } else if (capacity.overAverageCapacity) {
+              warningParts.push('Carga media superior a la dedicación disponible (' +
+                fmt(capacity.capacityPerPerson) + ' HH/persona).');
+            }
+            if (capacity.missingDuration) {
+              warningParts.push('Define una duración para distribuir la carga por colaborador.');
+            } else if (capacity.durationConflict) {
+              warningParts.push('La duración del equipo es inferior a las ' +
+                (weeklyPlan?.rows.find((row) => row.teamKey === teamId)?.activeWeeks ?? '—') +
+                ' semanas con tareas planificadas.');
+            }
+          }
           return (
             <div className={styles.line + ' ' + columns +
               (!checked ? ' ' + styles.inactive : '')} key={teamId}>
@@ -110,8 +172,8 @@ export function QuotationTeamsWorkspace({
                   <strong>{label}</strong>
                 </span>
               </label>
-              <input className={styles.number} type="number" min={1} max={100}
-                disabled={!editable || !checked}
+              <TextField className={styles.numberField} type="number" min={1} max={100}
+                disabled={!fieldsEditable}
                 aria-label={'Colaboradores de ' + label} value={people}
                 title={hasEdt ? 'Dotación de referencia; no cambia las HH de las tareas.' : undefined}
                 onChange={(e) => {
@@ -121,34 +183,61 @@ export function QuotationTeamsWorkspace({
                   else onEditTeam(teamId, { collaborators: count });
                 }}/>
               {view === 'team' && <>
-                <select disabled={!editable || !checked}
+                <Select className={styles.unitField}
+                  disabled={!fieldsEditable || hasEdt}
                   aria-label={'Unidad de ' + label} value={team?.unit ?? 'week'}
-                  onChange={(e) => onEditTeam(teamId, {
-                    unit: e.target.value as Team['unit'],
-                  })}>
-                  <option value="week">Semanas</option>
-                  <option value="day">Días</option>
-                </select>
-                <input className={styles.number} type="number" min={0} max={520}
-                  disabled={!editable || !checked}
-                  aria-label={'Duración de ' + label} value={team?.duration ?? 0}
-                  onChange={(e) => onEditTeam(teamId, {
-                    duration: Math.max(0, Number(e.target.value) || 0),
-                  })}/>
-                <input className={styles.number} type="number" min={0} max={168}
-                  disabled={!editable || !checked}
-                  aria-label={'Horas semanales de ' + label}
-                  value={team?.hoursPerWeek ?? 40}
-                  onChange={(e) => onEditTeam(teamId, {
-                    hoursPerWeek: Math.max(0, Number(e.target.value) || 0),
-                  })}/>
-                <input className={styles.number} type="number" min={0} max={100}
-                  disabled={!editable || !checked}
-                  aria-label={'Dedicación de ' + label}
-                  value={team?.dedicationPercent ?? 100}
-                  onChange={(e) => onEditTeam(teamId, {
-                    dedicationPercent: Math.max(0, Number(e.target.value) || 0),
-                  })}/>
+                  title="Al cambiar unidad se conserva la duración efectiva (5 días por semana)."
+                  options={[
+                    { value: 'week', label: 'Semanas' },
+                    { value: 'day', label: 'Días' },
+                  ]}
+                  onChange={(e) => {
+                    const unit = e.target.value as Team['unit'];
+                    const oldUnit = team?.unit ?? 'week';
+                    const duration = team?.duration ?? (canStartManualTeam ? 1 : 0);
+                    const converted = unit === oldUnit ? duration
+                      : unit === 'day' ? duration * 5 : duration / 5;
+                    // El contrato admite hasta 520: no truncar silenciosamente.
+                    if (converted > 520) return;
+                    onEditTeam(teamId, { unit, duration: converted });
+                  }} />
+                <TextField className={styles.numberField} type="number"
+                  min={hasEdt ? 1 : 0} max={520}
+                  disabled={!fieldsEditable}
+                  aria-label={'Duración de ' + label}
+                  title={hasEdt ? 'Plazo objetivo. Kora replanifica la EDT y rechaza plazos inviables.' : undefined}
+                  value={hasEdt ? effectiveDuration
+                    : team?.duration ?? (canStartManualTeam ? 1 : 0)}
+                  onChange={(e) => {
+                    const weeks = Math.max(hasEdt ? 1 : 0, Number(e.target.value) || 0);
+                    if (hasEdt) onEditMappedDuration(teamId, weeks);
+                    else onEditTeam(teamId, { duration: weeks });
+                  }}/>
+                {hasEdt ? <>
+                  <output className={styles.derivedLoad}
+                    aria-label={'HH semanales reales de ' + label}
+                    title="Media por persona calculada desde HH de tareas / colaboradores / semanas">
+                    {checked && capacity?.averagePerPerson != null
+                      ? fmt(capacity.averagePerPerson) : '—'}
+                  </output>
+                  <output className={styles.occupancy}
+                    aria-label={'Dedicación real de ' + label}
+                    title="Ocupación promedio de la jornada de referencia de 40 HH/semana">
+                    {checked && capacity?.occupationPercent != null
+                      ? fmt(capacity.occupationPercent) + '%' : '—'}
+                  </output>
+                </> : <>
+                  <QuotationCapacityInput className={styles.numberField}
+                    label={'Horas semanales de ' + label}
+                    value={team?.hoursPerWeek ?? KORA_QUOTATION_REFERENCE_WEEK_HOURS}
+                    max={KORA_QUOTATION_REFERENCE_WEEK_HOURS} disabled={!fieldsEditable}
+                    onCommit={(value) => onEditTeamCapacity(teamId, 'hoursPerWeek', value)}/>
+                  <QuotationCapacityInput className={styles.numberField}
+                    label={'Dedicación de ' + label}
+                    value={team?.dedicationPercent ?? 100} max={100}
+                    disabled={!fieldsEditable}
+                    onCommit={(value) => onEditTeamCapacity(teamId, 'dedicationPercent', value)}/>
+                </>}
               </>}
               {hasEdt && checked
                 ? <QuotationGroupHoursInput className={styles.hoursInput}
@@ -156,6 +245,11 @@ export function QuotationTeamsWorkspace({
                     disabled={!editable} value={getHours(teamId)}
                     onCommit={(hours) => onEditGroupHours(teamId, hours)}/>
                 : <strong className={styles.hours}>{checked ? fmt(getHours(teamId)) : '—'}</strong>}
+              {warningParts.length > 0 && <div className={styles.capacityWarning}
+                role="status" aria-label={'Alerta de capacidad de ' + label}>
+                <Badge tone="warning">Revisar capacidad</Badge>
+                <span>{warningParts.join(' ')}</span>
+              </div>}
             </div>
           );
         })}
@@ -178,15 +272,15 @@ export function QuotationTeamsWorkspace({
               return <div key={key} className={styles.pendingRole}>
                 <strong>{role}</strong>
                 <span>{fmt(hours)} HH propuestas</span>
-                <label>Colaboradores de referencia
-                  <input type="number" min={1} max={100} value={rolePeople.get(role) ?? 1}
-                    disabled={!editable} aria-label={'Colaboradores de ' + role}
-                    onChange={(e) => {
-                      const count = Number(e.target.value);
-                      if (Number.isInteger(count) && count >= 1 && count <= 100)
-                        onEditRoleCollaborators(role, count);
-                    }}/>
-                </label>
+                <TextField className={styles.pendingPeopleField}
+                  label="Colaboradores de referencia" type="number" min={1} max={100}
+                  value={rolePeople.get(role) ?? 1}
+                  disabled={!editable} aria-label={'Colaboradores de ' + role}
+                  onChange={(e) => {
+                    const count = Number(e.target.value);
+                    if (Number.isInteger(count) && count >= 1 && count <= 100)
+                      onEditRoleCollaborators(role, count);
+                  }} />
               </div>;
             })}
           </div>

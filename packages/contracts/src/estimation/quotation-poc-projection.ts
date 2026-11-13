@@ -6,6 +6,19 @@ import {
   type QuotationDraftData,
 } from './quotation.contract';
 
+/** El nombre comercial añade el código a un nombre EDT de hasta 300 caracteres.
+ * Ajustar solo la etiqueta visible evita un ZodError al guardar la cotización.
+ * El nombre completo se conserva en el snapshot inmutable de la EDT.
+ */
+function commercialStageName(code: string, name: string): string {
+  const prefix = code + ' · ';
+  const available = 300 - prefix.length;
+  if (available < 2) throw new Error('Código de fase incompatible con nombre comercial.');
+  const display = name.trim();
+  return prefix + (display.length <= available
+    ? display : display.slice(0, available - 1).trimEnd() + '…');
+}
+
 /** Comparación de snapshots JSON compatible con navegador y Node. */
 function sameJson(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
@@ -31,8 +44,18 @@ export function projectPocRolesToQuotationDraft(
   roleTeamIds: Readonly<Record<string, string>>,
 ): QuotationDraftData {
   const aiPoc = draft.aiPoc;
-  if (!aiPoc || aiPoc.source !== 'kdm_demo') {
-    throw new Error('El borrador no contiene una propuesta PoC de KDM.');
+  if (!aiPoc) {
+    throw new Error('El borrador no contiene una propuesta IA con procedencia documental coherente.');
+  }
+  // La propuesta, el snapshot y la EDT deben declarar el mismo origen.
+  // Preservar el fixture KDM histórico sin confundirlo con Drive real.
+  const isKdmDemo = aiPoc.source === 'kdm_demo' &&
+    aiPoc.proposal.sourceMode === 'poc_simulated';
+  const isRealDrive = aiPoc.source === 'drive' &&
+    aiPoc.proposal.sourceMode === 'drive';
+  if ((!isKdmDemo && !isRealDrive) ||
+      (aiPoc.edt && aiPoc.edt.source !== aiPoc.source)) {
+    throw new Error('El borrador no contiene una propuesta IA con procedencia documental coherente.');
   }
   const roles = aiPoc.proposal.roles;
   if (roles.length === 0 || roles.length > 100) {
@@ -110,7 +133,7 @@ export function projectPocRolesToQuotationDraft(
         }
         const edited = draft.edtStageSettings?.find((item) => item.stageCode === stage.code);
         return {
-          name: stage.code + ' · ' + (edited?.name ?? stage.name),
+          name: commercialStageName(stage.code, edited?.name ?? stage.name),
           startWeek: edited?.startWeek ?? stage.startWeek,
           durationWeeks: edited?.durationWeeks ?? stage.durationWeeks,
           teamHours: [...byTeam].map(([teamId, hours]) => ({ teamId, hours })),
@@ -148,26 +171,48 @@ export function projectPocRolesToQuotationDraft(
       });
     }
   }
-  const lastWeek = detailed && edt
-    ? Math.max(1, ...stageRows.map((stage) =>
-        stage.startWeek + stage.durationWeeks - 1))
-    : Math.max(1, ...commercialStages.map((stage) =>
-        stage.startWeek + stage.durationWeeks - 1));
+  // Cuando varios perfiles usan un mismo equipo, sus personas se COMPARTEN
+  // si la capacidad lo permite. No sumamos personal preliminar de Gemini:
+  // encontramos cuántas personas trabajan simultáneamente como máximo.
+  const peakCentsByTeam = new Map<string, Map<number, number>>();
+  if (detailed) for (const phase of phases) {
+    for (const row of phase.teamHours) {
+      const weeks = peakCentsByTeam.get(row.teamId) ?? new Map<number, number>();
+      const cents = Math.round(row.hours * 100);
+      const base = Math.floor(cents / phase.durationWeeks);
+      const remainder = cents % phase.durationWeeks;
+      for (let i = 0; i < phase.durationWeeks; i++) {
+        const week = phase.startWeek + i;
+        weeks.set(week, (weeks.get(week) ?? 0) + base + (i < remainder ? 1 : 0));
+      }
+      peakCentsByTeam.set(row.teamId, weeks);
+    }
+  }
   const teams = [...grouped.entries()].map(([teamId, group]) => {
-    const collaborators = Math.max(1, group.collaborators);
+    const peak = Math.max(0, ...(peakCentsByTeam.get(teamId)?.values() ?? []));
+    const optimizedPeople = peak ? Math.ceil(peak / (40 * 100)) : 1;
+    // Conservamos asignaciones manuales explícitas de colaboradores
+    // en remapeos posteriores (historial y revisiones del usuario).
+    const manuallyStaffed = roles.some((role) =>
+      roleTeamIds[role.role] === teamId &&
+      draft.edtRoleCollaborators?.some((entry) => entry.role === role.role));
+    const collaborators = detailed && !manuallyStaffed
+      ? optimizedPeople : Math.max(1, group.collaborators);
     if (collaborators > 100) {
       throw new Error('La cantidad de colaboradores del equipo supera 100.');
     }
-    const duration = Math.max(group.maxWeeks, detailed ? lastWeek : 1,
-      Math.ceil(group.hours / (168 * collaborators)));
+    // En EDT las semanas son actividad real del equipo, no la duración previa
+    // sugerida por Gemini para todo el proyecto.
+    const activeWeeks = detailed ? (peakCentsByTeam.get(teamId)?.size ?? 1) : group.maxWeeks;
+    const duration = Math.max(activeWeeks,
+      Math.ceil(group.hours / ((detailed ? 40 : 168) * collaborators)));
     if (duration > 520 || !Number.isFinite(duration)) {
       throw new Error('Las HH exceden el horizonte máximo de 520 semanas.');
     }
     return {
       teamId, collaborators,
       unit: 'week' as const, duration,
-      hoursPerWeek: Math.min(168,
-        Math.round(group.hours / duration / collaborators * 100) / 100),
+      hoursPerWeek: 40,
       dedicationPercent: 100,
     };
   });
@@ -183,6 +228,22 @@ export function projectPocRolesToQuotationDraft(
     throw new Error('La proyección de roles no conserva el total HH de la EDT.');
   }
   return projection;
+}
+
+
+/**
+ * En EDT los datos hoursPerWeek/dedicationPercent son disponibilidad
+ * comercial, NO carga media derivada de la EDT. Sin decisión explícita:
+ * 40 HH/semana = 100%. Se conserva el snapshot y todas las HH de Gemini.
+ */
+export function synchronizeQuotationEdtTeamLoad(draft: QuotationDraftData): QuotationDraftData {
+  if (!draft.aiPoc?.edt) return draft;
+  const customized = new Set(draft.edtCapacityCustomizedTeamIds ?? []);
+  return {
+    ...draft,
+    teams: draft.teams.map((team) => customized.has(team.teamId)
+      ? team : { ...team, hoursPerWeek: 40, dedicationPercent: 100 }),
+  };
 }
 
 /** Conserva la edición humana de colaboradores y semanas, pero nunca las HH
@@ -202,9 +263,11 @@ export function reconcilePocCommercialDraft(draft: QuotationDraftData): Quotatio
       return current ? { ...team, collaborators: current.collaborators,
         unit: current.unit,
         duration: current.duration > 0 ? current.duration : team.duration,
-        hoursPerWeek: current.hoursPerWeek > 0
-          ? current.hoursPerWeek : team.hoursPerWeek,
-        dedicationPercent: current.dedicationPercent } : team;
+        // Solo la edición comercial explícita reemplaza el valor base.
+        hoursPerWeek: draft.edtCapacityCustomizedTeamIds?.includes(team.teamId)
+          ? current.hoursPerWeek : 40,
+        dedicationPercent: draft.edtCapacityCustomizedTeamIds?.includes(team.teamId)
+          ? current.dedicationPercent : 100 } : team;
     }),
     phases: projected.phases.map((phase) => {
       const code = phase.name.split(' · ')[0];
@@ -218,7 +281,7 @@ export function reconcilePocCommercialDraft(draft: QuotationDraftData): Quotatio
     }),
     analysisProjectionStatus: 'synced',
   });
-  return merged;
+  return synchronizeQuotationEdtTeamLoad(merged);
 }
 
 /** La igualdad comercial exige equipo y HH idénticos en cada tramo.

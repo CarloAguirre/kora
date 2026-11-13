@@ -2,10 +2,13 @@ import { Module } from '@nestjs/common';
 import { TicketsController } from './presentation/tickets.controller';
 import { SupportPlansController } from './presentation/support-plans.controller';
 import { SupportInvoicesController } from './presentation/support-invoices.controller';
+import { GetSupportInvoiceAttachmentUseCase } from './application/use-cases/get-support-invoice-attachment.use-case';
+import { AttachSupportInvoiceDocumentUseCase } from './application/use-cases/attach-support-invoice-document.use-case';
 
 import { CreateTicketUseCase } from './application/use-cases/create-ticket.use-case';
 import { UpdateTicketUseCase } from './application/use-cases/update-ticket.use-case';
 import { ListTicketsUseCase } from './application/use-cases/list-tickets.use-case';
+import { ListTicketDailyHoursUseCase } from './application/use-cases/list-ticket-daily-hours.use-case';
 import { GetTicketUseCase } from './application/use-cases/get-ticket.use-case';
 import { ChangeTicketStatusUseCase } from './application/use-cases/change-ticket-status.use-case';
 import { DeleteTicketUseCase } from './application/use-cases/delete-ticket.use-case';
@@ -23,6 +26,7 @@ import { GetSupportPlanUseCase } from './application/use-cases/get-support-plan.
 import { ListSupportPlansForClientUseCase } from './application/use-cases/list-support-plans-for-client.use-case';
 import { MarkSupportInvoiceIssuedUseCase } from './application/use-cases/mark-support-invoice-issued.use-case';
 import { MarkSupportInvoicePaidUseCase } from './application/use-cases/mark-support-invoice-paid.use-case';
+import { VoidSupportInvoiceUseCase } from './application/use-cases/void-support-invoice.use-case';
 import { GetSupportBillingOverviewUseCase } from './application/use-cases/get-support-billing-overview.use-case';
 import { ListBillingLedgerEntriesUseCase } from './application/use-cases/list-billing-ledger-entries.use-case';
 import { ListSupportBillingRowsUseCase } from './application/use-cases/list-support-billing-rows.use-case';
@@ -74,9 +78,12 @@ import { HoursModule } from '../hours/hours.module';
   imports: [UsersModule, ClientsModule, ProjectsModule, HoursModule],
   controllers: [TicketsController, SupportPlansController, SupportInvoicesController],
   providers: [
+    GetSupportInvoiceAttachmentUseCase,
+    AttachSupportInvoiceDocumentUseCase,
     CreateTicketUseCase,
     UpdateTicketUseCase,
     ListTicketsUseCase,
+    ListTicketDailyHoursUseCase,
     GetTicketUseCase,
     ChangeTicketStatusUseCase,
     DeleteTicketUseCase,
@@ -94,6 +101,7 @@ import { HoursModule } from '../hours/hours.module';
     ListSupportPlansForClientUseCase,
     MarkSupportInvoiceIssuedUseCase,
     MarkSupportInvoicePaidUseCase,
+    VoidSupportInvoiceUseCase,
     GetSupportBillingOverviewUseCase,
     ListBillingLedgerEntriesUseCase,
     ListSupportBillingRowsUseCase,
@@ -115,6 +123,7 @@ import { HoursModule } from '../hours/hours.module';
     { provide: TICKET_PROJECT_READER, useClass: ProjectsModuleTicketProjectReader },
     { provide: TICKET_CODE_GENERATOR, useClass: DrizzleTicketCodeGenerator },
   ],
-  exports: [TICKET_REPOSITORY],
+  // Los contratos de soporte y sus lectores los usa también el resumen de fin de mes de `RemindersModule`.
+  exports: [GetSupportPlanUseCase, TICKET_REPOSITORY, SUPPORT_PLAN_REPOSITORY, TICKET_CLIENT_READER, TICKET_PROJECT_READER],
 })
 export class TicketsModule {}

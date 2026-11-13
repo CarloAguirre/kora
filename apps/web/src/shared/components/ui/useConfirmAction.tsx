@@ -6,6 +6,8 @@ export type ConfirmationRequest = {
   description: string;
   warning?: string;
   confirmLabel?: string;
+  cancelLabel?: string;
+  confirmVariant?: 'primary' | 'secondary' | 'danger';
   destructive?: boolean;
 };
 type Pending = ConfirmationRequest & { resolve: (confirmed: boolean) => void };
@@ -40,6 +42,8 @@ export function useConfirmAction() {
         description={pending?.description ?? ''}
         warning={pending?.warning}
         confirmLabel={pending?.confirmLabel ?? 'Confirmar'}
+        cancelLabel={pending?.cancelLabel}
+        confirmVariant={pending?.confirmVariant}
         destructive={pending?.destructive}
         onConfirm={async () => finish(true)}
         onClose={() => finish(false)}

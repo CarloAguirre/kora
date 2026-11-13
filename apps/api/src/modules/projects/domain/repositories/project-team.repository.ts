@@ -23,11 +23,22 @@ export interface ProjectTeamRecord {
   readonly teamName: string;
   readonly leaderUserId: string | null;
   readonly leaderName: string | null;
+  /** Líder efectivo para permisos: override del proyecto o líder orgánico del equipo. */
+  readonly effectiveLeaderUserId: string | null;
   readonly assignedHours: number | null;
   /** Contado en vivo desde `project_team_members` — la v1 no traía este dato, así que el valor migrado siempre es nulo. */
   readonly memberCount: number;
   /** Tope de colaboradores definido en el formulario (`project_teams.member_count`); nulo = sin tope. */
   readonly maxMembers: number | null;
+  /**
+   * HH aprobadas del líder del equipo (override del proyecto o, si no hay, el
+   * líder orgánico) cuando ese líder NO está asignado como miembro de ningún
+   * equipo del proyecto — sin esto sus horas caían en "Sin equipo" aunque
+   * figure como líder. Si lidera más de un equipo del proyecto, se le cuentan
+   * solo al primero asignado; 0 en el resto y cuando ya es miembro (sus horas
+   * ya suman por `project_team_members`).
+   */
+  readonly leaderConsumedHours: number;
 }
 
 export interface ProjectTeamRepository {

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, projectPocRolesToQuotationDraft, redistributeQuotationEdtHours, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationCommercialStage, withQuotationCommercialTask, withoutQuotationCommercialTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationEdtStage, withQuotationCommercialTask, withoutQuotationEdtTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
 import { useTeamsList } from '@/modules/teams/api/teams.queries';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { DropdownMenu } from '@/shared/components/ui/DropdownMenu';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
 import { Badge } from '@/shared/components/ui/Badge';
@@ -23,12 +24,22 @@ import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
 import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanningAcceptanceCard';
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
 import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
-import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
+import { QuotationPhaseWorkspace, referencePhasesFromEdt, nextQuotationPhaseStartWeek } from '../components/QuotationPhaseWorkspace';
+import {
+  alignQuotationEdtTeamsWithSchedule, replanQuotationEdtForWorkforce,
+} from '../lib/quotation-fulltime-plan';
 import { QuotationTeamsWorkspace } from '../components/QuotationTeamsWorkspace';
+import { QuotationHoursRedistributionDialog } from '../components/QuotationHoursRedistributionDialog';
+import { buildQuotationRedistributionPreview, type QuotationRedistributionPreview } from '../lib/quotation-hour-redistribution-preview';
+import { buildQuotationTeamCapacityEdit, type QuotationTeamCapacityField } from '../lib/quotation-team-capacity-edit';
 import { quotationAiAcceptanceBlockReason } from '../components/quotation-ai-acceptance';
 import { readQuotationTaskExcel } from '../lib/quotation-task-excel';
+import { downloadQuotationExcel, downloadQuotationPowerPoint } from '../lib/quotation-export';
+import { emptyQuotationTeam, withQuotationTeamEdit } from '../lib/quotation-blank-team';
 import { suggestedKoraTeamForRole } from '../components/quotation-role-team-suggestions';
 import { QuotationCommercialSections } from '../components/QuotationCommercialSections';
+import { QuotationDraftSaveBar } from '../components/QuotationDraftSaveBar';
+import { QuotationAiReviewBanner } from '../components/QuotationAiReviewBanner';
 import { NewProjectQuotationModal } from '../components/NewProjectQuotationModal';
 import styles from './QuotationWorkspacePage.module.css';
 
@@ -37,13 +48,13 @@ type Form = Pick<UpdateQuotationDraftInput, 'name' | 'hourlyRate' | 'currency' |
 const money = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 4 });
 const fromVersion = (version: QuotationVersion): Form => ({
   name: version.name, hourlyRate: version.hourlyRate, currency: version.currency,
-  tax: version.tax, draft: structuredClone(version.draft),
+  tax: version.tax, draft: version.draft.aiPoc?.edt
+    ? synchronizeQuotationEdtTeamLoad(structuredClone(version.draft))
+    : structuredClone(version.draft),
 });
 const numeric = (value: string): number => Math.max(0, Number(value) || 0);
 
-const emptyTeam = (teamId: string): QuotationDraftData['teams'][number] => ({
-  teamId, collaborators: 1, unit: 'week', duration: 1, hoursPerWeek: 40, dedicationPercent: 100,
-});
+const emptyTeam = emptyQuotationTeam;
 
 export function QuotationWorkspacePage() {
   const { user } = useAuth();
@@ -63,18 +74,25 @@ export function QuotationWorkspacePage() {
 
   const [form, setForm] = useState<Form | null>(null);
   const [newQuotationOpen, setNewQuotationOpen] = useState(false);
+  const [exporting, setExporting] = useState<'pptx' | 'xlsx' | null>(null);
   const [roleMappingOpen, setRoleMappingOpen] = useState(false);
   const [teamView, setTeamView] = useState<'team' | 'phases'>('phases');
   const [dirty, setDirty] = useState(false);
-  const [error, setError] = useState('');
+  const [hourPreview, setHourPreview] = useState<QuotationRedistributionPreview | null>(null);
+  // Modo de revisión IA estrictamente por versión, sin modificar el artefacto
+  // generado hasta que el usuario edite y guarde.
+  const [adjustingAiVersionId, setAdjustingAiVersionId] = useState<string | null>(null);
+  const [recentAiAcceptance, setRecentAiAcceptance] = useState<{ versionId: string; actor: string } | null>(null);
+  // Si el usuario descarta la asignación sugerida por IA, no aplicarla de nuevo
+  // sobre esa misma revisión guardada hasta que cambie de versión/revisión.
+  const dismissedAutomaticMapping = useRef<string | null>(null);
   const toast = useToast();
-  const reportError = (message: string) => { setError(message); toast.error(message); };
-  const [notice, setNotice] = useState('');
+  // Mensajes transitorios: usar siempre el snackbar nativo de Kora.
+  const reportError = (message: string) => toast.error(message);
+  const inform = (message: string) => toast.show(message);
+  const reportSampleError = reportError;
   const [sampleAnalysis, setSampleAnalysis] = useState<EstimationAnalysisArtifact | null>(null);
   const [sampleTeamMap, setSampleTeamMap] = useState<Record<string, string>>({});
-  const [sampleError, setSampleError] = useState('');
-  const reportSampleError = (message: string) => { setSampleError(message); toast.error(message); };
-  const [sampleSuccess, setSampleSuccess] = useState('');
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
 
   const quotation = quotationQuery.data;
@@ -92,14 +110,20 @@ export function QuotationWorkspacePage() {
 
   // La edición local no se sobreescribe en cada refetch, solo al cambiar de versión/revisión.
   useEffect(() => {
+    setAdjustingAiVersionId(null);
+  }, [selected?.id]);
+
+  useEffect(() => {
     setForm(selected ? fromVersion(selected) : null);
     setDirty(false);
-    setError('');
+    setHourPreview(null);
+
     setTeamView(selected?.draft.aiPoc?.edt || selected?.draft.mode === 'phases'
       ? 'phases' : 'team');
   }, [selected?.id, selected?.revision]);
 
-  const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project));
+  const quotationClosed = Boolean(quotation?.transferredVersionId);
+  const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project) && !quotationClosed);
   const editable = Boolean(mayWrite && selected?.status === 'draft' && form &&
     appliedPlan.data?.versionId !== selected?.id && !appliedPlan.isLoading);
 
@@ -108,6 +132,11 @@ export function QuotationWorkspacePage() {
   // Solo vincula si CADA perfil tiene una correspondencia única y no ambigua.
   useEffect(() => {
     if (!editable || dirty || !selected?.draft.aiPoc?.edt || !activeTeams.length) return;
+    // No iniciar ajustes silenciosos antes de que el usuario elija «Ajustar».
+    // Las cotizaciones históricas ya revisadas conservan su compatibilidad.
+    if (selected.origin === 'ai' && selected.aiReviewStatus === 'pending' &&
+        adjustingAiVersionId !== selected.id) return;
+    if (dismissedAutomaticMapping.current === selected.id + ':' + selected.revision) return;
     const evidence = selected.draft.aiPoc;
     const mapping = { ...evidence.roleTeamIds };
     if (evidence.proposal.roles.every((role) => Boolean(mapping[role.role]))) return;
@@ -121,17 +150,17 @@ export function QuotationWorkspacePage() {
       const mapped = projectPocRolesToQuotationDraft(selected.draft, mapping);
       setForm((current) => current ? { ...current, draft: mapped } : current);
       setDirty(true);
-      setNotice('Se reconocieron los equipos reales para esta EDT existente. Guarda el borrador para conservar la distribución, sin regenerar Gemini.');
+      inform('Se reconocieron los equipos reales para esta EDT existente. Guarda el borrador para conservar la distribución, sin regenerar Gemini.');
     } catch {
       // Si no concilia el artefacto histórico, preservar sus HH para revisión.
     }
-  }, [editable, dirty, selected?.id, selected?.revision, activeTeams]);
+  }, [editable, dirty, selected?.id, selected?.revision, activeTeams, adjustingAiVersionId]);
 
   const change = (update: (current: Form) => Form) => {
     setForm((current) => current ? update(current) : null);
     setDirty(true);
-    setNotice('');
-    setError('');
+
+
   };
   const updateDraft = (patch: Partial<QuotationDraftData>) =>
     change((current) => ({
@@ -149,30 +178,41 @@ export function QuotationWorkspacePage() {
   const selectVersion = async (id: string) => {
     if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
     setParams({ version: id });
-    setNotice('');
+
   };
   const newVersion = async (sourceVersionId?: string) => {
     if (!projectId || !mayWrite || createVersion.isPending) return;
     if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
-    setError('');
-    setNotice('');
+
     try {
       const created = await createVersion.mutateAsync(sourceVersionId ? { sourceVersionId } : {});
       setParams({ version: created.id });
       setForm(fromVersion(created));
       setDirty(false);
-      setNotice('Borrador ' + created.name + ' creado.');
+      inform('Borrador ' + created.name + ' creado.');
     } catch (err) {
       reportError(err instanceof Error ? err.message : 'No se pudo crear la versión.');
     }
   };
+  const discardChanges = () => {
+    if (!editable || !selected || saveDraft.isPending) return;
+    dismissedAutomaticMapping.current = selected.id + ':' + selected.revision;
+    setForm(fromVersion(selected));
+    setDirty(false);
+    setTeamView(selected.draft.aiPoc?.edt || selected.draft.mode === 'phases'
+      ? 'phases' : 'team');
+    setAdjustingAiVersionId(null);
+    inform('Se descartaron los cambios. Se restauró la versión guardada.');
+  };
+
   const save = async () => {
     if (!editable || !selected || !projectId || !form || saveDraft.isPending) return;
-    setError('');
-    setNotice('');
+
     try {
       // Contratos compartidos: validación en navegador; el servidor vuelve a validarlo.
-      const draft = quotationDraftDataSchema.parse(form.draft);
+      const current = form.draft.aiPoc?.edt
+        ? synchronizeQuotationEdtTeamLoad(form.draft) : form.draft;
+      const draft = quotationDraftDataSchema.parse(current);
       const saved = await saveDraft.mutateAsync({
         versionId: selected.id,
         input: { revision: selected.revision, name: form.name, hourlyRate: form.hourlyRate,
@@ -180,7 +220,8 @@ export function QuotationWorkspacePage() {
       });
       setForm(fromVersion(saved));
       setDirty(false);
-      setNotice('Borrador guardado. Revisión ' + saved.revision + '.');
+      setAdjustingAiVersionId(null);
+      toast.success('Cambios guardados en la versión. Revisión ' + saved.revision + '.');
     } catch (err) {
       reportError(err instanceof Error ? err.message : 'No se pudo guardar. Revisa los campos.');
     }
@@ -190,8 +231,7 @@ export function QuotationWorkspacePage() {
   const importSimulatedAnalysis = async (file?: File) => {
     setSampleAnalysis(null);
     setSampleTeamMap({});
-    setSampleError('');
-    setSampleSuccess('');
+
     if (!file) return;
     if (file.size > 1_000_000) {
       reportSampleError('El JSON supera el límite de 1 MB para este ejemplo.');
@@ -233,8 +273,7 @@ export function QuotationWorkspacePage() {
       return;
     }
     if (!await confirm({ title: 'Guardar demostración', description: 'El artefacto corresponde al ejemplo Zurich, no al análisis de este proyecto. ¿Deseas guardar una versión de DEMOSTRACIÓN explícitamente identificada?', confirmLabel: 'Guardar demostración', warning: 'No representa antecedentes reales del proyecto.' })) return;
-    setSampleError('');
-    setSampleSuccess('');
+
     try {
       const created = await createVersion.mutateAsync({
         simulation: { analysis: sampleAnalysis, roleTeamIds: sampleTeamMap },
@@ -242,8 +281,8 @@ export function QuotationWorkspacePage() {
       setParams({ version: created.id });
       setForm(fromVersion(created));
       setDirty(false);
-      setSampleSuccess('Versión de demostración creada con trazabilidad y HH verificadas.');
-      setNotice('Versión de IA simulada: pendiente de revisión.');
+      toast.success('Versión de demostración creada con trazabilidad y HH verificadas.');
+      inform('Versión de IA simulada: pendiente de revisión.');
     } catch (err) {
       reportSampleError(err instanceof Error ? err.message : 'No se pudo guardar la simulación.');
     }
@@ -264,12 +303,32 @@ export function QuotationWorkspacePage() {
   }) : null;
   const editTeamById = (teamId: string, patch: Partial<QuotationDraftData['teams'][number]>) => {
     if (!editable || !form) return;
-    const draft = {
-      ...form.draft,
-      teams: form.draft.teams.map((row) =>
-        row.teamId === teamId ? { ...row, ...patch } : row),
-    };
-    change((current) => ({ ...current, draft }));
+    change((current) => {
+      // El updater funcional evita perder la primera edición al activar un
+      // equipo en blanco y luego cambiar otra celda inmediatamente.
+      const draft = withQuotationTeamEdit(current.draft, teamId, patch);
+      if (draft === current.draft) return current;
+      // La disponibilidad del equipo no equivale a la carga real de las tareas.
+      const normalized = draft.aiPoc?.edt ? synchronizeQuotationEdtTeamLoad(draft) : draft;
+      return { ...current, draft: normalized };
+    });
+  };
+  const editTeamCapacity = (
+    teamId: string, field: QuotationTeamCapacityField, value: number,
+  ) => {
+    if (!editable || !form) return;
+    try {
+      const result = buildQuotationTeamCapacityEdit(form.draft, teamId, field, value);
+      if (result.preview) {
+        // Confirmación transaccional WBS×perfil; cancelar conserva el original.
+        setHourPreview(result.preview);
+      } else {
+        change((current) => ({ ...current, draft: result.draft }));
+      }
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message :
+        'No se pudo modificar la dedicación del equipo.');
+    }
   };
   const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
     updateDraft({ phases: phaseRows.map((row, position) =>
@@ -278,7 +337,8 @@ export function QuotationWorkspacePage() {
   const applyEdtChanges = (draft: QuotationDraftData) => {
     try {
       quotationEdtAssignments(draft); // validación del mismo contrato que usa la API
-      const saved = reconcilePocCommercialDraft(draft);
+      const saved = alignQuotationEdtTeamsWithSchedule(
+        reconcilePocCommercialDraft(draft));
       change((current) => ({ ...current, draft: saved }));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No fue posible conciliar la EDT.');
@@ -313,9 +373,10 @@ export function QuotationWorkspacePage() {
   ) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(redistributeQuotationEdtHours(form.draft, {
+      const preview = buildQuotationRedistributionPreview(form.draft, {
         teamKey, targetHours, stageCode, module,
-      }));
+      });
+      if (preview.delta !== 0) setHourPreview(preview);
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message :
         'No se pudieron redistribuir las HH de este equipo.');
@@ -360,23 +421,27 @@ export function QuotationWorkspacePage() {
   /** Las nuevas fases y tareas no modifican el artefacto de origen Gemini. */
   const addPhase = () => {
     if (!editable || !form) return;
-    if (!form.draft.aiPoc?.edt) {
-      updateDraft({ phases: [...phaseRows, {
-        name: 'Nuevo módulo', startWeek: 1, durationWeeks: 2, teamHours: [],
-      }] });
-      return;
-    }
     try {
-      const previous = [...(form.draft.aiPoc.edt.stages ?? []),
-        ...(form.draft.edtCommercialStages ?? [])];
-      const last = Math.max(0, ...previous.map((stage) =>
-        stage.startWeek + stage.durationWeeks - 1));
-      if (last >= 520) throw new Error('El calendario ya alcanzó la semana 520.');
-      const stage = {
+      // Usar el mismo calendario EFECTIVO que muestra el roadmap, no el
+      // snapshot inmutable de la IA. Las ediciones de semanas y la
+      // replanificación por colaboradores viven en edtStageSettings.
+      const visiblePhases = effectiveEdt && form.draft.aiPoc
+        ? referencePhasesFromEdt(effectiveEdt, form.draft.aiPoc.roleTeamIds,
+          teamById, form.draft)
+        : phaseRows;
+      const startWeek = nextQuotationPhaseStartWeek(visiblePhases);
+      if (startWeek > 520) throw new Error('El calendario ya alcanzó la semana 520.');
+      const durationWeeks = Math.min(2, 521 - startWeek);
+      if (!form.draft.aiPoc?.edt) {
+        updateDraft({ phases: [...phaseRows, {
+          name: 'Nuevo módulo', startWeek, durationWeeks, teamHours: [],
+        }] });
+        return;
+      }
+      applyEdtChanges(withQuotationCommercialStage(form.draft, {
         code: 'KS-' + crypto.randomUUID(), name: 'Nuevo módulo',
-        startWeek: last + 1, durationWeeks: Math.min(2, 520 - last),
-      };
-      applyEdtChanges(withQuotationCommercialStage(form.draft, stage));
+        startWeek, durationWeeks,
+      }));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo agregar la fase.');
     }
@@ -384,7 +449,7 @@ export function QuotationWorkspacePage() {
   const removeCommercialPhase = (code: string) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(withoutQuotationCommercialStage(form.draft, code));
+      applyEdtChanges(withoutQuotationEdtStage(form.draft, code));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo quitar la fase.');
     }
@@ -413,15 +478,15 @@ export function QuotationWorkspacePage() {
   const removeCommercialTask = (wbs: string) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(withoutQuotationCommercialTask(form.draft, wbs));
+      applyEdtChanges(withoutQuotationEdtTask(form.draft, wbs));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo quitar la tarea.');
     }
   };
-  const editTaskName = (wbs: string, name: string) => {
+  const editTaskName = (wbs: string, name: string, role?: string) => {
     if (!editable || !form) return;
     try {
-      applyEdtChanges(withQuotationTaskDisplayName(form.draft, wbs, name));
+      applyEdtChanges(withQuotationTaskDisplayName(form.draft, wbs, name, role));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'Nombre de tarea inválido.');
     }
@@ -444,7 +509,7 @@ export function QuotationWorkspacePage() {
         });
       }
       applyEdtChanges(next); // operación atómica: sin importación parcial
-      setNotice(records.length + ' tareas importadas a la fase. Guarda el borrador para persistirlas.');
+      inform(records.length + ' tareas importadas a la fase. Guarda el borrador para persistirlas.');
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo leer el Excel.');
     }
@@ -457,8 +522,27 @@ export function QuotationWorkspacePage() {
     ];
     applyEdtChanges({ ...form.draft, edtRoleCollaborators: next });
   };
+  const editMappedDuration = (teamId: string, maxWeeks: number) => {
+    if (!editable || !form) return;
+    try {
+      const candidate = replanQuotationEdtForWorkforce(
+        form.draft, { teamId, maxWeeks });
+      applyEdtChanges(candidate);
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message :
+        'El plazo solicitado no es viable con las tareas EDT.');
+    }
+  };
   const editMappedCollaborators = (teamId: string, collaborators: number) => {
-    editTeamById(teamId, { collaborators });
+    if (!editable || !form) return;
+    try {
+      const updated = withQuotationTeamEdit(form.draft, teamId, { collaborators });
+      // El número de personas modifica el calendario, nunca las HH de WBS.
+      applyEdtChanges(replanQuotationEdtForWorkforce(updated));
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message :
+        'No se pudo replanificar el calendario a 40 HH semanales.');
+    }
   };
   const toggleTeam = (teamId: string, checked: boolean) => {
     if (!editable || !form?.draft) return;
@@ -467,13 +551,15 @@ export function QuotationWorkspacePage() {
         reportError('Reasigna primero las tareas EDT de este equipo desde Por fases y módulos antes de desactivarlo.');
         return;
       }
-      const next = checked ? { ...form.draft, teams: [...teamRows, emptyTeam(teamId)] } :
-        { ...form.draft, teams: teamRows.filter((item) => item.teamId !== teamId) };
+      const next = checked
+        ? { ...form.draft, teams: [...teamRows, { ...emptyTeam(teamId), hoursPerWeek: 0 }] }
+        : { ...form.draft, teams: teamRows.filter((item) => item.teamId !== teamId) };
       // Una selección sin tareas todavía no pertenece a la proyección derivada.
       // No conciliar aquí: al reasignar actividades por fase sí se calcularán sus HH.
       quotationEdtAssignments(next);
-      change((current) => ({ ...current, draft: next }));
-      setNotice(checked
+      const normalized = synchronizeQuotationEdtTeamLoad(next);
+      change((current) => ({ ...current, draft: normalized }));
+      inform(checked
         ? 'Equipo incorporado. Asigna tareas desde Por fases y módulos antes de aprobar.'
         : 'Equipo sin tareas retirado de esta cotización.');
       return;
@@ -485,15 +571,32 @@ export function QuotationWorkspacePage() {
             teamHours: phase.teamHours.filter((item) => item.teamId !== teamId),
           })) });
   };
+  const exportQuotation = async (format: 'pptx' | 'xlsx') => {
+    if (!project || !selected || exporting) return;
+    if (dirty) {
+      reportError('Guarda o descarta los cambios antes de exportar la versión.');
+      return;
+    }
+    setExporting(format);
+    try {
+      const context = { project, version: selected, teamNames: teamById };
+      if (format === 'pptx') await downloadQuotationPowerPoint(context);
+      else await downloadQuotationExcel(context);
+      inform('Archivo ' + format.toUpperCase() + ' generado desde la versión guardada.');
+    } catch (error) {
+      reportError(error instanceof Error ? error.message : 'No se pudo exportar la cotización.');
+    } finally { setExporting(null); }
+  };
   const acceptAiProposal = async () => {
     if (!selected || lifecycle.acceptAi.isPending) return;
     if (aiAcceptBlockReason) { reportError(aiAcceptBlockReason); return; }
-    if (!await confirm({ title: 'Aceptar propuesta de Gemini', description: 'Aceptar la propuesta no aprueba al cliente ni traspasa el proyecto.', confirmLabel: 'Aceptar propuesta' })) return;
-    setError('');
-    setNotice('');
+    // «Usar tal cual» es la confirmación explícita del usuario.
+    // El backend vuelve a validar revisión, equipos y conciliación antes de aceptar.
     try {
       await lifecycle.acceptAi.mutateAsync({ versionId: selected.id, revision: selected.revision });
-      setNotice('Propuesta IA aceptada. La aprobación del cliente es una acción posterior.');
+      setAdjustingAiVersionId(null);
+      setRecentAiAcceptance({ versionId: selected.id, actor: user?.fullName?.trim() ?? '' });
+      toast.success('Propuesta IA aceptada. La aprobación del cliente es una acción posterior.');
     } catch (err) {
       reportError(err instanceof Error ? err.message : 'No se pudo aceptar la propuesta de IA.');
     }
@@ -502,7 +605,24 @@ export function QuotationWorkspacePage() {
   return (
     <DashboardLayout title="Proyectos" containedScroll>
       <main className={styles.page}>
-        {project && <h1 className={styles.projectTitle}>{project.name}</h1>}
+        {project && (
+          <div className={styles.projectHeading}>
+            <h1 className={styles.projectTitle}>{project.name}</h1>
+            {selected && (
+              <DropdownMenu align="right"
+                trigger={({ onClick, open }) => (
+                  <Button variant="outline" size="sm" onClick={onClick}
+                    disabled={Boolean(exporting)} loading={Boolean(exporting)}
+                    aria-haspopup="menu" aria-expanded={open}>Exportar ▾</Button>
+                )}
+                items={[
+                  { key: 'pptx', label: 'PowerPoint (.pptx)', onSelect: () => { void exportQuotation('pptx'); } },
+                  { key: 'xlsx', label: 'Excel (.xlsx)', onSelect: () => { void exportQuotation('xlsx'); } },
+                ]}
+              />
+            )}
+          </div>
+        )}
         <nav className={styles.breadcrumb} aria-label="Navegación de cotización">
           <Link to={project ? '/proyectos/' + project.slug : '/proyectos'}>‹ Volver a la ficha del proyecto</Link>
           <Link className={styles.listLink} to="/calculadora">Ver todas las cotizaciones</Link>
@@ -517,7 +637,9 @@ export function QuotationWorkspacePage() {
         {project && !mayWrite && (
           <Card>
             <strong>Consulta histórica</strong>
-            <p>Este proyecto no permite crear o editar borradores en su etapa comercial actual. Los proyectos aprobados, detenidos, finalizados o cancelados quedan en modo consulta hasta acordar el flujo de recotización.</p>
+            <p>{quotationClosed
+              ? 'Cotización cerrada: ya fue aprobada y traspasada al proyecto. Las versiones son históricas y no se pueden generar otras nuevas.'
+              : 'Este proyecto no permite crear ni editar borradores en su etapa comercial actual.'}</p>
           </Card>
         )}
 
@@ -530,33 +652,31 @@ export function QuotationWorkspacePage() {
                     <h2>Cotización · {project?.client?.companyName ?? project?.name ?? 'Proyecto'}</h2>
                   </div>
                   <Badge tone={selected?.status === 'approved' ? 'success' : selected?.status === 'sent' ? 'info' : 'neutral'}>
-                    {selected?.status === 'approved' ? 'Aprobada' : selected?.status === 'sent' ? 'Enviada' : 'Cotización'}
+                    {selected && quotation?.transferredVersionId === selected.id ? 'Cerrada · traspasada' :
+                      selected?.status === 'approved' ? 'Aprobada por el cliente' : selected?.status === 'sent' ? 'Enviada' : 'Cotización'}
                   </Badge>
                 </div>
                 <div className={styles.versions}>
                   {versions.map((version) => (
-                    <button key={version.id} type="button" onClick={() => void selectVersion(version.id)}
+                    <Button key={version.id} size="sm"
+                      variant={selected?.id === version.id ? 'secondary' : 'outline'}
+                      className={styles.version}
+                      onClick={() => void selectVersion(version.id)}
                       aria-label={'Abrir versión ' + version.versionNumber}
-                      aria-pressed={selected?.id === version.id} title={version.name}
-                      className={[styles.version, selected?.id === version.id ? styles.selected : ''].join(' ')}>
+                      aria-pressed={selected?.id === version.id} title={version.name}>
                       v{version.versionNumber}{version.origin === 'ai' ? ' ✦' : ''}
-                    </button>
+                    </Button>
                   ))}
                   {mayWrite && <>
-                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
-                      onClick={() => void newVersion(selected?.id)}>+ Nueva versión</button>
-                    <button type="button" className={styles.textAction + ' ' + styles.aiAction}
+                    <Button variant="tertiary" size="sm" disabled={createVersion.isPending}
+                      onClick={() => void newVersion(selected?.id)}>+ Nueva versión</Button>
+                    <Button variant="tertiary" size="sm" disabled={createVersion.isPending}
                       onClick={() => void (async () => {
                         if (dirty && !await confirm({ title: 'Descartar cambios', description: 'Hay cambios sin guardar. ¿Deseas descartarlos?', confirmLabel: 'Descartar', destructive: true })) return;
                         setNewQuotationOpen(true);
-                      })()}>✦ Nueva versión con IA</button>
-                    <button type="button" className={styles.textAction} disabled={createVersion.isPending}
-                      onClick={() => void newVersion()}>En blanco</button>
-                    {editable && dirty &&
-                      <Button size="sm" className={styles.saveDraftAction}
-                        loading={saveDraft.isPending} onClick={() => void save()}>
-                        Guardar borrador
-                      </Button>}
+                      })()}>✦ Nueva versión con IA</Button>
+                    <Button variant="tertiary" size="sm" disabled={createVersion.isPending}
+                      onClick={() => void newVersion()}>En blanco</Button>
                   </>}
                 </div>
                 {selected && form && <>
@@ -570,26 +690,44 @@ export function QuotationWorkspacePage() {
                     <div className={styles.statusField}>
                       <span>Estado</span>
                       <Badge tone={selected.status === 'approved' ? 'success' : selected.status === 'sent' ? 'info' : 'neutral'}>
-                        {selected.status === 'approved' ? 'Aprobada' : selected.status === 'sent' ? 'Enviada al cliente' : 'Borrador'}
+                        {quotation?.transferredVersionId === selected.id ? 'Cerrada · traspasada' :
+                          selected.status === 'approved' ? 'Aprobada por el cliente' : selected.status === 'sent' ? 'Enviada al cliente' : 'Borrador'}
                       </Badge>
                     </div>
                   </div>
-                  {selected.origin === 'ai' && selected.aiReviewStatus === 'pending' && (
-                    <div className={styles.aiBanner}>
-                      <div><strong>✦ Propuesta generada con Gemini</strong>
-                        <p>{selected.draft.aiPoc
-                          ? money(selected.draft.aiPoc.proposal.totalHours) + ' HH propuestas desde KDM de demostración y ' + selected.draft.aiPoc.answers.length + ' respuestas. '
-                          : 'Propuesta IA pendiente. '}
-                          {aiAcceptBlockReason ?? 'Revisa perfiles y HH antes de aceptar.'} La IA no define el valor HH comercial.</p>
-                      </div>
-                      {selected.draft.aiPoc && (
-                        <Button size="sm" className={styles.aiAccept}
-                          disabled={lifecycle.acceptAi.isPending}
-                          loading={lifecycle.acceptAi.isPending}
-                          onClick={() => void acceptAiProposal()}>
-                          Aceptar propuesta
-                        </Button>
-                      )}
+                  {/* Tras editar desaparece el bloque inicial, pero la aceptación IA
+                      sigue disponible para la versión guardada. Guardar los ajustes no
+                      equivale a aceptar la IA ni a registrar aprobación del cliente. */}
+                  {selected.origin === 'ai' && selected.revision === 1 &&
+                    !dirty && adjustingAiVersionId !== selected.id && (
+                    <QuotationAiReviewBanner
+                      version={selected}
+                      adjusting={adjustingAiVersionId === selected.id}
+                      editable={editable}
+                      dirty={dirty}
+                      saving={saveDraft.isPending}
+                      accepting={lifecycle.acceptAi.isPending}
+                      acceptedBy={recentAiAcceptance?.versionId === selected.id
+                        ? recentAiAcceptance.actor : undefined}
+                      onAdjust={() => setAdjustingAiVersionId(selected.id)}
+                      onAccept={() => void acceptAiProposal()}
+                      onDiscard={discardChanges}
+                      onSave={() => void save()}
+                    />
+                  )}
+                  {selected.origin === 'ai' && selected.aiReviewStatus === 'pending' &&
+                    selected.revision > 1 && (
+                    <div className={styles.aiAcceptanceAction}>
+                      <span>Propuesta IA pendiente de aceptación.</span>
+                      <Button size="sm" variant="secondary"
+                        disabled={!editable || dirty}
+                        loading={lifecycle.acceptAi.isPending}
+                        title={dirty
+                          ? 'Guarda o descarta los cambios antes de aceptar la propuesta.'
+                          : aiAcceptBlockReason ?? 'Aceptar la propuesta IA guardada, sin aprobar al cliente.'}
+                        onClick={() => void acceptAiProposal()}>
+                        Usar tal cual
+                      </Button>
                     </div>
                   )}
                 </>}
@@ -630,28 +768,37 @@ export function QuotationWorkspacePage() {
                       view={teamView}
                       onChangeView={(view) => {
                         setTeamView(view);
-                        // En una EDT las tareas son la fuente de HH. Este switch
-                        // cambia la vista, nunca la modalidad del cálculo.
-                        if (!form.draft.aiPoc?.edt) updateDraft({ mode: view });
+                        // Los tabs solo cambian el resumen superior cuando ya
+                        // existen fases o una EDT. Nunca modificar el modo de
+                        // cálculo ni ocultar la sección inferior de tareas.
+                        if (!form.draft.aiPoc?.edt && form.draft.phases.length === 0) {
+                          updateDraft({ mode: view });
+                        }
                       }}
                       onEditTeam={editTeamById}
+                      onEditTeamCapacity={editTeamCapacity}
                       onToggleTeam={toggleTeam}
                       onEditGroupHours={(teamKey, hours) =>
                         adjustEdtGroupHours(teamKey, hours)}
                       onEditRoleCollaborators={editRoleCollaborators}
                       onEditMappedCollaborators={editMappedCollaborators}
+                      onEditMappedDuration={editMappedDuration}
                       mappingAction={form.draft.aiPoc && !aiRolesMapped
-                        ? <button type="button" className={styles.mappingLink}
+                        ? <Button variant="tertiary" size="sm"
                             disabled={dirty}
                             title={dirty ? 'Guarda el borrador antes de revisar la asignación de perfiles.' : undefined}
                             onClick={() => setRoleMappingOpen(true)}>
                             ✦ Resolver correspondencia pendiente con equipos Kora
-                          </button> : null}
+                          </Button> : null}
                     />
                   </Card>
 
-                  {teamView === 'phases' &&
-                    (form.draft.mode === 'phases' || form.draft.aiPoc?.edt) && (
+                  {/* El desglose de fases permanece visible bajo ambos tabs del
+                      resumen. La fuente es la EDT o las fases de la cotización,
+                      no la opción de presentación «Por equipo». */}
+                  {(form.draft.mode === 'phases' ||
+                    Boolean(form.draft.aiPoc?.edt) ||
+                    form.draft.phases.length > 0) && (
                     <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
                       draft={form.draft}
@@ -755,7 +902,7 @@ export function QuotationWorkspacePage() {
                               options={activeTeams.map((team) => ({ value: team.id, label: team.name }))}
                               onChange={(e) => {
                                 setSampleTeamMap((mapping) => ({ ...mapping, [role.role]: e.target.value }));
-                                setSampleError('');
+
                               }} />
                           </div>
                         ))}
@@ -769,8 +916,6 @@ export function QuotationWorkspacePage() {
                       </Button>
                     </div>
                   )}
-                  {sampleError && <p className={styles.error} role="alert">{sampleError}</p>}
-                  {sampleSuccess && <p className={styles.success} role="status">{sampleSuccess}</p>}
                 </Card>
               )}
 
@@ -792,7 +937,7 @@ export function QuotationWorkspacePage() {
                 onSave={() => void save()}
                 actions={selected && project ? (
                   <QuotationCommercialLifecycleCard
-                    key={selected.id + ':' + selected.revision}
+                    key={selected.id}
                     project={project} version={selected}
                     quotation={quotation ?? null}
                     canOperate={mayWrite} hasUnsavedChanges={dirty}
@@ -801,12 +946,18 @@ export function QuotationWorkspacePage() {
                 ) : null}
               />
 
-              {dirty && <p className={styles.pendingNotice}>Guarda los cambios de la versión antes de enviar o aprobar.</p>}
-              {notice && <p role="status" className={styles.success}>{notice}</p>}
-              {error && <p role="alert" className={styles.error}>{error}</p>}
             </aside>
           </div>
         )}
+        <QuotationDraftSaveBar
+          visible={editable && (dirty || (adjustingAiVersionId === selected?.id &&
+            selected?.aiReviewStatus === 'pending' && selected?.origin === 'ai'))}
+          dirty={dirty}
+          saving={saveDraft.isPending}
+          fromAi={Boolean(selected?.draft.aiPoc)}
+          onDiscard={discardChanges}
+          onSave={() => void save()}
+        />
         <Modal open={roleMappingOpen && Boolean(selected?.draft.aiPoc)}
           title="Asignar perfiles a equipos de Kora" wide
           onClose={() => setRoleMappingOpen(false)}>
@@ -819,12 +970,32 @@ export function QuotationWorkspacePage() {
                 change((current) => ({ ...current, draft }));
                 setRoleMappingOpen(false);
                 setTeamView('phases');
-                setNotice('Perfiles asociados. Guarda el borrador para conservar la distribución.');
+                inform('Perfiles asociados. Guarda el borrador para conservar la distribución.');
               }}/>
           )}
         </Modal>
+        <QuotationHoursRedistributionDialog
+          preview={hourPreview}
+          teamName={hourPreview ? teamById.get(hourPreview.teamKey) ??
+            hourPreview.teamKey.replace(/^profile:/, '') : ''}
+          phaseName={hourPreview?.stageCode
+            ? form?.draft.phases.find((phase) =>
+                phase.name.startsWith(hourPreview.stageCode + ' · '))?.name.split(' · ').slice(1).join(' · ') ??
+              hourPreview.module ?? hourPreview.stageCode
+            : undefined}
+          onCancel={() => setHourPreview(null)}
+          onApply={() => {
+            if (!hourPreview || !editable || !form) return;
+            if (form.draft !== hourPreview.sourceDraft) {
+              setHourPreview(null);
+              reportError('El borrador cambió durante la vista previa. Vuelve a indicar las HH.');
+              return;
+            }
+            applyEdtChanges(hourPreview.nextDraft);
+            setHourPreview(null);
+          }}/>
         {confirmationDialog}
-        {project && newQuotationOpen && (
+        {project && mayWrite && newQuotationOpen && (
           <NewProjectQuotationModal project={project} versions={versions} onClose={() => setNewQuotationOpen(false)} />
         )}
       </main>

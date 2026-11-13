@@ -17,6 +17,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@kora/contracts": "workspace:*",
     "@tanstack/react-query": "^5.102.4",
+    "hunspell-asm": "4.0.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.71.0",

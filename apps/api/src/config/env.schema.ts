@@ -40,6 +40,8 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CALLBACK_URL: z.string().optional(),
+  // PoC opt-in: nunca inicia OAuth Drive ni altera el login salvo habilitación explícita.
+  GOOGLE_DRIVE_OAUTH_POC_ENABLED: z.stringbool().default(false),
 
   // Integración servidor-a-servidor con Google Drive para los antecedentes de
   // proyectos. Ambas son opcionales: sin ellas, Calculadora informa que Drive
@@ -51,6 +53,10 @@ export const envSchema = z.object({
   // AiModule cae al proveedor simulado y la aplicación sigue arrancando.
   GEMINI_API_KEY: z.string().trim().min(1).optional(),
   GEMINI_MODEL: z.string().trim().min(1).default('gemini-3.5-flash-lite'),
+  // Selección explícita: nunca cambiar proveedor ni generar costos por accidente.
+  AI_PROVIDER: z.enum(['auto', 'gemini', 'openai', 'poc']).default('auto'),
+  OPENAI_API_KEY: z.string().trim().min(1).optional(),
+  OPENAI_MODEL: z.string().trim().min(1).default('gpt-6.1-sol'),
 
   // Correo saliente (Resend). Sin RESEND_API_KEY los correos se escriben en el
   // log en vez de enviarse — solo admisible fuera de producción.
@@ -62,9 +68,15 @@ export const envSchema = z.object({
   // URL pública del front: los enlaces de los correos tienen que ser absolutos.
   WEB_APP_URL: z.url().default('http://localhost:5173'),
   // Recordatorios diarios de horas (18:00 horas sin registrar, 08:00 horas por
-  // aprobar — ver modules/reminders). Apagados por defecto: con la base local
+  // aprobar) y resumen de soportes por cobrar del último día hábil del mes —
+  // ver modules/reminders. Apagados por defecto: con la base local
   // de copia de producción, encenderlos en desarrollo le escribiría a gente real.
   HOUR_REMINDERS_ENABLED: z.stringbool().default(false),
+
+  // Servidor LanguageTool propio para la revisión gramatical del corrector
+  // (tildes según el contexto, concordancia). Opcional: sin él, el front
+  // sigue corrigiendo la ortografía con su diccionario local.
+  LANGUAGETOOL_URL: z.url().optional(),
 
   MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),

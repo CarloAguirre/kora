@@ -127,7 +127,9 @@ export function UsersListPage() {
     if (dialog.kind !== 'delete') return;
 
     await deleteUser.mutateAsync(dialog.user.id);
-    toast.success(`${dialog.user.fullName} fue dado de baja.`);
+    toast.success(dialog.user.role === 'cliente'
+      ? `${dialog.user.fullName} fue dado de baja y desvinculado del portal. Sus contactos comerciales permanecen en la ficha de la empresa.`
+      : `${dialog.user.fullName} fue dado de baja.`);
   };
 
   return (
@@ -261,7 +263,9 @@ export function UsersListPage() {
         title="Dar de baja al usuario"
         description={
           dialog.kind === 'delete'
-            ? `${dialog.user.fullName} perderá el acceso y dejará de aparecer en los listados. Su historial de horas, tickets y proyectos se conserva íntegro.`
+            ? dialog.user.role === 'cliente'
+              ? `${dialog.user.fullName} perderá el acceso y se eliminarán sus vínculos y autorizaciones del portal. Se conserva el historial y el contacto comercial de la empresa, que puedes quitar por separado desde Clientes.`
+              : `${dialog.user.fullName} perderá el acceso y dejará de aparecer en los listados. Su historial de horas, tickets y proyectos se conserva íntegro.`
             : ''
         }
         confirmLabel="Dar de baja"

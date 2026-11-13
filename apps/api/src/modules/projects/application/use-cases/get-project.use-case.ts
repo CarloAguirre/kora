@@ -3,6 +3,7 @@ import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type
 import { isUuid } from '@kora/core';
 import type { Permission, ProjectDetail } from '@kora/contracts';
 import { PaymentMilestoneTriggerService } from '../services/payment-milestone-trigger.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -29,6 +30,9 @@ import { PROJECT_HOUR_ENTRY_READER, type ProjectHourEntryReader } from '../ports
 import { PROJECT_ACTIVITY_READER, type ProjectActivityReader } from '../ports/project-activity-reader.port';
 import type { UseCase } from '../../../../shared/application/use-case';
 import { toProjectDetail } from '../mappers/project.mapper';
+import {
+  APPROVED_PROJECT_CALENDAR, type ApprovedProjectCalendar,
+} from '../ports/approved-project-calendar.port';
 
 export interface GetProjectCommand {
   readonly projectId: string;
@@ -58,6 +62,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
     @Inject(PROJECT_ACTIVITY_READER) private readonly activity: ProjectActivityReader,
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly paymentTriggers: PaymentMilestoneTriggerService,
+    @Inject(APPROVED_PROJECT_CALENDAR) private readonly approvedCalendar: ApprovedProjectCalendar,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(command: GetProjectCommand): Promise<Result<ProjectDetail, ApplicationError>> {
@@ -111,16 +117,22 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       ownPrimaryContact ?? (client?.primaryContactId ? await this.contacts.findById(client.primaryContactId) : null);
 
     /**
-     * Fase "Prospecto/Cotización": horas aprobadas con fecha anterior al
-     * DÍA del Hito 0 (no al instante exacto — una hora cargada el mismo día
-     * en que se facturó ya es del proyecto, ver el documento de Leslie
-     * "Corte por fecha"). Sin Hito 0 todavía, el proyecto nunca se activó:
-     * todo lo consumido es de esta fase.
+     * Corte de HH preactivación (Prospecto/Cotización):
+     * 1. Hito 0 oficial, si existe; tiene siempre prioridad.
+     * 2. Fecha de inicio como referencia PROVISIONAL únicamente en proyectos
+     *    activos heredados sin Hito 0 (ej. App Walvy).
+     * 3. Sin corte, conservar todo el consumo en Prospecto/Cotización.
+     *
+     * Se comparan días completos: las HH del mismo día del corte pertenecen
+     * a ejecución. No se modifican los registros históricos ni se crea
+     * artificialmente un Hito 0 en la base de datos.
      */
-    const prospectPhaseHours = snapshot.hito0At
+    const hoursCutoff = snapshot.hito0At ??
+      (snapshot.status === 'active' ? snapshot.startDate : null);
+    const prospectPhaseHours = hoursCutoff
       ? await this.hourEntries.sumApprovedHoursBeforeDateForProject(
           project.id,
-          new Date(snapshot.hito0At.toISOString().slice(0, 10)),
+          new Date(hoursCutoff.toISOString().slice(0, 10)),
         )
       : snapshot.usedHours;
 
@@ -129,10 +141,32 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         snapshot.leaderUserId === command.actorUserId ||
         snapshot.developerUserId === command.actorUserId ||
         snapshot.commercialManagerUserId === command.actorUserId ||
-        projectTeams.some((team) => team.leaderUserId === command.actorUserId) ||
-        members.some((member) => member.userId === command.actorUserId);
+        // Igual que la autorización de tareas y entregas: líder efectivo del equipo.
+        projectTeams.some((team) => team.effectiveLeaderUserId === command.actorUserId) ||
+        members.some((member) => member.userId === command.actorUserId && !member.blockedAt);
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
+
+    // El traspaso ya fue aprobado. En la primera lectura autorizada de un
+    // proyecto iniciado se materializan las semanas comerciales como bloques
+    // operativos reales. Esta operación es transaccional, idempotente y
+    // preserva toda edición previa; NO exige una segunda aprobación.
+    // El evento de traspaso registrado en la BD es la autorización real del
+    // calendario. No repetir aquí el filtro salesStage: una edición posterior
+    // de la ficha comercial no debe ocultar un traspaso aprobado y persistido.
+    // ensure() comprueba el evento quotation_transferred y la fecha de inicio.
+    const generated = snapshot.type === 'development' && snapshot.status === 'active' &&
+      Boolean(snapshot.startDate || snapshot.hito0At)
+      ? await this.approvedCalendar.ensure(project.id) : false;
+    if (generated) {
+      // El calendario traspasado puede crear los primeros bloques sin pasar
+      // por un caso de uso de edición; sincronizar el caché usado por la
+      // ordenación de proyectos desde la primera materialización.
+      await this.progress.recalculate(project.id);
+    }
+    const currentModules = generated
+      ? await this.modules.listForProject(project.id)
+      : projectModules;
 
     /**
      * Quién puede autorizar que ESTE proyecto admita horas extra: mismo
@@ -152,7 +186,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
      * con que `UpdateProjectModuleDeliveryUseCase` deja al líder de equipo gestionar sus entregas.
      */
     const deliveryTeamIds = [
-      ...new Set(projectModules.flatMap((module) => module.deliveries.flatMap((delivery) => (delivery.teamId ? [delivery.teamId] : [])))),
+      ...new Set(currentModules.flatMap((module) => module.deliveries.flatMap((delivery) => (delivery.teamId ? [delivery.teamId] : [])))),
     ];
     const ledTeamIds = new Set(
       canManagePendings
@@ -177,7 +211,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         members,
         teams: projectTeams,
         observations: projectObservations,
-        modules: projectModules,
+        modules: currentModules,
         paymentMilestones: projectPaymentMilestones,
         usedHoursUpdatedAt,
         leaderLastActivityAt,

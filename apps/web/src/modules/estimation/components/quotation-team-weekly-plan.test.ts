@@ -64,6 +64,26 @@ describe('Proyección semanal por equipos de la EDT', () => {
     expect([...plan.weekTotals.values()]).toEqual([20, 30, 10]);
   });
 
+
+  it('incluye nuevas tareas y fases comerciales en cargas y picos, sin omitir HH', () => {
+    const stage = 'KS-0777e456-fd76-445e-83f1-afc25061c107';
+    const edited = quotationDraftDataSchema.parse({
+      ...draft,
+      edtCommercialStages: [{ code: stage, name: 'Integración final',
+        startWeek: 2, durationWeeks: 1 }],
+      edtCommercialTasks: [{
+        wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c108',
+        stageCode: stage, name: 'Pruebas finales', teamId: dev, hours: 20, fixed: false,
+      }],
+    });
+    const plan = quotationTeamWeeklyPlan(edited)!;
+    expect(plan.totalHours).toBe(80);
+    expect(plan.rows.find((row) => row.teamKey === dev)?.totalHours).toBe(70);
+    expect([...plan.rows.find((row) => row.teamKey === dev)!.weeklyHours.values()])
+      .toEqual([20, 45, 5]);
+    expect([...plan.weekTotals.values()]).toEqual([20, 50, 10]);
+  });
+
   it('concilia centésimos cuando se ajustan HH de una tarea', () => {
     const edited = quotationDraftDataSchema.parse({
       ...draft,

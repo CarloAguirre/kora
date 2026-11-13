@@ -78,3 +78,12 @@ horas de soporte se migran en **M5**, donde vive la lógica real (mayormente en
 funciones PL/pgSQL como `soporte_has_active_usable_plan`). M3 migra
 `plan_soporte` (texto) y `soporte_horas` (numérico) como el compromiso de
 soporte declarado en el propio proyecto — el dato legado, no la reconciliación.
+
+## Ajuste de edición — 2026-11-04 (solicitud comercial)
+
+- **Prospecto y Cotización** admiten en la edición `draft` (No iniciado) y `on_hold` (Detenido), sin modificar `salesStage` ni aprobar el proyecto. Se conserva `onHoldReason` y la bitácora/auditoría del cambio de estado.
+- La **creación** permite elegir `on_hold` (Detenido) directamente en Prospecto/Cotización, con motivo obligatorio. Sin selección, nacen `draft` (No iniciado). Nunca se ofrece `active` antes de aprobación comercial. Este comportamiento se restauró tras la regresión del commit `9aacea322` (2026-10-28), que había vaciado las opciones y bloqueado el selector.
+- Reanudar un prospecto o cotización es volver de Detenido a No iniciado, **no** a Activo. La API rechaza activar sin aprobación comercial y rechaza retroceder a una etapa no aprobada mientras el proyecto siga Activo.
+- Para un proyecto aprobado sin Hito 0, pasar a Activo desde No iniciado **o Detenido** exige motivo de activación manual. Reactivar uno que ya tenía Hito 0 no lo vuelve a crear.
+- Los tramos pendientes no pasan a Por facturar mientras `salesStage !== 'approved'`, incluso si la fecha programada o fase se cumplen. Al aprobarse, se evalúan normalmente. No se cambian los tramos ya facturados ni los registros históricos.
+- No se requieren migraciones: `salesStage`, `status`, `onHoldReason` y `hito0At` ya existen.

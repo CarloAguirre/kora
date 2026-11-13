@@ -1,10 +1,12 @@
-import { useState, type ComponentType, type ReactNode } from 'react';
+import { type ComponentType, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import styles from './ClientProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useStoredState } from '@/shared/hooks/useStoredState';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
 import {
   AlignLeftIcon,
@@ -17,15 +19,12 @@ import {
   DiamondIcon,
   DollarSignIcon,
   DownloadIcon,
+  EyeIcon,
   HistoryIcon,
   LinkIcon,
   ListIcon,
-  LockIcon,
   PlayIcon,
-  RefreshIcon,
   TrendingUpIcon,
-  UnlockIcon,
-  UsersIcon,
   type IconProps,
 } from '@/shared/components/icons/Icons';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -33,7 +32,10 @@ import { useHourEntriesList } from '@/modules/hours/api/hours.queries';
 import { PhaseProgressBar } from '../components/PhaseProgressBar';
 import { PhaseRoadmap } from '../components/PhaseRoadmap';
 import { ProjectBillingCard } from '../components/ProjectBillingCard';
+import { ProjectBusinessImpact } from '../components/ProjectBusinessImpact';
 import { ProjectBitacora } from '../components/ProjectBitacora';
+import { ProjectProgressOverview } from '../components/ProjectProgressOverview';
+import { calculateScheduleElapsedPercent } from '@/modules/projects/lib/project-progress-display';
 import { ProjectViewTabs } from '../components/ProjectViewTabs';
 import { StatusPill, type StatusPillTone } from '../components/StatusPill';
 import { toClientProjectDetail } from '../adapters/project-detail.adapter';
@@ -57,7 +59,7 @@ const ACCESS_LINKS: readonly AccessLink[] = [
   { key: 'documentation', label: 'Documentación', subtitle: 'Especificaciones', icon: AlignLeftIcon },
 ];
 
-type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
+type SectionKey = 'info' | 'billing' | 'links' | 'progress' | 'hours' | 'gantt' | 'impact' | 'qa' | 'bitacora';
 
 /**
  * Un botón por sección — "esta botonera muestra o esconde las secciones de
@@ -69,14 +71,15 @@ type SectionKey = 'info' | 'billing' | 'links' | 'roadmap' | 'hours' | 'gantt' |
  * del periodo" se quitó — su contenido ya vive en "Bitácora").
  */
 const SECTION_TOGGLES: ReadonlyArray<{ key: SectionKey; label: string; icon: typeof LinkIcon }> = [
-  { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
-  { key: 'roadmap', label: 'Hoja de ruta', icon: RefreshIcon },
-  { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
+  // Mismo orden en que se renderizan las secciones más abajo.
   { key: 'info', label: 'Datos del proyecto', icon: ListIcon },
+  { key: 'billing', label: 'Facturación', icon: DollarSignIcon },
+  { key: 'links', label: 'Accesos y enlaces', icon: LinkIcon },
+  { key: 'progress', label: 'Avance del proyecto', icon: CircleCheckIcon },
   { key: 'hours', label: 'Horas y avance', icon: ClockIcon },
+  { key: 'gantt', label: 'Roadmap por Fases', icon: CalendarIcon },
   { key: 'impact', label: 'Impacto en el negocio', icon: TrendingUpIcon },
   { key: 'qa', label: 'Métricas de la etapa actual', icon: BarChartIcon },
-  { key: 'gantt', label: 'Roadmap por Fases', icon: CalendarIcon },
   { key: 'bitacora', label: 'Bitácora', icon: HistoryIcon },
 ];
 
@@ -84,7 +87,7 @@ const ALL_SECTIONS_VISIBLE: Record<SectionKey, boolean> = {
   info: true,
   billing: true,
   links: true,
-  roadmap: true,
+  progress: true,
   hours: true,
   gantt: true,
   impact: true,
@@ -92,13 +95,23 @@ const ALL_SECTIONS_VISIBLE: Record<SectionKey, boolean> = {
   bitacora: true,
 };
 
+/** Lo que recuerda la botonera entre visitas. `sections` es parcial: una sección
+ *  agregada después de guardar arranca visible en vez de quedar oculta. */
+interface ViewPrefs {
+  readonly sections: Partial<Record<SectionKey, boolean>>;
+  readonly usedHoursVisible: boolean;
+}
+
+const DEFAULT_VIEW_PREFS: ViewPrefs = { sections: ALL_SECTIONS_VISIBLE, usedHoursVisible: true };
+
 const HEALTH_LABEL: Readonly<Record<ClientProjectHealth, string>> = {
   prospect: 'Prospecto',
   quoted: 'Cotización',
   not_started: 'No iniciado',
   active: 'Activo',
-  at_risk: 'En riesgo',
+  on_hold: 'Detenido',
   finished: 'Finalizado',
+  cancelled: 'Cancelado',
 };
 
 const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
@@ -106,8 +119,9 @@ const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
   quoted: 'info',
   not_started: 'neutral',
   active: 'success',
-  at_risk: 'warning',
+  on_hold: 'warning',
   finished: 'neutral',
+  cancelled: 'neutral',
 };
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
@@ -140,7 +154,8 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
  * La botonera de íconos bajo el título replica la del Figma en el orden y
  * los conceptos, no en la cantidad exacta: el archivo se quedó con 9 botones
  * sin sincronizar con la fusión de "Hitos y aprobaciones" + "Puntos de
- * atención e incidentes" en una sola "Bitácora" — acá son 9, uno por sección.
+ * atención e incidentes" en una sola "Bitácora" — acá son 9, uno por sección,
+ * más uno final para ocultar las horas consumidas (`usedHoursVisible`).
  * `SECTION_TOGGLES` es la única lista — el botón y la sección que controla
  * nunca pueden desincronizarse porque ambos leen de ahí.
  */
@@ -179,10 +194,23 @@ export function ClientProjectDetailPage({
     { enabled: Boolean(projectDetail?.id) },
   );
   const project = projectDetail ? toClientProjectDetail(projectDetail, projectHourEntries?.items ?? []) : undefined;
-  const [visible, setVisible] = useState<Record<SectionKey, boolean>>(ALL_SECTIONS_VISIBLE);
+  /** La botonera se recuerda por usuario y cliente: al recargar o volver a la
+   *  ficha (de este o de otro proyecto del mismo cliente) sigue lo que dejó. */
+  const { user } = useAuth();
+  const clientId = projectDetail?.client?.id;
+  const prefsKey = user && clientId ? `kora:portal-ficha:${user.id}:${clientId}` : null;
+  const [prefs, setPrefs] = useStoredState<ViewPrefs>(prefsKey, DEFAULT_VIEW_PREFS);
+  const visible: Record<SectionKey, boolean> = { ...ALL_SECTIONS_VISIBLE, ...prefs.sections };
+  /** Oculta solo las horas consumidas dentro de "Horas y avance" — el % de
+   *  avance, las horas estimadas y la fecha fin siguen visibles. También
+   *  esconde el número de desviación (= consumidas − estimadas, lo
+   *  revelaría), pero deja el pill "En riesgo"/"Sin desviación". */
+  const usedHoursVisible = prefs.usedHoursVisible !== false;
   const resolvedBackTo = backTo ?? '/portal/proyectos';
 
-  const toggleSection = (key: SectionKey) => setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleSection = (key: SectionKey) =>
+    setPrefs((prev) => ({ ...prev, sections: { ...prev.sections, [key]: !(prev.sections?.[key] ?? true) } }));
+  const toggleUsedHours = () => setPrefs((prev) => ({ ...prev, usedHoursVisible: prev.usedHoursVisible === false }));
 
   /** No hay generación de PDF en el backend — "Compartir" copia el enlace de
    *  esta misma ficha (quien lo reciba necesita acceso al portal cliente) y
@@ -270,12 +298,22 @@ export function ClientProjectDetailPage({
               className={[styles.sectionToggle, visible[key] ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
               aria-pressed={visible[key]}
               aria-label={`${visible[key] ? 'Ocultar' : 'Mostrar'} ${label}`}
-              title={label}
+              data-tooltip={label}
               onClick={() => toggleSection(key)}
             >
               <Icon size={16} />
             </button>
           ))}
+          <button
+            type="button"
+            className={[styles.sectionToggle, usedHoursVisible ? styles.sectionToggleOn : ''].filter(Boolean).join(' ')}
+            aria-pressed={usedHoursVisible}
+            aria-label={`${usedHoursVisible ? 'Ocultar' : 'Mostrar'} horas consumidas`}
+            data-tooltip={usedHoursVisible ? 'Ocultar horas consumidas' : 'Mostrar horas consumidas'}
+            onClick={toggleUsedHours}
+          >
+            <EyeIcon size={16} />
+          </button>
         </div>
 
         {visible.info && (
@@ -333,17 +371,19 @@ export function ClientProjectDetailPage({
         </section>
         )}
 
-        {visible.roadmap && (
+        {visible.progress && (
         <section className={styles.section}>
-          <div className={styles.sectionHeadingRow}>
-            <h3 className={styles.sectionTitle}>Hoja de ruta</h3>
-            <span className={styles.sectionCaption}>Cada fase tiene su propio cronograma independiente · la línea roja marca el avance esperado a hoy</span>
-          </div>
-          <div className={styles.roadmapList}>
-            {project.roadmap.map((phase) => (
-              <PhaseProgressBar key={phase.name} phase={phase} />
-            ))}
-          </div>
+          <h3 className={styles.sectionTitle}>Avance del proyecto</h3>
+          <ProjectProgressOverview
+            actualPercent={project.progressActualPercent}
+            expectedPercent={project.progressExpectedPercent}
+            scheduleElapsedPercent={projectDetail?.progress.actual == null
+              ? calculateScheduleElapsedPercent(projectDetail?.startDate, projectDetail?.endDate)
+              : null}
+            startDate={project.startDate}
+            endDate={project.endDate}
+            daysRemaining={project.daysRemaining}
+          />
         </section>
         )}
 
@@ -357,7 +397,7 @@ export function ClientProjectDetailPage({
               <div className={styles.hoursDeviationRow}>
                 <span className={styles.statLabel}>Horas desviación</span>
                 <div className={styles.hoursDeviationValueRow}>
-                  <span className={styles.statSub}>{formatHours(project.hoursDeviation)}</span>
+                  {usedHoursVisible && <span className={styles.statSub}>{formatHours(project.hoursDeviation)}</span>}
                   {project.hoursDeviation > 0 ? (
                     <StatusPill tone="warning">En riesgo</StatusPill>
                   ) : (
@@ -366,6 +406,7 @@ export function ClientProjectDetailPage({
                 </div>
               </div>
             </Card>
+            {usedHoursVisible && (
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Horas utilizadas a la fecha</span>
               <span className={styles.statValue}>{formatHours(project.usedHoursToDate)}</span>
@@ -375,6 +416,7 @@ export function ClientProjectDetailPage({
                 {project.usedHoursUpdatedAt}
               </span>
             </Card>
+            )}
             <Card className={styles.statCard}>
               <span className={styles.statLabel}>Avance real vs. esperado</span>
               {project.progressActualPercent != null && project.progressExpectedPercent != null ? (
@@ -408,46 +450,19 @@ export function ClientProjectDetailPage({
             <h3 className={styles.sectionTitle}>Roadmap por Fases</h3>
             <span className={styles.sectionCaption}>Vista por semana de diseño, desarrollo, QA y aprobación por fase</span>
           </div>
-          <PhaseRoadmap phaseRoadmap={project.phaseRoadmap} />
+          {/* La "Hoja de ruta" de cada fase va dentro de su tarjeta, igual que en el Roadmap interno.
+              `roadmap` y `phaseRoadmap.phases` salen de `project.modules` en el mismo orden. */}
+          <PhaseRoadmap
+            phaseRoadmap={project.phaseRoadmap}
+            renderPhaseExtras={(phase) => {
+              const roadmapPhase = project.roadmap[project.phaseRoadmap.phases.indexOf(phase)];
+              return roadmapPhase ? <PhaseProgressBar phase={roadmapPhase} embedded /> : null;
+            }}
+          />
         </section>
         )}
 
-        {visible.impact && (() => {
-          const { before, after, reductionPercent } = project.businessImpact;
-          return (
-        <section className={styles.section}>
-          <div className={styles.sectionHeadingRow}>
-            <h3 className={styles.sectionTitle}>Impacto en el negocio</h3>
-            <span className={styles.sectionCaption}>Proceso manual vs. proceso con automatizado</span>
-          </div>
-          <div className={styles.impactCard}>
-            <div className={styles.impactColumn}>
-              <span className={styles.impactHeading}>Antes de automatizar</span>
-              <ImpactStat icon={ClockIcon} iconTone="before" label="Tiempo total del proceso" value={`${before.totalProcessHours} horas`} />
-              <ImpactStat icon={UsersIcon} iconTone="before" label="Personas involucradas" value={`${before.peopleInvolved} personas`} />
-              <ImpactStat icon={CalendarIcon} iconTone="before" label="Duración calendario" value={`${before.cycleDays} días laborales (8h c/u)`} />
-              <ImpactStat icon={LockIcon} iconTone="before" label="Modalidad" value={before.modality} last />
-            </div>
-            <div className={styles.impactColumn}>
-              <span className={styles.impactHeading}>Después — medido en QA / Marcha blanca</span>
-              <ImpactStat icon={ClockIcon} iconTone="after" label="Tiempo total del proceso" value={`${after.totalProcessHours} horas`} />
-              <ImpactStat
-                icon={UsersIcon}
-                iconTone="after"
-                label="Personas involucradas"
-                value={after.peopleInvolved === 0 ? `0 personas · solo supervisión` : `${after.peopleInvolved} personas`}
-              />
-              <ImpactStat icon={CalendarIcon} iconTone="after" label="Duración calendario" value={after.cycleDays === 0 ? 'Mismo día' : `${after.cycleDays} días`} />
-              <ImpactStat icon={UnlockIcon} iconTone="after" label="Modalidad" value={after.modality} last />
-            </div>
-            <div className={styles.impactCallout}>
-              <p className={styles.impactCalloutValue}>-{reductionPercent}%</p>
-              <p className={styles.impactCalloutCaption}>reducción de tiempo de proceso</p>
-            </div>
-          </div>
-        </section>
-          );
-        })()}
+        {visible.impact && <ProjectBusinessImpact impact={project.businessImpact} />}
 
         {visible.qa && project.qaMetrics && (() => {
           const qa = project.qaMetrics;
@@ -512,26 +527,3 @@ function InfoField({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function ImpactStat({
-  icon: Icon,
-  iconTone,
-  label,
-  value,
-  last = false,
-}: {
-  icon: ComponentType<IconProps>;
-  iconTone: 'before' | 'after';
-  label: string;
-  value: string;
-  last?: boolean;
-}) {
-  return (
-    <div className={[styles.impactStat, last ? styles.impactStatLast : ''].filter(Boolean).join(' ')}>
-      <span className={[styles.impactIcon, iconTone === 'after' ? styles.impactIconAfter : ''].filter(Boolean).join(' ')}>
-        <Icon size={14} />
-      </span>
-      <span className={styles.impactLabel}>{label}</span>
-      <span className={styles.impactValue}>{value}</span>
-    </div>
-  );
-}

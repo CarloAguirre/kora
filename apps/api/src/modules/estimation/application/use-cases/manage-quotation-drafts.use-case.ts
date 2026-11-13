@@ -27,6 +27,9 @@ export class ManageQuotationDraftsUseCase {
     if (write && !isQuotationDraftEligibleProject(project)) {
       throw new ConflictException('El proyecto no admite borradores comerciales en esta etapa y estado.');
     }
+    if (write && (await this.repository.getByProjectId(projectId))?.transferredVersionId) {
+      throw new ConflictException('Cotización cerrada: ya fue traspasada al proyecto. Solo puedes consultar sus versiones históricas.');
+    }
     return project;
   }
 
@@ -256,7 +259,9 @@ export class ManageQuotationDraftsUseCase {
 
   /** Consultar el catálogo solo DESPUÉS de autorizar el proyecto. */
   async listActiveQuotationTeams(projectId: string, actor: QuotationActor): Promise<QuotationTeamCatalogEntry[]> {
-    await this.authorizeAiPoc(projectId, actor);
+    // El catálogo se usa también para mostrar versiones históricas cerradas.
+    // Crear un borrador IA sigue exigiendo authorizeAiPoc (escritura).
+    await this.authorize(projectId, actor, false);
     return this.repository.listActiveQuotationTeams();
   }
 
@@ -266,13 +271,14 @@ export class ManageQuotationDraftsUseCase {
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string,
     roleTeamIds?: Readonly<Record<string, string>>,
+    selectedTeamIds: readonly string[] = [],
   ): Promise<QuotationVersion> {
     await this.authorizeAiPoc(projectId, actor);
-    if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
-        proposal.sourceMode !== 'poc_simulated') {
+    if (proposal.projectId !== projectId || !['gemini', 'openai'].includes(proposal.provider) ||
+        !['poc_simulated', 'drive'].includes(proposal.sourceMode)) {
       throw new BadRequestException('El proyecto y el origen de la propuesta IA no coinciden.');
     }
-    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds);
+    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds, selectedTeamIds);
   }
 
   /** Aceptación del baseline técnico KDM: NO es aprobación del cliente ni

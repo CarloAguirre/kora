@@ -16,6 +16,7 @@ import {
   ProjectAssigneeDisabledError,
   ProjectModuleNotFoundError,
   ProjectNotFoundError,
+  SegmentNotInModuleError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
@@ -89,13 +90,28 @@ export class CreateProjectModuleTaskUseCase
     }
 
     if (command.data.startDate > command.data.date) return err(new InvalidTaskDatesError());
+    const segmentId = command.data.segmentId ?? null;
+    const segment = command.data.segmentId
+      ? module.segments.find((item) => item.id === command.data.segmentId) : undefined;
+    if (segmentId && !segment) return err(new SegmentNotInModuleError());
+    if (segment && (
+      segment.teamId !== command.data.teamId ||
+      command.data.startDate < segment.startDate.toISOString().slice(0, 10) ||
+      command.data.date > segment.endDate.toISOString().slice(0, 10))) {
+      return err(new ForbiddenError(
+        'La tarea debe pertenecer a un bloque de la misma fase y equipo, dentro de sus fechas.',
+        'PROJECT_TASK_INVALID_SEGMENT',
+      ));
+    }
 
     const now = this.clock.now();
     const assigneeUserId = command.data.assigneeUserId ?? null;
     const assignee = assigneeUserId
-      ? (await this.projectTeamMembers.listForProject(project.id)).find((member) => member.userId === assigneeUserId)
+      ? (await this.projectTeamMembers.listForProject(project.id)).find((member) =>
+        member.userId === assigneeUserId && member.teamId === command.data.teamId && !member.blockedAt)
       : undefined;
-    if (assignee?.userStatus === 'disabled') return err(new ProjectAssigneeDisabledError());
+    if (assigneeUserId && (!assignee || assignee.userStatus === 'disabled'))
+      return err(new ProjectAssigneeDisabledError());
     const assigneeName = assignee?.fullName;
 
     // Alta y registro en la misma transacción: no queda una tarea sin su registro de creación.
@@ -105,6 +121,7 @@ export class CreateProjectModuleTaskUseCase
           moduleId: command.moduleId,
           teamId: command.data.teamId ?? null,
           assigneeUserId,
+          segmentId,
           name: command.data.name,
           description: command.data.description ?? null,
           startDate: new Date(command.data.startDate),
@@ -129,8 +146,10 @@ export class CreateProjectModuleTaskUseCase
         now,
         tx,
       );
-      await this.progress.recalculate(project.id, tx);
       await this.forecastSync.syncTask(project, command.moduleId, taskId, now, tx);
+      if (segment) await this.modules.refreshSegmentClosure(segment.id, now, tx);
+      // El caché global debe reflejar el cierre calculado de los bloques.
+      await this.progress.recalculate(project.id, tx);
       return taskId;
     });
 

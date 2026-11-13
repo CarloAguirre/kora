@@ -1,6 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import styles from './PhaseRoadmap.module.css';
 import { Button } from '@/shared/components/ui/Button';
+import { DropdownMenu } from '@/shared/components/ui/DropdownMenu';
 import { TextField } from '@/shared/components/ui/TextField';
 import { ChevronDownIcon, ChevronRightIcon, DiamondIcon } from '@/shared/components/icons/Icons';
 import { StatusPill, type StatusPillTone } from './StatusPill';
@@ -8,13 +9,18 @@ import { BitacoraEntryRow } from './ProjectBitacora';
 import {
   PHASE_ROADMAP_ROLE_COLORS,
   PHASE_ROADMAP_ROLE_LABELS,
-  PHASE_ROADMAP_TASK_SCOPES,
-  PHASE_ROADMAP_TASK_SCOPE_LABELS,
+  type PhaseRoadmapDeliveryState,
   type PhaseRoadmapPhase,
   type PhaseRoadmapTask,
-  type PhaseRoadmapTaskScope,
+  type PhaseRoadmapTaskItemState,
   type ProjectPhaseRoadmap,
 } from '../types';
+
+/** Paleta entregada por diseño v5.02, exclusiva de la vista interna. */
+const OPERATIONAL_ROLE_COLORS: Record<keyof typeof PHASE_ROADMAP_ROLE_LABELS, string> = {
+  dev: '#ea7a1f', pmo: '#64748b', qa: '#3b82f6',
+  ux: '#22a55a', ia: '#e0526b', rpa: '#14a3a0',
+};
 
 const STATUS_LABEL: Readonly<Record<PhaseRoadmapPhase['status'], string>> = {
   finished: 'Finalizado',
@@ -34,6 +40,8 @@ const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'S
 const scrollWidthPercent = (zoom: number) => 100 + zoom * 3;
 /** Sobre este valor del zoom aparecen la cuadrícula y las etiquetas por día. */
 const DETAIL_ZOOM_THRESHOLD = 35;
+/** Ancho mínimo (% de la pista) de un bloque de mes para mostrar su nombre. */
+const MIN_MONTH_LABEL_PERCENT = 6;
 
 const toDate = (isoDate: string) => new Date(`${isoDate}T00:00:00`);
 
@@ -48,6 +56,8 @@ const formatShortDate = (isoDate: string) => {
   const date = toDate(isoDate);
   return `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`;
 };
+/** Etiquetas diarias sobre el eje: no cambian la fecha ni el estado de la tarea. */
+const formatAxisDay = (date: Date) => `${date.getDate()} ${MONTH_LABELS[date.getMonth()]}`;
 
 interface DateRange {
   readonly min: Date;
@@ -115,6 +125,27 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
   return { range, months, weekLines, dayLines, dayTicks, todayPercent };
 }
 
+const shiftDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+
+/**
+ * Rango propio de una fase: de su primer a su último tramo/entrega/tarea, con una semana de margen y
+ * al menos 4 semanas de ancho. Con la escala del proyecto completo una fase corta (p.ej. dos semanas
+ * de pruebas al final) quedaba comprimida en una esquina y había que desplazarse para encontrarla.
+ * `null` si la fase no tiene nada con fecha.
+ */
+function phaseRange(phase: PhaseRoadmapPhase): DateRange | null {
+  const dates = [
+    ...phase.tasks.flatMap((task) => [task.startDate, task.endDate]),
+    ...phase.deliveries.map((delivery) => delivery.date),
+    ...phase.taskItems.map((taskItem) => taskItem.date),
+  ].sort();
+  if (dates.length === 0) return null;
+  const min = shiftDays(toDate(dates[0]!), -7);
+  const max = shiftDays(toDate(dates[dates.length - 1]!), 7);
+  const minimumMax = shiftDays(min, 28);
+  return { min, max: max < minimumMax ? minimumMax : max };
+}
+
 /**
  * "Roadmap por Fases" — reemplaza el Gantt fijo de 3 módulos × 4 tareas
  * (`ProjectGanttChart`, ya borrado) por un acordeón de fases del proyecto
@@ -124,22 +155,19 @@ function buildTimelineAxis(range: DateRange): TimelineAxis {
  *
  * El calendario es de fechas reales, no de posiciones fijas: barras,
  * marcadores, meses, cuadrícula y línea de HOY se calculan como % del rango
- * visible, igual que el prototipo `ficha_proyecto_lider`. Por eso el filtro
- * "Rango visible" y el zoom Semanas/Días sí cambian la vista (el zoom ensancha
- * la pista y sobre 35 revela la cuadrícula y las etiquetas por día). Solo la
+ * visible, igual que el prototipo `ficha_proyecto_lider`. Cada fase abre en su
+ * propio rango de fechas (`phaseRange`); el filtro "Rango visible" aplicado a
+ * mano lo reemplaza para todas, y el zoom Semanas/Días ensancha la pista (sobre
+ * 35 revela la cuadrícula y las etiquetas por día). Solo la
  * columna de pistas hace scroll horizontal: los nombres de cada fila quedan
  * siempre visibles a la izquierda.
- *
- * Los chips de "Resumen de avance" mantienen la píldora navy sólida del
- * Figma, pero están conectados a las tareas reales de la fase (`taskItems`,
- * cada una con su `scope`): el tooltip muestra el % completado por ámbito
- * (mismo cálculo que `ProjectModulesCard` del Roadmap interno) y el clic
- * filtra/atenúa en la fila "Tareas" las que no son de ese ámbito.
  */
 export function PhaseRoadmap({
   phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
-  toolbarActions, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
+  toolbarActions, operationalNotice, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
   alwaysExpanded = false,
+  operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows, onPlanOperationalRow,
+  operationalMetrics, operationalFooter, operationalPresaleHours,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -153,11 +181,35 @@ export function PhaseRoadmap({
     });
   const [rangeDraft, setRangeDraft] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
   const [appliedRange, setAppliedRange] = useState({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
+  const previousAutoRange = useRef({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
+  // La cotización se carga después del proyecto. Recalcular el rango por defecto
+  // cuando llegan sus propuestas, sin reemplazar un rango elegido manualmente.
+  useEffect(() => {
+    const previous = previousAutoRange.current;
+    const next = { from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate };
+    setAppliedRange((current) =>
+      current.from === previous.from && current.to === previous.to ? next : current);
+    setRangeDraft((current) =>
+      current.from === previous.from && current.to === previous.to ? next : current);
+    previousAutoRange.current = next;
+  }, [phaseRoadmap.rangeStartDate, phaseRoadmap.rangeEndDate]);
 
   const axis = useMemo(() => buildTimelineAxis({ min: toDate(appliedRange.from), max: toDate(appliedRange.to) }), [appliedRange]);
 
   const rangeDraftIsValid = toDate(rangeDraft.from) < toDate(rangeDraft.to);
   const rangeIsCustom = appliedRange.from !== phaseRoadmap.rangeStartDate || appliedRange.to !== phaseRoadmap.rangeEndDate;
+
+  /** Sin un "Rango visible" aplicado a mano, cada fase abre en su propio rango (`phaseRange`); con uno, todas usan ese. */
+  const axisByPhase = useMemo(
+    () =>
+      new Map(
+        phaseRoadmap.phases.map((phase) => {
+          const range = rangeIsCustom ? null : phaseRange(phase);
+          return [phase.id, range ? buildTimelineAxis(range) : axis];
+        }),
+      ),
+    [phaseRoadmap.phases, rangeIsCustom, axis],
+  );
 
   const onResetRange = () => {
     setRangeDraft({ from: phaseRoadmap.rangeStartDate, to: phaseRoadmap.rangeEndDate });
@@ -165,23 +217,24 @@ export function PhaseRoadmap({
   };
 
   return (
-    <div className={styles.wrapper}>
+    <div className={[styles.wrapper, operationalView ? styles.operationalWrapper : ''].filter(Boolean).join(' ')}>
       {/* Encabezado compacto del prototipo `ficha_proyecto_lider-actualizada.html` (`.roadmap-toolbar`
           + `.roadmap-legend`): chips y rango en un bloque, leyenda en una sola línea con la nota del
           zoom al final. */}
       <div className={[styles.summaryRow, borderlessSummary ? styles.summaryRowBorderless : ''].filter(Boolean).join(' ')}>
         <div className={styles.summaryChips}>
           <span className={styles.summaryChip}>
-            <b>{phaseRoadmap.phaseCount}</b> Fases
+            <b>{phaseRoadmap.phaseCount}</b> {operationalView ? 'fases' : 'Fases'}
           </span>
           <span className={styles.summaryChip}>
-            <b>{phaseRoadmap.teamSegmentCount}</b> tramos de equipo
+            <b>{operationalView ? (operationalBlockCount ?? phaseRoadmap.teamSegmentCount) : phaseRoadmap.teamSegmentCount}</b> {operationalView ? 'bloques de trabajo' : 'tramos de equipo'}
           </span>
           <span className={styles.summaryChip}>
-            <b>{phaseRoadmap.plannedDeliveryCount}</b> entregas planificadas
+            <b>{operationalView ? (operationalTaskCount ?? 0) : phaseRoadmap.plannedDeliveryCount}</b> {operationalView ? 'tareas' : 'entregas planificadas'}
           </span>
         </div>
         <div className={styles.filterRow}>
+          {!operationalView && <>
           <span className={styles.filterLabel}>Rango visible:</span>
           <TextField
             className={styles.rangeDateField}
@@ -202,12 +255,48 @@ export function PhaseRoadmap({
           <Button size="sm" variant="ghost" onClick={onResetRange} disabled={!rangeIsCustom}>
             Restablecer
           </Button>
+          </>}
           {toolbarActions && <div className={styles.toolbarActions}>{toolbarActions}</div>}
         </div>
       </div>
 
-      <div className={styles.legendRow}>
-        {(Object.keys(PHASE_ROADMAP_ROLE_LABELS) as Array<keyof typeof PHASE_ROADMAP_ROLE_LABELS>).map((role) => (
+      {operationalView && operationalNotice}
+      {operationalView && (
+        <div className={styles.operationalExplanation}>
+          <strong>Bloque de trabajo:</strong>{' '}
+          periodo en que un equipo trabaja en una fase con sus horas estimadas.
+          Cada bloque cierra con una sola entrega; si se necesita otra entrega, se crea otro bloque.
+        </div>
+      )}
+      <div className={[styles.legendRow, operationalView ? styles.operationalLegend : ''].filter(Boolean).join(' ')}>
+        {operationalView ? <>
+          <span className={styles.legendItem}>
+            <span className={styles.legendProgress} aria-hidden="true"><i /></span>Avance del bloque
+          </span>
+          <span className={styles.legendItem}>
+            <DiamondIcon size={14} className={styles.legendDiamondPlanned} /> Entrega planificada
+          </span>
+          <span className={styles.legendItem}>
+            <DiamondIcon size={14} className={styles.legendDiamondDone} /> Entregada
+          </span>
+          <span className={styles.legendItem}>
+            <DiamondIcon size={14} className={styles.legendDiamondDelayed} /> Entrega vencida
+          </span>
+          <span className={styles.legendItem}>
+            <span className={styles.legendTodayMarker} aria-hidden="true" /> Hoy
+          </span>
+          <span className={styles.legendItem}>
+            <span className={styles.legendCheck} aria-hidden="true">✓</span> Tarea aprobada
+          </span>
+          <span className={styles.legendItem}>
+            <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotUpcoming].join(' ')} aria-hidden="true" /> Tarea pendiente
+          </span>
+          <span className={styles.legendItem}>
+            <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotDelayed].join(' ')} aria-hidden="true" /> Tarea vencida
+          </span>
+        </> : <>
+
+        {!operationalView && (Object.keys(PHASE_ROADMAP_ROLE_LABELS) as Array<keyof typeof PHASE_ROADMAP_ROLE_LABELS>).map((role) => (
           <span key={role} className={styles.legendItem}>
             <span className={styles.legendDot} style={{ background: PHASE_ROADMAP_ROLE_COLORS[role] }} />
             {PHASE_ROADMAP_ROLE_LABELS[role]}
@@ -222,25 +311,42 @@ export function PhaseRoadmap({
         <span className={styles.legendItem}>
           <DiamondIcon size={14} className={styles.legendDiamondDelayed} /> Entrega atrasada
         </span>
-        <span className={styles.legendItem}>
+        {!operationalView && <span className={styles.legendItem}>
           <span className={styles.legendCheck}>✓</span> Tarea terminada
-        </span>
-        <span className={styles.legendItem}>
+        </span>}
+        {!operationalView && <span className={styles.legendItem}>
           <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotUpcoming].join(' ')} /> Tarea próxima
-        </span>
-        <span className={styles.legendItem}>
+        </span>}
+        {!operationalView && <span className={styles.legendItem}>
           <span className={[styles.legendDot, styles.legendTaskMark, styles.taskDotDelayed].join(' ')} /> Tarea atrasada
-        </span>
+        </span>}
         <span className={styles.legendHoy}>— Hoy</span>
-        <span className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</span>
+        {!operationalView && <span className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</span>}
+        </>}
       </div>
+      {operationalView && operationalPresaleHours != null && operationalPresaleHours > 0 && (
+        <p className={styles.operationalPresale}>
+          Preventa: {new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(operationalPresaleHours)} HH
+          de prospecto y cotización registradas antes del inicio. Cuentan como HH consumidas,
+          pero no forman parte del plan.
+        </p>
+      )}
 
       <div className={styles.phaseList}>
-        {phaseRoadmap.phases.map((phase) => (
+        {phaseRoadmap.phases.map((phase) => operationalView ? (
+          <OperationalPhaseCard key={phase.id} phase={phase} axis={axis}
+            placeholderRows={operationalRows?.(phase) ?? []}
+            onPlanRow={onPlanOperationalRow}
+            getMetrics={operationalMetrics}
+            renderHeaderName={renderPhaseHeaderName}
+            renderHeaderActions={renderPhaseHeaderActions}
+            renderReferences={renderPhaseReferences}
+            renderSelectionDetail={renderSelectionDetail} />
+        ) : (
           <PhaseCard
             key={phase.id}
             phase={phase}
-            axis={axis}
+            axis={axisByPhase.get(phase.id) ?? axis}
             expanded={alwaysExpanded || expandedPhaseIds.has(phase.id)}
             onToggle={() => { if (!alwaysExpanded) togglePhase(phase.id); }}
             staticHeader={alwaysExpanded}
@@ -252,6 +358,7 @@ export function PhaseRoadmap({
           />
         ))}
       </div>
+      {operationalView && operationalFooter && <div className={styles.operationalFooter}>{operationalFooter}</div>}
     </div>
   );
 }
@@ -266,6 +373,166 @@ function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
   return { leftPercent, widthPercent: Math.max(rightPercent - leftPercent, 0.8) };
 }
 
+const DELIVERY_STATE_LABEL: Readonly<Record<PhaseRoadmapDeliveryState, string>> = {
+  delivered: 'Realizada',
+  committed: 'Comprometida',
+  delayed: 'Atrasada',
+};
+
+const TASK_ITEM_STATE_LABEL: Readonly<Record<PhaseRoadmapTaskItemState, string>> = {
+  done: 'Terminada',
+  upcoming: 'Próxima',
+  delayed: 'Atrasada',
+};
+
+/** Mayor = más urgente: un grupo de marcadores muestra el símbolo del más urgente, así un atraso no queda escondido. */
+const DELIVERY_URGENCY: Readonly<Record<PhaseRoadmapDeliveryState, number>> = { delivered: 0, committed: 1, delayed: 2 };
+const TASK_ITEM_URGENCY: Readonly<Record<PhaseRoadmapTaskItemState, number>> = { done: 0, upcoming: 1, delayed: 2 };
+
+const deliverySymbol = (state: PhaseRoadmapDeliveryState) => (
+  <DiamondIcon
+    size={18}
+    className={
+      state === 'delivered'
+        ? styles.legendDiamondDone
+        : state === 'delayed'
+          ? styles.legendDiamondDelayed
+          : styles.legendDiamondCommitted
+    }
+  />
+);
+
+/** Terminada = el mismo ✓ que la leyenda (y que las tareas terminadas del Roadmap interno). */
+const taskItemSymbol = (state: PhaseRoadmapTaskItemState) =>
+  state === 'done' ? (
+    <span className={[styles.legendCheck, styles.markerTaskMark].join(' ')}>✓</span>
+  ) : (
+    <span
+      className={[styles.legendDot, styles.markerTaskMark, state === 'delayed' ? styles.taskDotDelayed : styles.taskDotUpcoming].join(' ')}
+    />
+  );
+
+/** Una entrega o tarea puntual de la fila "Entregas"/"Tareas", ya con su símbolo resuelto. */
+interface TimelineMarker {
+  readonly key: string;
+  readonly label: string;
+  /** ISO `YYYY-MM-DD`. */
+  readonly date: string;
+  readonly urgency: number;
+  readonly symbol: ReactNode;
+  readonly stateLabel: string;
+  readonly selection: PhaseRoadmapSelection;
+}
+
+/**
+ * Fila de marcadores de una fase. Los que caen el mismo día se dibujan como un solo marcador
+ * con contador ("2 entregas (8 Oct)") que abre la lista para elegir uno — antes se dibujaban
+ * todos en el mismo punto, encimados e ilegibles, y solo el de arriba se podía clicar.
+ */
+function MarkerTrackRow({
+  markers,
+  range,
+  variant,
+  pluralNoun,
+  showLabels,
+  selected,
+  onSelect,
+}: {
+  markers: readonly TimelineMarker[];
+  range: DateRange;
+  variant: 'delivery' | 'task';
+  /** "entregas" / "tareas" — etiqueta de un grupo. */
+  pluralNoun: string;
+  showLabels: boolean;
+  selected: PhaseRoadmapSelection | null;
+  onSelect: (selection: PhaseRoadmapSelection) => void;
+}) {
+  const groups = new Map<string, TimelineMarker[]>();
+  for (const marker of markers) groups.set(marker.date, [...(groups.get(marker.date) ?? []), marker]);
+  const visibleGroups = [...groups]
+    .map(([date, items]) => ({ date, items, leftPercent: percentOf(toDate(date), range) }))
+    .filter(({ leftPercent }) => leftPercent >= 0 && leftPercent <= 100);
+  const itemClassName = (isSelected: boolean) =>
+    [styles.markerItem, variant === 'task' ? styles.markerItemTask : '', isSelected ? styles.markerItemHighlighted : ''].join(' ');
+
+  return (
+    <div className={styles.trackRow}>
+      {visibleGroups.map(({ date, items, leftPercent }) => {
+        if (items.length === 1) {
+          const marker = items[0]!;
+          return (
+            <button
+              key={marker.key}
+              type="button"
+              className={itemClassName(sameSelection(selected, marker.selection))}
+              aria-label={`Ver ${variant === 'task' ? 'tarea' : 'entrega'} ${marker.label}: ${marker.stateLabel}`}
+              aria-pressed={sameSelection(selected, marker.selection)}
+              style={{ left: `${leftPercent}%` }}
+              title={`${marker.label} · ${formatShortDate(date)}`}
+              onClick={() => onSelect(marker.selection)}
+            >
+              {marker.symbol}
+              {showLabels && (
+                <span className={styles.markerLabel}>
+                  {marker.label} ({formatShortDate(date)})
+                </span>
+              )}
+            </button>
+          );
+        }
+
+        const lead = items.reduce((current, marker) => (marker.urgency > current.urgency ? marker : current));
+        const isSelected = items.some((marker) => sameSelection(selected, marker.selection));
+        return (
+          <div
+            key={date}
+            className={[
+              styles.markerGroup,
+              variant === 'task' ? styles.markerItemTask : '',
+              isSelected ? styles.markerGroupHighlighted : '',
+            ].join(' ')}
+            style={{ left: `${leftPercent}%` }}
+          >
+            <DropdownMenu
+              align="left"
+              trigger={({ onClick, open }) => (
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={open}
+                  aria-label={`Ver ${items.length} ${pluralNoun} del ${formatShortDate(date)}`}
+                  className={itemClassName(isSelected)}
+                  title={`${items.map((marker) => marker.label).join(' · ')} · ${formatShortDate(date)}`}
+                  onClick={onClick}
+                >
+                  <span className={styles.markerSymbol}>
+                    {lead.symbol}
+                    <span className={styles.markerCount}>{items.length}</span>
+                  </span>
+                  {showLabels && (
+                    <span className={styles.markerLabel}>
+                      {items.length} {pluralNoun} ({formatShortDate(date)})
+                    </span>
+                  )}
+                  {showLabels && <ChevronDownIcon size={12} className={styles.markerChevron} />}
+                </button>
+              )}
+              items={items.map((marker) => ({
+                key: marker.key,
+                label: marker.label,
+                icon: marker.symbol,
+                hint: marker.stateLabel,
+                active: sameSelection(selected, marker.selection),
+                onSelect: () => onSelect(marker.selection),
+              }))}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /**
  * Qué tramo/entrega/tarea/incidente está seleccionado dentro de una fase — decide
  * qué se muestra en "Registros de bitácora relacionados" (antes se mostraban
@@ -278,7 +545,7 @@ function barGeometry(task: PhaseRoadmapTask, range: DateRange) {
  * viene) identifica el ítem real — lo usa el Roadmap interno para su detalle.
  */
 export type PhaseRoadmapSelection =
-  | { kind: 'segment' | 'task' | 'delivery'; id?: string; label: string }
+  | { kind: 'segment' | 'task' | 'delivery' | 'reference-block'; id?: string; label: string }
   | { kind: 'incident' };
 
 const sameSelection = (a: PhaseRoadmapSelection | null, b: PhaseRoadmapSelection) => {
@@ -288,9 +555,18 @@ const sameSelection = (a: PhaseRoadmapSelection | null, b: PhaseRoadmapSelection
   return a.id !== undefined && b.id !== undefined ? a.id === b.id : a.label === b.label;
 };
 
+export interface OperationalRoadmapRow {
+  id: string;
+  role: keyof typeof PHASE_ROADMAP_ROLE_LABELS;
+  label: string;
+  hours: number;
+  /** Explica por qué aún no existe un bloque operativo. */
+  missingBlockMessage?: string;
+}
+
 export interface PhaseRoadmapProps {
   phaseRoadmap: ProjectPhaseRoadmap;
-  /** Contenido extra dentro de cada fase, bajo "Resumen de avance" (p.ej. la etapa editable del Roadmap interno). */
+  /** Contenido extra dentro de cada fase, bajo el zoom (p.ej. los datos de la fase del Roadmap interno). */
   renderPhaseExtras?: (phase: PhaseRoadmapPhase) => ReactNode;
   /** Referencias EDT en la fase, después del Gantt. Solo vista interna; portal cliente no cambia. */
   renderPhaseReferences?: (phase: PhaseRoadmapPhase) => ReactNode;
@@ -298,10 +574,25 @@ export interface PhaseRoadmapProps {
   renderSelectionDetail?: (phase: PhaseRoadmapPhase, selection: PhaseRoadmapSelection, clearSelection: () => void) => ReactNode;
   /** Extensiones exclusivas de la ficha interna; si se omiten el portal cliente permanece idéntico. */
   toolbarActions?: ReactNode;
+  /** Avisos operativos dentro del Roadmap interno, antes de la leyenda. */
+  operationalNotice?: ReactNode;
   /** Solo en ficha interna: elimina borde de la barra de filtros sin modificar el portal cliente. */
   borderlessSummary?: boolean;
   /** La ficha interna v5 mantiene todas las fases y su Gantt visibles; solo los detalles interiores colapsan. */
   alwaysExpanded?: boolean;
+  /** Diseño operativo v5.02 de la ficha interna; portal del cliente conserva el Roadmap anterior. */
+  operationalView?: boolean;
+  operationalTaskCount?: number;
+  operationalBlockCount?: number;
+  onPlanOperationalRow?: (phase: PhaseRoadmapPhase, row: OperationalRoadmapRow) => void;
+  /** Referencias pendientes: solo los segmentos persistidos dibujan barras del Gantt. */
+  operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
+  /** HH y avance comprobables de cada bloque operativo; no se inventan porcentajes. */
+  operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
+  /** HH reales de preventa previas al Hito 0, fuera del plan operativo. */
+  operationalPresaleHours?: number | null;
+  /** Acción al final de las fases, exclusiva de la ficha interna. */
+  operationalFooter?: ReactNode;
   renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;
   renderPhaseHeaderActions?: (phase: PhaseRoadmapPhase) => ReactNode;
 }
@@ -330,8 +621,9 @@ function PhaseCard({
   staticHeader?: boolean;
 }) {
   /** Igual que `zoomByModule` en `ProjectModulesCard` (Roadmap interno): un slider real, no un
-      toggle decorativo. Es estado de vista local, no una acción a conectar. */
-  const [zoom, setZoom] = useState(15);
+      toggle decorativo. Es estado de vista local, no una acción a conectar. Arranca en 0: con el
+      rango propio de la fase (`phaseRange`) la fase entera cabe sin desplazarse. */
+  const [zoom, setZoom] = useState(0);
   const today = startOfToday();
   /** Por debajo de este zoom la pista no ensancha lo suficiente (`scrollWidthPercent`)
    *  para separar tareas cercanas entre sí: sus etiquetas se solapan y quedan
@@ -364,28 +656,24 @@ function PhaseCard({
     return latest ? [latest] : [];
   }, [phase.relatedBitacora, selectedRelated]);
 
-  /** Chips de "Resumen de avance": % de avance por ámbito ponderado por HH
-   *  (`phase.scopeProgress`, del backend; sin él, % de tareas aprobadas) — clic
-   *  filtra/atenúa en la fila "Tareas" las que no son de ese ámbito. */
-  const [activeScope, setActiveScope] = useState<PhaseRoadmapTaskScope | null>(null);
-
-  const scopeStats = useMemo(() => {
-    const stats = new Map<PhaseRoadmapTaskScope, { total: number; done: number }>();
-    for (const item of phase.taskItems) {
-      const entry = stats.get(item.scope) ?? { total: 0, done: 0 };
-      entry.total += 1;
-      if (item.state === 'done') entry.done += 1;
-      stats.set(item.scope, entry);
-    }
-    return stats;
-  }, [phase.taskItems]);
-
-  const visibleDeliveries = phase.deliveries
-    .map((delivery) => ({ delivery, leftPercent: percentOf(toDate(delivery.date), axis.range) }))
-    .filter(({ leftPercent }) => leftPercent >= 0 && leftPercent <= 100);
-  const visibleTaskItems = phase.taskItems
-    .map((taskItem) => ({ taskItem, leftPercent: percentOf(toDate(taskItem.date), axis.range) }))
-    .filter(({ leftPercent }) => leftPercent >= 0 && leftPercent <= 100);
+  const deliveryMarkers: TimelineMarker[] = phase.deliveries.map((delivery, index) => ({
+    key: delivery.id ?? `delivery-${index}`,
+    label: delivery.label,
+    date: delivery.date,
+    urgency: DELIVERY_URGENCY[delivery.state],
+    symbol: deliverySymbol(delivery.state),
+    stateLabel: DELIVERY_STATE_LABEL[delivery.state],
+    selection: { kind: 'delivery', id: delivery.id, label: delivery.label },
+  }));
+  const taskItemMarkers: TimelineMarker[] = phase.taskItems.map((taskItem, index) => ({
+    key: taskItem.id ?? `task-${index}`,
+    label: taskItem.label,
+    date: taskItem.date,
+    urgency: TASK_ITEM_URGENCY[taskItem.state],
+    symbol: taskItemSymbol(taskItem.state),
+    stateLabel: TASK_ITEM_STATE_LABEL[taskItem.state],
+    selection: { kind: 'task', id: taskItem.id, label: taskItem.label },
+  }));
 
   return (
     <div className={styles.phaseCard}>
@@ -439,34 +727,6 @@ function PhaseCard({
       {expanded && (
         <div className={styles.phaseBody}>
           <div className={styles.summaryOfProgressRow}>
-            <span className={styles.summaryOfProgressLabel}>Resumen de avance</span>
-            <div className={styles.stageChips}>
-              {PHASE_ROADMAP_TASK_SCOPES.map((scope) => {
-                const stats = scopeStats.get(scope);
-                const percent =
-                  phase.scopeProgress !== undefined
-                    ? phase.scopeProgress[scope]
-                    : stats && stats.total > 0
-                      ? Math.round((stats.done / stats.total) * 100)
-                      : null;
-                const title =
-                  percent !== null
-                    ? `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: ${percent}% (${stats?.done ?? 0}/${stats?.total ?? 0} aprobadas)`
-                    : `${PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}: sin tareas registradas`;
-                return (
-                  <button
-                    key={scope}
-                    type="button"
-                    className={[styles.stageChip, activeScope === scope ? styles.stageChipActive : ''].join(' ')}
-                    title={title}
-                    onClick={() => setActiveScope((current) => (current === scope ? null : scope))}
-                  >
-                    {PHASE_ROADMAP_TASK_SCOPE_LABELS[scope]}
-                    {percent !== null && <span className={styles.stageChipPercent}>{percent}%</span>}
-                  </button>
-                );
-              })}
-            </div>
             <div className={styles.zoomRow}>
               <span>Semanas</span>
               <input
@@ -508,7 +768,8 @@ function PhaseCard({
                       className={styles.ganttMonth}
                       style={{ left: `${month.leftPercent}%`, width: `${month.widthPercent}%` }}
                     >
-                      {MONTH_LABELS[month.monthIndex]}
+                      {/* Un mes que apenas asoma en el borde (p.ej. el rango parte el 30) no lleva nombre: se encimaba con el siguiente. */}
+                      {month.widthPercent >= MIN_MONTH_LABEL_PERCENT && MONTH_LABELS[month.monthIndex]}
                     </span>
                   ))}
                   {axis.dayTicks.map((tick, index) => (
@@ -566,81 +827,27 @@ function PhaseCard({
                 })}
 
                 {phase.deliveries.length > 0 && (
-                  <div className={styles.trackRow}>
-                    {visibleDeliveries.map(({ delivery, leftPercent }, index) => {
-                      const selection: PhaseRoadmapSelection = { kind: 'delivery', id: delivery.id, label: delivery.label };
-                      const isSelected = sameSelection(selectedRelated, selection);
-                      return (
-                        <button
-                          key={delivery.id ?? index}
-                          type="button"
-                          className={[styles.markerItem, isSelected ? styles.markerItemHighlighted : ''].join(' ')}
-                          style={{ left: `${leftPercent}%` }}
-                          title={`${delivery.label} · ${formatShortDate(delivery.date)}`}
-                          onClick={() => toggleSelection(selection)}
-                        >
-                          <DiamondIcon
-                            size={18}
-                            className={
-                              delivery.state === 'delivered'
-                                ? styles.legendDiamondDone
-                                : delivery.state === 'delayed'
-                                  ? styles.legendDiamondDelayed
-                                  : styles.legendDiamondCommitted
-                            }
-                          />
-                          {!isFullPeriodView && (
-                            <span className={styles.markerLabel}>
-                              {delivery.label} ({formatShortDate(delivery.date)})
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <MarkerTrackRow
+                    markers={deliveryMarkers}
+                    range={axis.range}
+                    variant="delivery"
+                    pluralNoun="entregas"
+                    showLabels={!isFullPeriodView}
+                    selected={selectedRelated}
+                    onSelect={toggleSelection}
+                  />
                 )}
 
                 {phase.taskItems.length > 0 && (
-                  <div className={styles.trackRow}>
-                    {visibleTaskItems.map(({ taskItem, leftPercent }, index) => {
-                      const selection: PhaseRoadmapSelection = { kind: 'task', id: taskItem.id, label: taskItem.label };
-                      const isSelected = sameSelection(selectedRelated, selection);
-                      const isDimmed = activeScope !== null && taskItem.scope !== activeScope;
-                      return (
-                        <button
-                          key={taskItem.id ?? index}
-                          type="button"
-                          className={[
-                            styles.markerItem,
-                            styles.markerItemTask,
-                            isSelected ? styles.markerItemHighlighted : '',
-                            isDimmed ? styles.markerItemDimmed : '',
-                          ].join(' ')}
-                          style={{ left: `${leftPercent}%` }}
-                          title={`${taskItem.label} · ${formatShortDate(taskItem.date)}`}
-                          onClick={() => toggleSelection(selection)}
-                        >
-                          {/* Terminada = el mismo ✓ que la leyenda (y que las tareas terminadas del Roadmap interno). */}
-                          {taskItem.state === 'done' ? (
-                            <span className={[styles.legendCheck, styles.markerTaskMark].join(' ')}>✓</span>
-                          ) : (
-                            <span
-                              className={[
-                                styles.legendDot,
-                                styles.markerTaskMark,
-                                taskItem.state === 'delayed' ? styles.taskDotDelayed : styles.taskDotUpcoming,
-                              ].join(' ')}
-                            />
-                          )}
-                          {!isFullPeriodView && (
-                            <span className={styles.markerLabel}>
-                              {taskItem.label} ({formatShortDate(taskItem.date)})
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <MarkerTrackRow
+                    markers={taskItemMarkers}
+                    range={axis.range}
+                    variant="task"
+                    pluralNoun="tareas"
+                    showLabels={!isFullPeriodView}
+                    selected={selectedRelated}
+                    onSelect={toggleSelection}
+                  />
                 )}
               </div>
             </div>
@@ -672,5 +879,287 @@ function PhaseCard({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Presentación operativa del Roadmap v5.02. No es un segundo modelo de datos:
+ * la geometría reutiliza `barGeometry` y `buildTimelineAxis` del Gantt de Kora;
+ * las referencias sin fechas nunca reciben posiciones ni barras inventadas.
+ */
+function OperationalPhaseCard({
+  phase, axis, placeholderRows, onPlanRow, getMetrics, renderHeaderName, renderHeaderActions,
+  renderReferences, renderSelectionDetail,
+}: {
+  phase: PhaseRoadmapPhase;
+  axis: TimelineAxis;
+  placeholderRows: readonly OperationalRoadmapRow[];
+  onPlanRow?: PhaseRoadmapProps['onPlanOperationalRow'];
+  getMetrics?: PhaseRoadmapProps['operationalMetrics'];
+  renderHeaderName?: PhaseRoadmapProps['renderPhaseHeaderName'];
+  renderHeaderActions?: PhaseRoadmapProps['renderPhaseHeaderActions'];
+  renderReferences?: PhaseRoadmapProps['renderPhaseReferences'];
+  renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
+}) {
+  const [selected, setSelected] = useState<PhaseRoadmapSelection | null>(null);
+  const choose = (selection: PhaseRoadmapSelection) =>
+    setSelected((current) => sameSelection(current, selection) ? null : selection);
+  // Restaurar el zoom real del cronograma anterior, sin alterar el modelo de bloques v5.02.
+  // Cada fase conserva su propio zoom y el mismo eje para barras, entregas y tareas.
+  const [zoom, setZoom] = useState(0);
+  const showDays = zoom >= DETAIL_ZOOM_THRESHOLD;
+  // El zoom alto sí debe mostrar días (1, 2, 3…), no seguir en semanas.
+  // En rangos muy extensos se espacian etiquetas para impedir superposiciones.
+  const dayCount = axis.dayLines.length;
+  const dailyTickStride = zoom >= 85 ? (dayCount > 300 ? 2 : 1)
+    : zoom >= 65 ? (dayCount > 200 ? 3 : dayCount > 90 ? 2 : 1)
+      : dayCount > 120 ? 7 : dayCount > 45 ? 4 : 2;
+  const ticks = showDays
+    ? axis.dayLines.flatMap((leftPercent, index) => {
+      if (index % dailyTickStride !== 0) return [];
+      const date = shiftDays(axis.range.min, index);
+      return [{ leftPercent, label: date.getDate() === 1 || index === 0
+        ? formatAxisDay(date) : String(date.getDate()) }];
+    })
+    : axis.dayTicks;
+  const hasDatedRows = phase.tasks.length > 0;
+  const hasTimelineItems = hasDatedRows || phase.taskItems.length > 0 || phase.deliveries.length > 0;
+  const relatedEntries = selected?.kind === 'incident'
+    ? phase.relatedBitacora.filter((entry) => entry.kind === 'attention')
+    : selected && 'label' in selected
+      ? phase.relatedBitacora.filter((entry) =>
+          entry.title.toLowerCase().includes(selected.label.trim().toLowerCase())).slice(0, 1)
+      : [];
+  return (
+    <section className={[styles.phaseCard, styles.operationalPhase].join(' ')}
+      aria-label={phase.badge + ': ' + phase.name}>
+      <div className={[styles.phaseHeader, styles.operationalPhaseHeader].join(' ')}>
+        <span className={styles.phaseBadge}>{phase.badge}</span>
+        {renderHeaderName ? <span className={styles.phaseNameControl}>{renderHeaderName(phase)}</span> :
+          <strong className={styles.phaseName}>{phase.name}</strong>}
+        <span className={styles.phaseHeaderSpacer} />
+        {renderHeaderActions && <span className={styles.phaseHeaderActions}>
+          {renderHeaderActions(phase)}
+        </span>}
+        {phase.alertLabel && <button type="button" className={styles.alertBadge}
+          onClick={() => choose({ kind: 'incident' })}>⚑ {phase.alertLabel}</button>}
+      </div>
+      <div className={styles.operationalPhaseBody}>
+        {hasTimelineItems && <div className={styles.operationalZoomRow}>
+          <span>Semanas</span>
+          <button type="button" className={styles.operationalZoomButton}
+            disabled={zoom === 0} onClick={() => setZoom((value) => Math.max(0, value - 20))}
+            aria-label={'Alejar cronograma de ' + phase.name}>−</button>
+          <input type="range" min={0} max={100} step={5} value={zoom}
+            onChange={(event) => setZoom(Number(event.target.value))}
+            aria-label={'Zoom del cronograma de ' + phase.name + ': Semanas a Días'} />
+          <button type="button" className={styles.operationalZoomButton}
+            disabled={zoom === 100} onClick={() => setZoom((value) => Math.min(100, value + 20))}
+            aria-label={'Acercar cronograma de ' + phase.name}>+</button>
+          <span>Días</span>
+        </div>}
+        {(hasTimelineItems || placeholderRows.length > 0) && (
+          <div className={styles.operationalGanttViewport}>
+            <div className={styles.operationalGantt}
+              style={{ width: scrollWidthPercent(zoom) + '%' }}
+              data-zoom={zoom}>
+              {hasTimelineItems && (
+                <div className={styles.operationalTimelineHeading}>
+                  <div className={styles.operationalStickyLabel} />
+                  <div className={styles.operationalAxis}>
+                    {ticks.map((tick, index) => (
+                      <span key={index} style={{ left: tick.leftPercent + '%' }}>
+                        {tick.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            {phase.tasks.map((task, index) => {
+              const geometry = barGeometry(task, axis.range);
+              const metrics = getMetrics?.(phase, task);
+              // Conserva los estados visibles del Gantt de master. Un cierre
+              // real, NO el mero vencimiento del plazo, acredita el check.
+              const now = startOfToday();
+              const isClosed = Boolean(task.closedAt);
+              const isInProgress = toDate(task.startDate) <= now && now <= toDate(task.endDate);
+              const isFuture = toDate(task.startDate) > now;
+              const selection: PhaseRoadmapSelection = {
+                kind: 'segment', id: task.id, label: task.label,
+              };
+              const isSelected = sameSelection(selected, selection);
+              return <div key={task.id ?? index} className={styles.operationalLine}>
+                <button type="button" className={styles.operationalBlockLabel}
+                  title={task.label} aria-label={'Ver detalle del bloque ' + task.label}
+                  onClick={() => choose(selection)}>
+                  <span className={styles.operationalRole}
+                    style={{ background: OPERATIONAL_ROLE_COLORS[task.role] }}>
+                    {PHASE_ROADMAP_ROLE_LABELS[task.role]}
+                  </span>
+                  <span className={styles.operationalLabelText}>{task.label}
+                    {metrics && <small>{metrics.hours == null ? 'HH sin definir' : metrics.hours + ' HH'} · {metrics.progress == null ? 'avance sin definir' : metrics.progress + '% de avance'}</small>}
+                  </span>
+                </button>
+                <div className={styles.operationalTrack}>
+                  {axis.weekLines.map((percent, idx) =>
+                    <span key={idx} className={styles.operationalGridLine}
+                      style={{ left: percent + '%' }} />)}
+                  {showDays && axis.dayLines.map((percent, idx) =>
+                    <span key={'day-' + idx} className={styles.operationalDayGridLine}
+                      style={{ left: percent + '%' }} />)}
+                  {axis.todayPercent !== null && <span className={styles.operationalToday}
+                    style={{ left: axis.todayPercent + '%' }} />}
+                  {geometry && <>
+                    <button type="button"
+                      className={[styles.operationalBar,
+                         isFuture ? styles.operationalBarFuture : '',
+                         isSelected ? styles.operationalBarSelected : ''].filter(Boolean).join(' ')}
+                      aria-label={'Abrir bloque ' + task.label}
+                      aria-pressed={isSelected}
+                      style={{
+                        left: geometry.leftPercent + '%',
+                        width: geometry.widthPercent + '%',
+                        background: OPERATIONAL_ROLE_COLORS[task.role],
+                      }}
+                      title={task.label + ' · ' + formatShortDate(task.startDate) + ' a ' + formatShortDate(task.endDate)}
+                      onClick={() => choose(selection)}>
+                      {metrics?.progress != null && <span className={styles.operationalBarProgress}
+                        style={{ width: Math.min(100, Math.max(0, metrics.progress)) + '%' }} />}
+                      {(isClosed || isInProgress) && <span className={styles.operationalBarState}>
+                        {isClosed ? '✓ ' + PHASE_ROADMAP_ROLE_LABELS[task.role] : 'En curso'}
+                      </span>}
+                    </button>
+                    {(() => {
+                      const closed = Boolean(task.closedAt);
+                      const plannedPosition = percentOf(toDate(task.endDate), axis.range);
+                      const actualDate = task.closedAt?.slice(0, 10);
+                      const actualPosition = actualDate
+                        ? percentOf(toDate(actualDate), axis.range) : null;
+                      const sameDay = actualDate === task.endDate;
+                      const overdue = !closed && toDate(task.endDate) < startOfToday();
+                      const planned = plannedPosition >= 0 && plannedPosition <= 100;
+                      const actual = actualPosition !== null &&
+                        actualPosition >= 0 && actualPosition <= 100;
+                      return <>
+                        {planned && (!closed || !sameDay) && <button type="button"
+                          aria-label={(overdue ? 'Cierre vencido ' : 'Cierre planificado ') + task.label}
+                          title={'Cierre planificado: ' + formatShortDate(task.endDate)}
+                          className={styles.operationalClosureMarker}
+                          style={{ left: Math.max(0.6, Math.min(99.4, plannedPosition)) + '%' }}
+                          onClick={() => choose(selection)}>
+                          <DiamondIcon size={16} className={overdue
+                            ? styles.legendDiamondDelayed : styles.legendDiamondPlanned} />
+                        </button>}
+                        {closed && actual && <button type="button"
+                          aria-label={'Cierre real ' + task.label}
+                          title={'Cierre real: ' + formatShortDate(actualDate!)}
+                          className={styles.operationalClosureMarker}
+                          style={{ left: Math.max(0.6, Math.min(99.4, actualPosition)) + '%' }}
+                          onClick={() => choose(selection)}>
+                          <DiamondIcon size={16} className={styles.legendDiamondDone} />
+                        </button>}
+                      </>;
+                    })()}
+                  </>}
+                </div>
+              </div>;
+            })}
+            {phase.deliveries.length > 0 && <div className={styles.operationalLine}>
+              <span className={[styles.operationalEventTitle, styles.operationalStickyLabel].join(' ')}>
+                Entregas · {phase.deliveries.length}
+              </span>
+              <div className={[styles.operationalTrack, styles.operationalMarkerTrack].join(' ')}>
+                <MarkerTrackRow
+                  markers={phase.deliveries.map((delivery, index) => ({
+                    key: delivery.id ?? 'delivery-' + index,
+                    label: delivery.label, date: delivery.date,
+                    urgency: DELIVERY_URGENCY[delivery.state],
+                    symbol: deliverySymbol(delivery.state),
+                    stateLabel: DELIVERY_STATE_LABEL[delivery.state],
+                    selection: { kind: 'delivery' as const, id: delivery.id, label: delivery.label },
+                  }))}
+                  range={axis.range} variant="delivery" pluralNoun="entregas"
+                  showLabels={showDays} selected={selected} onSelect={choose}
+                />
+              </div>
+            </div>}
+            {phase.taskItems.length > 0 && (
+              <div className={styles.operationalLine}>
+                <span className={[styles.operationalEventTitle, styles.operationalStickyLabel].join(' ')}>
+                  Tareas
+                </span>
+                <div className={[styles.operationalTrack, styles.operationalMarkerTrack].join(' ')}>
+                  {showDays && axis.dayLines.map((percent, idx) =>
+                    <span key={idx} className={styles.operationalDayGridLine}
+                      style={{ left: percent + '%' }} />)}
+                  {/* Una sola fila, como el cronograma original. MarkerTrackRow agrupa
+                      automáticamente las tareas con igual fecha límite y permite elegir
+                      cada una en el desplegable, conservando sus estados y sus IDs. */}
+                  <MarkerTrackRow
+                    markers={phase.taskItems.map((task, index) => ({
+                      key: task.id ?? 'task-' + index,
+                      label: task.label, date: task.date,
+                      urgency: TASK_ITEM_URGENCY[task.state],
+                      symbol: taskItemSymbol(task.state),
+                      stateLabel: TASK_ITEM_STATE_LABEL[task.state],
+                      selection: { kind: 'task' as const, id: task.id, label: task.label },
+                    }))}
+                    range={axis.range} variant="task" pluralNoun="tareas"
+                    showLabels={showDays} selected={selected} onSelect={choose}
+                  />
+                </div>
+              </div>
+            )}
+            {placeholderRows.map((row) => {
+              const selection: PhaseRoadmapSelection = {
+                kind: 'reference-block', id: row.id, label: row.label,
+              };
+              const isSelected = sameSelection(selected, selection);
+              return <div key={row.id} className={[
+                styles.operationalLine, styles.operationalReferenceRow,
+                isSelected ? styles.operationalReferenceSelected : '',
+              ].filter(Boolean).join(' ')}>
+                <button type="button" className={styles.operationalBlockLabel}
+                  title={row.label} aria-label={'Abrir bloque ' + row.label}
+                  onClick={() => choose(selection)}>
+                  <span className={styles.operationalRole}
+                    style={{ background: OPERATIONAL_ROLE_COLORS[row.role] }}>
+                    {PHASE_ROADMAP_ROLE_LABELS[row.role]}
+                  </span>
+                  <span className={styles.operationalLabelText}>
+                    {row.label}<small>{row.hours} HH de referencia · sin bloque operativo</small>
+                  </span>
+                </button>
+                <div className={styles.operationalNoDates}>
+                  <button type="button" className={styles.operationalOpenReference}
+                    onClick={() => choose(selection)}>
+                    {row.missingBlockMessage ??
+                      'Se generará al iniciar el proyecto desde la cotización aprobada.'}
+                  </button>
+                  {onPlanRow && <button type="button" onClick={() => onPlanRow(phase, row)}>
+                    Planificar bloque
+                  </button>}
+                </div>
+              </div>;
+            })}
+            </div>
+          </div>
+        )}
+        {selected && renderSelectionDetail?.(phase, selected, () => setSelected(null))}
+        {renderReferences?.(phase)}
+        {selected && phase.relatedBitacora.length > 0 && (
+          <div className={styles.relatedBitacora}>
+            <div className={styles.relatedBitacoraLabelRow}>
+              <span className={styles.relatedBitacoraLabel}>Registros de bitácora relacionados</span>
+              <button type="button" className={styles.relatedBitacoraReset}
+                onClick={() => setSelected(null)}>Quitar selección</button>
+            </div>
+            {relatedEntries.length
+              ? relatedEntries.map((entry) => <BitacoraEntryRow key={entry.id} entry={entry} />)
+              : <p className={styles.relatedBitacoraEmpty}>No hay registros para esta selección.</p>}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }

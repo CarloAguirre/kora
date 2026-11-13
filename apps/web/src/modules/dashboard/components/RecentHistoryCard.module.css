@@ -3,7 +3,6 @@
   flex-direction: column;
   gap: var(--kora-space-4);
 }
-
 .header {
   display: flex;
   justify-content: space-between;
@@ -11,18 +10,85 @@
   gap: var(--kora-space-3);
   flex-wrap: wrap;
 }
-
 .title {
   margin: 0;
   font-size: var(--kora-text-xl);
   font-weight: var(--kora-weight-bold);
   color: var(--kora-navy);
 }
-
-.weekSelect {
-  min-width: 200px;
+.empty { color: var(--kora-text-disabled); }
+.linkPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 110px;
 }
-
-.empty {
-  color: var(--kora-text-disabled);
+.linkPills span {
+  border-radius: 4px;
+  background: #eef1f7;
+  color: #60718f;
+  padding: 3px 5px;
+  font-size: 10px;
+  line-height: 1.4;
+  max-width: 240px;
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  white-space: nowrap;
+}
+/* Detalle de HH: presentación local con tokens del UI Kit Kora.
+   Modal/encabezado/pie y acciones siguen siendo los componentes compartidos. */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.detailRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--kora-space-3);
+  padding: var(--kora-space-2) 0;
+  border-bottom: 1px solid var(--kora-border-subtle);
+}
+.detailRow:last-child { border-bottom: 0; }
+.detailRow dt {
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  color: var(--kora-text-muted);
+  line-height: 1.5;
+}
+.detailRow dd {
+  margin: 0;
+  color: var(--kora-text);
+  font-size: var(--kora-text-sm);
+  line-height: 1.5;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.statusDetail {
+  display: flex;
+  gap: var(--kora-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.statusDetail > span:last-child:not(:first-child) {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+.note {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-text-muted);
+  margin: var(--kora-space-2) 0 0;
+}
+@media (max-width: 540px) {
+  .detailRow { grid-template-columns: minmax(90px, 34%) minmax(0, 1fr); }
+  .detailRow dt, .detailRow dd { font-size: var(--kora-text-xs); }
 }

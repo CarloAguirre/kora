@@ -71,6 +71,174 @@
   background: var(--kora-lime-surface);
 }
 
+.boardDragging,
+.boardDragging * {
+  cursor: grabbing !important;
+}
+
+/* ─── Carga ─── */
+
+/* Al cambiar filtros el tablero se queda con el resultado anterior, atenuado,
+   hasta que respondan todas las columnas. */
+.board .columnBody {
+  transition: opacity 0.2s;
+}
+
+.boardSyncing .columnBody {
+  opacity: 0.55;
+}
+
+.columnBodyEnter {
+  animation: bodyEnter 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+}
+
+@keyframes bodyEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* Mismo shimmer que `DataTable` (`.skeletonBar`). */
+.skeletonBar {
+  display: block;
+  height: 14px;
+  border-radius: var(--kora-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--kora-surface-disabled) 25%,
+    var(--kora-surface-muted) 50%,
+    var(--kora-surface-disabled) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.skeletonCard,
+.skeletonCard:hover {
+  border-color: var(--kora-blue-200);
+  box-shadow: none;
+  cursor: default;
+}
+
+.skeletonCount {
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+.skeletonChip {
+  width: 44px;
+  height: 24px;
+}
+
+.skeletonTitle {
+  width: 85%;
+  height: 19px;
+}
+
+.skeletonLine {
+  height: 19px;
+}
+
+/* ─── Drag & drop ─── */
+
+/* Hueco donde va a caer la tarjeta: cerrado (alto 0, compensando el `gap`
+   de la columna) en toda columna destino, se abre al pasar por encima. */
+.dropSlot {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin-top: calc(-1 * var(--kora-space-2));
+  border-radius: var(--kora-radius-lg);
+  border: 0 dashed var(--kora-lime-mid);
+  background: color-mix(in srgb, var(--kora-lime) 14%, transparent);
+  opacity: 0;
+  transition:
+    height 0.24s cubic-bezier(0.2, 0.9, 0.3, 1),
+    margin 0.24s cubic-bezier(0.2, 0.9, 0.3, 1),
+    border-width 0.24s,
+    opacity 0.2s;
+}
+
+.dropSlotOpen {
+  margin-top: 0;
+  border-width: 2px;
+  opacity: 1;
+}
+
+/* Tarjeta flotante que sigue al cursor (montada en `body`). El `transform`
+   de posición/inclinación lo pone el hook frame a frame. */
+.dragOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--kora-z-toast);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.dragOverlayCard {
+  border-radius: var(--kora-radius-lg);
+  transform: scale(1.04);
+  box-shadow:
+    0 22px 45px -12px rgba(18, 34, 53, 0.35),
+    0 8px 16px -6px rgba(18, 34, 53, 0.18);
+  animation: liftCard 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition:
+    transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1),
+    box-shadow 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.dragOverlayCardLanding {
+  transform: scale(1);
+  box-shadow: var(--kora-shadow-sm);
+}
+
+.dragOverlayCard .ticket {
+  border-color: var(--kora-lime-mid);
+}
+
+@keyframes liftCard {
+  from {
+    transform: scale(1);
+    box-shadow: var(--kora-shadow-sm);
+  }
+}
+
+/* La tarjeta original queda como "sombra" en su columna mientras se arrastra. */
+.ticketGhost {
+  opacity: 0.4;
+  border-style: dashed;
+  transform: scale(0.97);
+  box-shadow: none !important;
+}
+
+.ticketHidden {
+  visibility: hidden;
+}
+
+/* Pulso al aterrizar en la columna nueva. */
+.ticketSettled {
+  animation: settleCard 0.7s ease-out;
+}
+
+@keyframes settleCard {
+  0% {
+    border-color: var(--kora-lime-mid);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--kora-lime) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
 .columnHeader {
   font-size: var(--kora-text-lg);
   font-weight: var(--kora-weight-bold);
@@ -102,7 +270,11 @@
   border: 1px solid var(--kora-blue-400);
   background: var(--kora-surface);
   cursor: grab;
-  transition: box-shadow 0.2s;
+  user-select: none;
+  transition:
+    box-shadow 0.2s,
+    opacity 0.2s,
+    transform 0.2s;
   box-sizing: border-box;
   text-align: left;
 }

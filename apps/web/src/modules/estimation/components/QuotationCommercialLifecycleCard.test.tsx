@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProjectDetail, ProjectQuotation, QuotationVersion } from '@kora/contracts';
 import { QuotationCommercialLifecycleCard } from './QuotationCommercialLifecycleCard';
+import buttonStyles from '@/shared/components/ui/Button.module.css';
 
 const mocks = vi.hoisted(() => ({
   acceptAi: vi.fn(), markSent: vi.fn(), approveClient: vi.fn(), transferApproved: vi.fn(),
-  toastError: vi.fn(),
+  toastError: vi.fn(), toastSuccess: vi.fn(),
 }));
 vi.mock('@/shared/components/ui/Toast', () => ({
-  useToast: () => ({ error: mocks.toastError }),
+  useToast: () => ({ error: mocks.toastError, success: mocks.toastSuccess }),
 }));
 vi.mock('../api/quotation.queries', () => ({
   useQuotationLifecycle: () => ({
@@ -68,8 +69,18 @@ describe('Ciclo comercial separado · Kora', () => {
     render(<QuotationCommercialLifecycleCard project={project} quotation={quotation}
       version={{ ...version, aiReviewStatus: 'accepted' }} canOperate
       hasUnsavedChanges={false} embedded showAiAcceptance={false} />);
-    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' })).toBeEnabled();
+    const requiredClass = (value: string | undefined) => {
+      if (!value) throw new Error('Clase compartida Button ausente');
+      return value;
+    };
+    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' }))
+      .toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Marcar como enviada al cliente' }))
+      .toHaveClass(requiredClass(buttonStyles.outline));
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }))
+      .toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }))
+      .toHaveClass(requiredClass(buttonStyles.secondary));
     expect(screen.queryByText('Ciclo comercial de la cotización')).not.toBeInTheDocument();
     expect(screen.queryByText('Opciones de aprobación y traspaso')).not.toBeInTheDocument();
     expect(screen.queryByText('La fuente documental es el PDF KDM de prueba.'))
@@ -84,10 +95,10 @@ describe('Ciclo comercial separado · Kora', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }));
     expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Acepta la propuesta IA'));
     expect(mocks.approveClient).not.toHaveBeenCalled();
-    const notice = screen.getByRole('status', { name: 'Requisitos comerciales pendientes' });
-    expect(notice).toHaveTextContent('Acepta la propuesta IA en el bloque violeta');
-    expect(notice).not.toHaveTextContent('Completa el plan de pago');
-    expect(notice).not.toHaveTextContent('Asigna equipos Kora y horas');
+    expect(mocks.toastError).not.toHaveBeenCalledWith(
+      expect.stringContaining('Completa el plan de pago'));
+    expect(screen.queryByRole('status', { name: 'Requisitos comerciales pendientes' }))
+      .not.toBeInTheDocument();
   });
 
   it('muestra cada bloqueo comercial restante sin depender del tooltip', () => {
@@ -96,11 +107,13 @@ describe('Ciclo comercial separado · Kora', () => {
         draft: { ...version.draft, paymentPlan: [{ name: 'Inicio', percent: 50,
           trigger: 'approval' }] } }} canOperate hasUnsavedChanges
       embedded showAiAcceptance={false}/>);
-    const notice = screen.getByRole('status', { name: 'Requisitos comerciales pendientes' });
-    expect(notice).toHaveTextContent('Guarda los cambios del borrador.');
-    expect(notice).toHaveTextContent('Ingresa y guarda un valor HH');
-    expect(notice).toHaveTextContent('50% de 100%');
-    expect(notice).toHaveTextContent('Acepta la propuesta IA');
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación del cliente' }));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Guarda los cambios del borrador.'));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Ingresa y guarda un valor HH'));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('50% de 100%'));
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Acepta la propuesta IA'));
+    expect(screen.queryByRole('status', { name: 'Requisitos comerciales pendientes' }))
+      .not.toBeInTheDocument();
   });
 
   it('resumen v5 bloquea envío y aprobación mientras haya cambios sin guardar', () => {
@@ -134,6 +147,8 @@ describe('Ciclo comercial separado · Kora', () => {
     await waitFor(() => expect(mocks.markSent).toHaveBeenCalledWith({
       versionId: version.id, revision: 3,
     }));
+    await waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledWith(
+      'Envío registrado. La versión quedó bloqueada.'));
   });
 
   it('la aprobación con traspaso después no altera el proyecto', async () => {
@@ -148,14 +163,40 @@ describe('Ciclo comercial separado · Kora', () => {
     expect(mocks.transferApproved).not.toHaveBeenCalled();
   });
 
-  it('versión aprobada muestra traspaso pendiente, bloqueado si ya está Activo', () => {
+  it('la aprobada de proyecto Activo puede solicitar traspaso con validación del servidor', async () => {
     show({ ...version, status: 'approved', aiReviewStatus: 'accepted' },
       { ...project, status: 'active' });
-    expect(screen.getByRole('button', { name: 'Traspasar ahora' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Traspasar ahora' }));
-    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('requiere conciliación'));
+    expect(screen.getByText('Traspasar a la ficha del proyecto')).toBeInTheDocument();
     expect(mocks.transferApproved).not.toHaveBeenCalled();
-    expect(screen.getByText(/La versión aprobada permanece registrada/)).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Traspasar' }));
+    await waitFor(() => expect(mocks.transferApproved).toHaveBeenCalledWith({
+      versionId: version.id, revision: version.revision,
+    }));
+  });
+
+  it('permite escoger traspaso ahora al aprobar en un proyecto Activo', async () => {
+    show({ ...version, status: 'sent', aiReviewStatus: 'accepted' }, { ...project, status: 'active' });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar aprobación' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/proyecto está Activo/)).toBeInTheDocument();
+    const option = within(dialog).getByLabelText(/Aprobar y traspasar ahora/);
+    expect(option).toBeEnabled();
+    fireEvent.click(option);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar aprobación' }));
+    await waitFor(() => expect(mocks.approveClient).toHaveBeenCalled());
+    expect(await screen.findByText('Traspasar a la ficha del proyecto')).toBeInTheDocument();
+    expect(mocks.transferApproved).not.toHaveBeenCalled();
+  });
+
+  it('una cotización traspasada no muestra acciones comerciales', () => {
+    render(<QuotationCommercialLifecycleCard project={project}
+      quotation={{ ...quotation, transferredVersionId: version.id }}
+      version={{ ...version, status: 'approved', aiReviewStatus: 'accepted' }}
+      canOperate hasUnsavedChanges={false} embedded />);
+    expect(screen.getByText(/Cotización aprobada y traspasada/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Traspasar/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Registrar aprobación/ })).not.toBeInTheDocument();
   });
 
   it('permite aprobar un borrador sin envío solo con advertencia y confirmación reforzada', async () => {

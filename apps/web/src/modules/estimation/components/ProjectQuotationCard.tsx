@@ -2,18 +2,30 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isQuotationDraftEligibleProject, type ProjectDetail, type QuotationVersion } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
-import { useAppliedQuotationPlanning, useDeleteQuotationVersion, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { useAppliedQuotationPlanning, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
-import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
+import { Badge } from '@/shared/components/ui/Badge';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
+import { quotationCommercialBlockers } from './quotation-commercial-blockers';
 import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLifecycleDialogs';
 import styles from './ProjectQuotationCard.module.css';
 
 export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
-  const { data, isLoading, error } = useProjectQuotation(project.id);
-  const applied = useAppliedQuotationPlanning(project.id);
+  const { user } = useAuth();
+  const { can } = usePermissions();
+  // Igual que la ruta /calculadora y la autorización de cotizaciones en API:
+  // proyectos:manage o líder de ESTE proyecto con projects:read_assigned.
+  // No basta con poder consultar el proyecto ni con liderar otro equipo.
+  const canAccessCalculator = can('projects:manage') ||
+    (can('projects:read_assigned') && user?.id === project.leader?.id);
+  // Evitar incluso solicitar las cifras comerciales si no está autorizado.
+  const { data, isLoading, error } = useProjectQuotation(
+    canAccessCalculator ? project.id : null,
+  );
+  const applied = useAppliedQuotationPlanning(canAccessCalculator ? project.id : null);
   const lifecycle = useQuotationLifecycle(project.id);
-  const deleteVersion = useDeleteQuotationVersion(project.id);
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
   const [newOpen, setNewOpen] = useState(false);
@@ -24,11 +36,16 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   );
   const [transferFromApproval, setTransferFromApproval] = useState(false);
   const [transferRevision, setTransferRevision] = useState<number | null>(null);
-  const { confirm, dialog: confirmationDialog } = useConfirmAction();
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
-  const eligible = isQuotationDraftEligibleProject(project);
+  // El traspaso cierra todas las versiones del proyecto, incluso las no seleccionadas.
+  const closed = Boolean(data?.transferredVersionId);
+  const eligible = isQuotationDraftEligibleProject(project) && !closed;
   const transferredVersion = versions.find((version) => version.id === data?.transferredVersionId);
   const registerApproval = (version: QuotationVersion) => {
+    // Prevalidación compartida con la calculadora; el backend vuelve a validar.
+    if (quotationCommercialBlockers(version, {
+      dirty: false, canOperate: eligible, demoProduction: import.meta.env.PROD,
+    }).length > 0) return;
     setActionError(''); setActionNotice('');
     setTransferTiming(project.status === 'draft' ? 'now' : 'later');
     setApproving(version);
@@ -43,7 +60,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
         ...(approving.status === 'draft' ? { confirmWithoutSend: true as const } : {}),
       });
       setApproving(null);
-      if (transferTiming === 'now' && project.status === 'draft') {
+      if (transferTiming === 'now' && (project.status === 'draft' || project.status === 'active')) {
         setTransferring(approving);
         setTransferRevision(approved.revision);
         setTransferFromApproval(true);
@@ -55,17 +72,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
     }
   };
 
-  const removeVersion = async (versionId: string, revision: number,
-    versionNumber: number, name: string) => {
-    setActionError(''); setActionNotice('');
-    if (!await confirm({ title: 'Eliminar cotización v' + versionNumber, description: '¿Eliminar definitivamente la cotización «' + name + '»? Esta acción no se puede deshacer. No se modificarán otras versiones ni la planificación del proyecto.', confirmLabel: 'Eliminar cotización', destructive: true })) return;
-    try {
-      await deleteVersion.mutateAsync({ versionId, revision });
-      setActionNotice('Cotización v' + versionNumber + ' eliminada.');
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'No fue posible eliminar la cotización.');
-    }
-  };
   const transferNow = (version: QuotationVersion) => {
     setActionError(''); setActionNotice('');
     setTransferFromApproval(false);
@@ -96,6 +102,8 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
     }
   };
   const number = (n: number) => n.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+  if (!canAccessCalculator) return null;
+
   return (
     <section className={styles.tabContent} aria-label="Cotizaciones del proyecto">
       {isLoading ? <p className={styles.helper}>Consultando cotizaciones…</p>
@@ -116,23 +124,31 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
               </div>
               {eligible && <Button size="sm" onClick={() => setNewOpen(true)}>+ Nueva versión</Button>}
             </div>
-            {versions[0]?.status === 'approved' && data?.transferredVersionId !== versions[0]?.id && (
-              <p className={styles.helper}>Existe una versión aprobada con traspaso pendiente.</p>
-            )}
+            {closed ? (
+              <p className={styles.closedNotice}>Cotización aprobada y traspasada a la ficha del proyecto. Historial cerrado: no se pueden crear nuevas versiones.</p>
+            ) : versions.some((version) => version.status === 'approved') ? (
+              <p className={styles.helper}>Cotización aprobada por el cliente · traspaso pendiente. La versión se conserva hasta confirmar el traspaso.</p>
+            ) : null}
             <div className={styles.scroll}>
               <table className={styles.versions}>
                 <thead><tr><th>Versión</th><th>Estado</th><th>Horas</th><th>Total</th><th>Acciones</th></tr></thead>
-                <tbody>{versions.map((v) => (
-                  <tr key={v.id} className={v.status === 'sent' ? styles.sentRow : undefined}>
+                <tbody>{versions.map((v) => {
+                  const approvalBlockers = quotationCommercialBlockers(v, {
+                    dirty: false, canOperate: eligible, demoProduction: import.meta.env.PROD,
+                  });
+                  return <tr key={v.id} className={v.status === 'sent' ? styles.sentRow : undefined}>
                     <td><strong>v{v.versionNumber} · {v.name}</strong>
                       <small>{new Date(v.createdAt).toLocaleDateString('es-CL')}
-                        {v.origin === 'ai' ? ' · Origen IA (KDM de prueba)' : ''}</small></td>
-                    <td><span className={styles.status}>
-                      {data?.transferredVersionId === v.id ? 'Traspasada' :
-                        applied.data?.versionId === v.id ? 'Planificación previa (sin aprobación)' :
-                        v.status === 'draft' ? 'Borrador' :
-                          v.status === 'sent' ? 'Enviada al cliente' : 'Aprobada · traspaso pendiente'}
-                    </span></td>
+                        {v.origin === 'ai' ? (v.draft.aiPoc?.source === 'kdm_demo' ? ' · Agente IA (KDM demo)' : ' · Agente IA') : ''}</small></td>
+                    <td><div className={styles.statuses}>
+                      {data?.transferredVersionId === v.id ? <Badge tone="success">Traspasada</Badge> :
+                        applied.data?.versionId === v.id ? <Badge tone="warning">Planificación previa</Badge> :
+                          v.status === 'draft' ? <Badge tone="neutral">Borrador</Badge> :
+                            v.status === 'sent' ? <Badge tone="info">Enviada al cliente</Badge> :
+                              <Badge tone="success">Aprobada por el cliente</Badge>}
+                      {!closed && v.status === 'draft' && v.origin === 'ai' && v.aiReviewStatus === 'pending' &&
+                        <Badge tone="brand">✦ Por revisar</Badge>}
+                    </div></td>
                     <td>{number(v.totalHours)} HH</td>
                     <td>{v.totalAmount === null ? 'Sin valor HH' : number(v.totalAmount) + ' ' + v.currency}</td>
                     <td>
@@ -141,50 +157,62 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                           Abrir en calculadora
                         </Link>
                         {eligible && (v.status === 'sent' || v.status === 'draft') &&
-                          <Button size="sm" variant="ghost"
-                            disabled={lifecycle.approveClient.isPending}
-                            onClick={() => registerApproval(v)}>
-                            Registrar aprobación
-                          </Button>}
+                          (approvalBlockers.length > 0
+                            ? <Link to={projectQuotationPath(project) + '?version=' + v.id}
+                                title={'Completa la cotización antes de aprobar:\n' +
+                                  approvalBlockers.join('\n')}>
+                                Registrar aprobación
+                              </Link>
+                            : <Button size="sm" variant="ghost"
+                                disabled={lifecycle.approveClient.isPending}
+                                onClick={() => registerApproval(v)}>
+                                Registrar aprobación
+                              </Button>
+                          )}
                         {eligible && v.status === 'approved' &&
                           data?.transferredVersionId !== v.id &&
                           <Button size="sm" variant="ghost"
-                            disabled={lifecycle.transferApproved.isPending || project.status !== 'draft'}
+                            disabled={lifecycle.transferApproved.isPending}
                             onClick={() => transferNow(v)}>
                             Traspasar ahora
                           </Button>}
-                        {eligible && data?.transferredVersionId !== v.id && (
-                          <Button size="sm" variant="ghost"
-                            disabled={deleteVersion.isPending}
-                            onClick={() => void removeVersion(v.id, v.revision, v.versionNumber, v.name)}>
-                            Eliminar
-                          </Button>
-                        )}
                       </div>
                     </td>
-                  </tr>
-                ))}</tbody>
+                  </tr>;
+                })}</tbody>
               </table>
             </div>
             {transferredVersion && (
               <div className={styles.commercialSummary}>
-                <h3>Resumen comercial · versión traspasada v{transferredVersion.versionNumber}</h3>
-                <p>Consulta histórica; no modifica el proyecto operativo.</p>
-                <div className={styles.summaryGrid}>
-                  <span>Valor HH: <strong>{transferredVersion.hourlyRate ?? '—'} {transferredVersion.currency}</strong></span>
-                  <span>HH cotizadas: <strong>{number(transferredVersion.totalHours)}</strong></span>
-                  <span>Neto: <strong>{transferredVersion.netAmount ?? '—'} {transferredVersion.currency}</strong></span>
-                  <span>Total: <strong>{transferredVersion.totalAmount ?? '—'} {transferredVersion.currency}</strong></span>
+                <div className={styles.summaryHead}>
+                  <div>
+                    <h3>Resumen comercial</h3>
+                    <p>Copia fija de la v{transferredVersion.versionNumber}, traspasada a la ficha del proyecto.</p>
+                  </div>
+                  <span className={styles.calculatorOnlyBadge}>Solo usuarios de la calculadora</span>
                 </div>
-                {transferredVersion.draft.costs.length > 0 && (
-                  <p>Costos externos: {transferredVersion.draft.costs.map((cost) =>
-                    cost.description + ' (' + cost.amount + ' ' + transferredVersion.currency + ' · ' +
-                    cost.recurrence + ')').join('; ')}</p>
-                )}
-                {transferredVersion.draft.assumptions.length > 0 && (
-                  <p>Supuestos: {transferredVersion.draft.assumptions.join('; ')}</p>
-                )}
-                <Link to={projectQuotationPath(project) + '?version=' + transferredVersion.id}>
+                <div className={styles.summaryGrid}>
+                  <span><small>Valor HH</small><strong>{transferredVersion.hourlyRate === null ? '—' : number(transferredVersion.hourlyRate)} {transferredVersion.currency}</strong></span>
+                  <span><small>Horas cotizadas</small><strong>{number(transferredVersion.totalHours)} HH</strong></span>
+                  <span><small>Neto</small><strong>{transferredVersion.netAmount === null ? '—' : number(transferredVersion.netAmount)} {transferredVersion.currency}</strong></span>
+                  <span><small>Total con IVA</small><strong>{transferredVersion.totalAmount === null ? '—' : number(transferredVersion.totalAmount)} {transferredVersion.currency}</strong></span>
+                </div>
+                <div className={styles.costsScroll}>
+                  <table className={styles.costsTable}>
+                    <thead><tr><th>Licencia o costo externo</th><th>Cobro</th><th>Monto</th></tr></thead>
+                    <tbody>{(transferredVersion.draft.costs ?? []).length === 0 ? (
+                      <tr><td colSpan={3} className={styles.noCosts}>Sin licencias ni costos externos.</td></tr>
+                    ) : (transferredVersion.draft.costs ?? []).map((cost, index) =>
+                      <tr key={index}>
+                        <td>{cost.description}</td>
+                        <td>{cost.recurrence === 'once' ? 'Único'
+                          : cost.recurrence === 'monthly' ? 'Mensual' : 'Anual'}</td>
+                        <td>{number(cost.amount)} {transferredVersion.currency}</td>
+                      </tr>)}</tbody>
+                  </table>
+                </div>
+                <Link className={styles.commercialDetailLink}
+                  to={projectQuotationPath(project) + '?version=' + transferredVersion.id}>
                   Ver ficha comercial completa
                 </Link>
               </div>
@@ -193,7 +221,6 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
         )}
       {actionError && <p role="alert" className={styles.error}>{actionError}</p>}
       {actionNotice && <p role="status" className={styles.helper}>{actionNotice}</p>}
-      {confirmationDialog}
       {approving && (
         <QuotationApprovalDialog project={project} version={approving}
           previouslyApprovedVersionNumber={data?.versions.find((candidate) =>
@@ -208,7 +235,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
           afterApproval={transferFromApproval} pending={lifecycle.transferApproved.isPending}
           error={actionError} onClose={closeTransfer} onTransfer={() => void confirmTransfer()} />
       )}
-      {newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
+      {eligible && newOpen && <NewProjectQuotationModal project={project} versions={data?.versions ?? []}
         onClose={() => setNewOpen(false)} />}
     </section>
   );

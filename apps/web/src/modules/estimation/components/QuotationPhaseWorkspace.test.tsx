@@ -1,7 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { quotationDraftDataSchema, quotationReferenceEdtSchema } from '@kora/contracts';
-import { QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt } from './QuotationPhaseWorkspace';
+import {
+  QuotationPhaseWorkspace, referenceTasksForPhase, referencePhasesFromEdt,
+  nextQuotationPhaseStartWeek,
+} from './QuotationPhaseWorkspace';
+import buttonStyles from '@/shared/components/ui/Button.module.css';
+
+// Los tipos generados para CSS Modules contemplan claves ausentes.
+// Validamos su existencia antes de pasarlas a toHaveClass, sin ocultar un
+// posible cambio de nombre o una exportación CSS rota.
+const nativeButtonClass = (variant: 'button' | 'secondary' | 'outline' | 'tertiary' | 'ghost'): string => {
+  const className = buttonStyles[variant];
+  if (!className) throw new Error('Falta la clase nativa Button.' + variant);
+  return className;
+};
 
 const dev = '0777e456-fd76-445e-83f1-afc25061c103';
 const qa = '0777e456-fd76-445e-83f1-afc25061c104';
@@ -75,6 +88,48 @@ function renderEditor(custom = draft) {
 afterEach(() => vi.clearAllMocks());
 
 describe('Cotización HTML v5 · fases y tareas', () => {
+  it('agrega una fase después del fin ACTUAL de la EDT replanificada, no del snapshot IA', () => {
+    // La IA terminó originalmente en semana 3, pero la cotización cambió
+    // una fase a semanas 11–13 y otra quedó en 1–2.
+    const replanned = quotationDraftDataSchema.parse({
+      ...mappedDraft,
+      edtStageSettings: [{
+        stageCode: 'T02', name: 'Pruebas', startWeek: 11, durationWeeks: 3,
+      }],
+    });
+    const phases = referencePhasesFromEdt(edt, replanned.aiPoc!.roleTeamIds,
+      teams, replanned);
+    expect(nextQuotationPhaseStartWeek(phases)).toBe(14);
+    expect(edt.stages?.[1]?.startWeek).toBe(3); // El snapshot no se mutó
+    const shorter = quotationDraftDataSchema.parse({
+      ...replanned, edtStageSettings: [{
+        stageCode: 'T02', name: 'Pruebas', startWeek: 6, durationWeeks: 2,
+      }],
+    });
+    expect(nextQuotationPhaseStartWeek(referencePhasesFromEdt(
+      edt, shorter.aiPoc!.roleTeamIds, teams, shorter,
+    ))).toBe(8);
+  });
+
+  it('considera fases comerciales previas, cambios manuales y límite de semanas', () => {
+    const extra = { code: 'KS-0777e456-fd76-445e-83f1-afc25061c106',
+      name: 'Control', startWeek: 9, durationWeeks: 2 };
+    const modified = quotationDraftDataSchema.parse({
+      ...mappedDraft, edtCommercialStages: [extra],
+      edtStageSettings: [
+        { stageCode: 'T02', name: 'Pruebas', startWeek: 6, durationWeeks: 2 },
+        { stageCode: extra.code, name: 'Control', startWeek: 12, durationWeeks: 2 },
+      ],
+    });
+    const visible = referencePhasesFromEdt(edt, modified.aiPoc!.roleTeamIds,
+      teams, modified);
+    expect(nextQuotationPhaseStartWeek(visible)).toBe(14);
+    expect(nextQuotationPhaseStartWeek([])).toBe(1);
+    expect(nextQuotationPhaseStartWeek([{ startWeek: 519, durationWeeks: 2 }]))
+      .toBe(521);
+  });
+
+
   it('muestra módulos y roadmap aun sin fases comerciales ni equipos mapeados', () => {
     renderEditor();
     expect(screen.getByText('Fases · Módulos')).toBeInTheDocument();
@@ -153,10 +208,26 @@ describe('Cotización HTML v5 · fases y tareas', () => {
       onAddPhase={callbacks.onAddPhase} onRemovePhase={callbacks.onRemovePhase}/>);
     fireEvent.click(screen.getByRole('button', { name: /Agregar fase/ }));
     expect(callbacks.onAddPhase).toHaveBeenCalledOnce();
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    expect(screen.getByRole('dialog', { name: 'Eliminar fase de la cotización' })).toBeInTheDocument();
     expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(callbacks.onRemovePhase).not.toHaveBeenCalled();
+  });
+
+  it('reutiliza Button Kora en las acciones sin cambiar sus callbacks ni permisos', () => {
+    renderEditor();
+    expect(screen.getByRole('button', { name: 'Asignar equipos Kora' }))
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('secondary'));
+    expect(screen.getByRole('button', { name: '+ Agregar fase / módulo' }))
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('outline'));
+    screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
+    expect(screen.getAllByRole('button', { name: '+ Agregar tarea' })[0])
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('outline'));
+    expect(screen.getAllByRole('button', { name: 'Ver plantilla' })[0])
+      .toHaveClass(nativeButtonClass('button'), nativeButtonClass('tertiary'));
+    fireEvent.click(screen.getByRole('button', { name: 'Asignar equipos Kora' }));
+    expect(callbacks.onOpenRoleMapping).toHaveBeenCalledOnce();
   });
 
   it('muestra añadir tarea, Excel y plantilla dentro de cada fase EDT', () => {
@@ -177,12 +248,31 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     const name = screen.getByLabelText('Tarea T01.01 · Fullstack');
     fireEvent.change(name, { target: { value: 'Integración revisada' } });
     fireEvent.blur(name);
-    expect(callbacks.onEditTaskName).toHaveBeenCalledWith('T01.01', 'Integración revisada');
+    expect(callbacks.onEditTaskName).toHaveBeenCalledWith(
+      'T01.01', 'Integración revisada', 'Fullstack');
     expect(screen.queryByText(/Propuesta del agente/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Descripción y referencias/)).not.toBeInTheDocument();
   });
 
-  it('muestra una fase comercial nueva con su tarea sin perder los originales', () => {
+
+  it('muestra modal Kora al eliminar tarea y fase y respeta cancelación', async () => {
+    renderEditor(mappedDraft);
+    const taskDelete = screen.getAllByRole('button', { name: 'Quitar tarea T01.01' })[0]!;
+    fireEvent.click(taskDelete);
+    expect(screen.getByRole('dialog', { name: 'Eliminar tarea de la cotización' })).toBeInTheDocument();
+    expect(callbacks.onDeleteTask).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(callbacks.onDeleteTask).not.toHaveBeenCalled();
+    fireEvent.click(taskDelete);
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea' }));
+    await vi.waitFor(() => expect(callbacks.onDeleteTask).toHaveBeenCalledWith('T01.01'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Eliminar' })[0]!);
+    expect(callbacks.onRemoveCommercialPhase).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar fase' }));
+    await vi.waitFor(() => expect(callbacks.onRemoveCommercialPhase).toHaveBeenCalledWith('T01'));
+  });
+
+  it('muestra una fase comercial nueva con su tarea sin perder los originales', async () => {
     const extraPhase = { code: 'KS-0777e456-fd76-445e-83f1-afc25061c103',
       name: 'Control', startWeek: 5, durationWeeks: 2 };
     const extraTask = { wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c105',
@@ -198,8 +288,56 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
     expect(screen.getByText('Fase 4')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Control de entregas')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs }));
-    expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs);
+    const deleteButton = screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs });
+    expect(deleteButton).toHaveClass(nativeButtonClass('button'), nativeButtonClass('ghost'));
+    fireEvent.click(deleteButton);
+    expect(screen.getByRole('dialog', { name: 'Eliminar tarea de la cotización' })).toBeInTheDocument();
+    expect(callbacks.onDeleteTask).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar tarea' }));
+    await vi.waitFor(() => expect(callbacks.onDeleteTask).toHaveBeenCalledWith(extraTask.wbs));
+  });
+
+  it('el contador anuncia las filas reales de un WBS multiperfil, no sólo códigos WBS únicos', () => {
+    renderEditor(mappedDraft);
+    expect(screen.getByText('2 tareas · 1 actividad · 15 HH')).toBeInTheDocument();
+    expect(screen.getByText('1 tarea · 8 HH')).toBeInTheDocument();
+    const fields = screen.getAllByLabelText(/^Tarea T01.01/);
+    expect(fields).toHaveLength(2);
+  });
+
+
+  it('una WBS multiperfil muestra nombres y descripciones propios de cada rol', () => {
+    const specific = quotationReferenceEdtSchema.parse({
+      ...edt,
+      modules: edt.modules.map((m) => ({
+        ...m,
+        tasks: m.tasks.map((task) => task.wbs !== 'T01.01' ? task : {
+          ...task, roleEffort: [
+            { role: 'Fullstack', hours: 12,
+              taskName: 'Implementar integración SOAP',
+              taskDescription: 'Programar cliente SOAP y errores de integración.' },
+            { role: 'Tester', hours: 3,
+              taskName: 'Verificar integración SOAP',
+              taskDescription: 'Ejecutar casos de prueba positivos y negativos.' },
+          ],
+        }),
+      })),
+    });
+    const draftWithDeliverables = quotationDraftDataSchema.parse({
+      ...draft, aiPoc: { ...draft.aiPoc!, edt: specific },
+    });
+    const rows = referenceTasksForPhase(
+      referencePhasesFromEdt(specific, {}, teams, draftWithDeliverables)[0]!,
+      specific, {}, teams, draftWithDeliverables,
+    );
+    expect(rows.map((row) => row.name)).toEqual([
+      'Implementar integración SOAP', 'Verificar integración SOAP',
+    ]);
+    expect(rows.map((row) => row.description)).toEqual([
+      'Programar cliente SOAP y errores de integración.',
+      'Ejecutar casos de prueba positivos y negativos.',
+    ]);
+    expect(rows.reduce((sum, row) => sum + row.hours, 0)).toBe(15);
   });
 
   it('mantiene HH por perfil y WBS al representar un mismo trabajo multiperfil', () => {

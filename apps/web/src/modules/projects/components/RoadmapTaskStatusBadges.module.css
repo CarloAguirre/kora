@@ -1,0 +1,3 @@
+/* Sólo composición; visual, tono y punto pertenecen al Badge nativo. */
+.group { display: inline-flex; align-items: center; flex-wrap: wrap;
+  min-width: 0; max-width: 100%; gap: var(--kora-space-1); }

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ProjectDetail } from '@kora/contracts';
+import { SUPPORT_SURPLUS_POLICY_LABELS, type ProjectDetail } from '@kora/contracts';
 import { EditProjectDialog, type EditProjectDialogProps } from './EditProjectDialog';
+import { EditDevelopmentProjectDialog, type EditDevelopmentProjectDialogProps } from './EditDevelopmentProjectDialog';
 import { ToastProvider } from '@/shared/components/ui/Toast';
 
 function renderDialog(props: EditProjectDialogProps) {
@@ -12,6 +13,20 @@ function renderDialog(props: EditProjectDialogProps) {
     </ToastProvider>,
   );
 }
+
+function renderDevelopmentDialog(props: EditDevelopmentProjectDialogProps) {
+  return render(
+    <ToastProvider>
+      <EditDevelopmentProjectDialog {...props} />
+    </ToastProvider>,
+  );
+}
+
+const projectQuotationMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/modules/estimation/api/quotation.queries', () => ({
+  useProjectQuotation: (...args: unknown[]) => projectQuotationMock(...args),
+}));
 
 const mutateAsync = vi.fn().mockResolvedValue(undefined);
 
@@ -33,10 +48,14 @@ vi.mock('../api/projects.queries', () => ({
   useProjectsList: () => ({ data: { items: [] } }),
 }));
 
+const updateSupportPlanMutateAsync = vi.fn().mockResolvedValue(undefined);
+const supportPlansForClientMock = vi.fn(() => ({ data: [] as unknown[] }));
+const supportPlanDetailMock = vi.fn(() => ({ data: undefined as unknown }));
+
 vi.mock('../api/support-plan.queries', () => ({
-  useSupportPlansForClient: () => ({ data: [] }),
-  useSupportPlanDetail: () => ({ data: undefined }),
-  useUpdateSupportPlan: () => ({ mutateAsync: vi.fn() }),
+  useSupportPlansForClient: () => supportPlansForClientMock(),
+  useSupportPlanDetail: () => supportPlanDetailMock(),
+  useUpdateSupportPlan: () => ({ mutateAsync: updateSupportPlanMutateAsync }),
 }));
 
 vi.mock('@/modules/clients/api/clients.queries', () => ({
@@ -54,6 +73,10 @@ vi.mock('@/modules/users/api/users.queries', () => ({
 vi.mock('@/modules/forecast/api/forecast.queries', () => ({
   useForecastLoadPreview: () => ({ data: undefined }),
   useCheckForecastOverload: () => async () => [],
+}));
+
+vi.mock('@/modules/hours/api/hours.queries', () => ({
+  useHolidays: () => ({ data: [] }),
 }));
 
 vi.mock('@/modules/teams/api/teams.queries', () => ({
@@ -83,6 +106,7 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
     supportPlanDescription: null,
     supportHours: 0,
     allowsOvertime: false,
+    isInternal: false,
     createdAt: '2026-01-01T00:00:00.000Z',
     developer: null,
     commercialManager: null,
@@ -140,13 +164,98 @@ function buildProject(overrides: Partial<ProjectDetail> = {}): ProjectDetail {
 describe('EditProjectDialog', () => {
   beforeEach(() => {
     useUsersListMock.mockReturnValue({ data: { items: [] } });
+    mutateAsync.mockClear();
+    changeStatusMutateAsync.mockClear();
   });
 
   it('precarga el formulario con los datos actuales del proyecto', () => {
     renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true });
 
+    expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('bodyScrollOnly');
     expect(screen.getByLabelText(/Nombre del proyecto/)).toHaveValue('Proyecto de prueba');
     expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
+  });
+
+  it('permite editar HH vendidas después de Hito 0 y pide motivo al cambiarlas', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        hito0At: '2026-10-01T00:00:00.000Z',
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Viveros' },
+      }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    const soldHours = screen.getByLabelText('HH vendidas');
+    const save = screen.getByRole('button', { name: 'Guardar cambios' });
+    expect(soldHours).toBeEnabled();
+    expect(save).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+
+    await user.clear(soldHours);
+    await user.type(soldHours, '750');
+    const reason = screen.getByLabelText('Motivo del ajuste de HH vendidas');
+    expect(save).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Debes ingresar un motivo del ajuste de HH vendidas para habilitar «Guardar cambios».',
+    );
+    expect(reason).toHaveAttribute('aria-invalid', 'true');
+    expect(mutateAsync).not.toHaveBeenCalled();
+
+    // Solo espacios no satisfacen la obligación de dejar un motivo.
+    await user.type(reason, '   ');
+    expect(save).toBeDisabled();
+
+    await user.type(reason, 'Ampliación de alcance aprobada');
+    expect(save).toBeEnabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(reason).toHaveAttribute('aria-invalid', 'false');
+    // jsdom no envía formularios desde botones externos por el atributo form.
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: 'project-1',
+        input: expect.objectContaining({ soldHours: 750, soldHoursChangeReason: 'Ampliación de alcance aprobada' }),
+      })),
+    );
+  });
+
+  it('no exige motivo si las HH vendidas permanecen iguales después de Hito 0', () => {
+    renderDialog({
+      open: true,
+      project: buildProject({ hito0At: '2026-10-01T00:00:00.000Z' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+    expect(screen.getByLabelText('HH vendidas')).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+  });
+
+  it('reactiva Guardar si las HH vendidas vuelven a su valor anterior', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ hito0At: '2026-10-01T00:00:00.000Z' }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+    const soldHours = screen.getByLabelText('HH vendidas');
+    const save = screen.getByRole('button', { name: 'Guardar cambios' });
+    await user.clear(soldHours);
+    await user.type(soldHours, '750');
+    expect(save).toBeDisabled();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    await user.clear(soldHours);
+    await user.type(soldHours, '500');
+    expect(save).toBeEnabled();
+    expect(screen.queryByLabelText('Motivo del ajuste de HH vendidas')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('bloquea "Líder Kabeli a cargo" cuando el actor no puede reasignar el proyecto (solo Gerencia/PMO puede)', () => {
@@ -205,7 +314,8 @@ describe('EditProjectDialog', () => {
     expect(screen.getByLabelText(/Responsable comercial/)).toBeInTheDocument();
   });
 
-  it.each(['prospect', 'quoted'] as const)('en %s el Estado solo ofrece "—" (sin estado) y Detenido, sin "No iniciado"', (salesStage) => {
+  it.each(['prospect', 'quoted'] as const)('en %s permite Detenido sin aprobar el proyecto', async (salesStage) => {
+    const user = userEvent.setup();
     renderDialog({
       open: true,
       project: buildProject({ salesStage, status: 'draft', phase: null }),
@@ -215,12 +325,90 @@ describe('EditProjectDialog', () => {
     });
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
-    const labels = Array.from(estado.options).map((option) => option.textContent);
-    expect(labels).toEqual(['—', 'Detenido']);
-    expect(estado).toHaveValue('draft');
+    expect(Array.from(estado.options).map((option) => option.textContent)).toEqual(['No iniciado', 'Detenido']);
+    expect(estado).toBeEnabled();
+    await user.selectOptions(estado, 'on_hold');
+    expect(screen.getByLabelText('Motivo del detenimiento')).toBeInTheDocument();
+    expect(screen.getByLabelText('Etapa de avance')).toBeDisabled();
+    expect(screen.queryByText(/Activación manual \(Hito 0 sin factura\)/)).not.toBeInTheDocument();
   });
 
-  it('no ofrece "Activo" en el Estado a quien no es Gerencia/PMO (el líder no puede activar el proyecto)', () => {
+  it('detiene una cotización conservando etapa comercial, motivo y sin solicitar facturación', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        salesStage: 'quoted', status: 'draft', phase: null,
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Responsable Comercial' },
+      }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+
+    await user.selectOptions(screen.getByLabelText('Estado'), 'on_hold');
+    await user.type(screen.getByLabelText('Motivo del detenimiento'), 'Cliente pausó la cotización.');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'on_hold' },
+    }));
+    expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ salesStage: 'quoted', onHoldReason: 'Cliente pausó la cotización.' }),
+    }));
+    expect(screen.queryByText(/Completa los montos/)).not.toBeInTheDocument();
+  });
+
+  it('reanuda una cotización detenida a No iniciado, sin Hito 0', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        salesStage: 'quoted', status: 'on_hold', phase: null, onHoldReason: 'Pausada',
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Responsable Comercial' },
+      }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+
+    await user.selectOptions(screen.getByLabelText('Estado'), 'draft');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'draft' },
+    }));
+    expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ salesStage: 'quoted' }),
+    }));
+  });
+
+  it('al activar por primera vez un Aprobado detenido exige motivo del Hito 0', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ salesStage: 'approved', status: 'on_hold', phase: null, hito0At: null }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+    await user.selectOptions(screen.getByLabelText('Estado'), 'active');
+    expect(screen.getByLabelText('Estado')).toHaveValue('active');
+    expect(screen.getByRole('heading', { name: 'Activación manual (Hito 0 sin factura)' })).toBeInTheDocument();
+  });
+
+  it('al retroceder un Aprobado activo a Cotización cambia primero el estado', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({
+        salesStage: 'approved', status: 'active', hito0At: '2026-10-01T00:00:00.000Z',
+        commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Responsable Comercial' },
+      }),
+      onClose: vi.fn(), onSuccess: vi.fn(), isManagement: true,
+    });
+    await user.selectOptions(screen.getByLabelText('Tipo de proyecto'), 'cotizacion');
+    expect(screen.getByLabelText('Estado')).toHaveValue('draft');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(changeStatusMutateAsync).toHaveBeenCalledWith({ projectId: 'project-1', input: { status: 'draft' } });
+    expect(changeStatusMutateAsync.mock.invocationCallOrder[0]).toBeLessThan(mutateAsync.mock.invocationCallOrder[0]!);
+  });
+
+  it('ofrece la activación manual también al líder del proyecto (sin Gerencia/PMO)', () => {
     renderDialog({
       open: true,
       project: buildProject({ salesStage: 'approved', status: 'draft' }),
@@ -230,7 +418,7 @@ describe('EditProjectDialog', () => {
     });
 
     const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
-    expect(Array.from(estado.options).map((option) => option.value)).not.toContain('active');
+    expect(Array.from(estado.options).map((option) => option.textContent)).toContain('Activo (activación manual)');
   });
 
   it('ofrece la activación manual a Gerencia/PMO', () => {
@@ -264,8 +452,12 @@ describe('EditProjectDialog', () => {
       isManagement: true,
     });
 
-    expect(screen.getByLabelText('Horas de soporte')).toBeInTheDocument();
-    expect(screen.getByLabelText('Plan de soporte')).toBeInTheDocument();
+    // Las horas del plan (mensuales / bolsa) se editan en el contrato de soporte, no aquí.
+    expect(screen.queryByLabelText('Horas de soporte')).not.toBeInTheDocument();
+    // Las HH vendidas son `soldHours` también en soporte (fijas; lo que avanza son las consumidas).
+    expect(screen.getByLabelText('HH vendidas')).toHaveValue(500);
+    // El tipo de soporte sale del contrato (`plan_type`); ya no es un texto libre editable aquí.
+    expect(screen.queryByLabelText('Plan de soporte')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Tipo de proyecto')).not.toBeInTheDocument();
   });
 
@@ -297,5 +489,340 @@ describe('EditProjectDialog', () => {
       ),
     );
     expect(onSuccess).toHaveBeenCalledWith('Se actualizaron los datos de Proyecto renombrado.');
+  });
+
+  it('al marcar "Proyecto interno" oculta el plan de pago y manda el flag al guardar', async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ commercialManager: { id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Riveros' } }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    expect(screen.getByRole('heading', { name: 'Plan de pago' })).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Proyecto interno'));
+    expect(screen.queryByRole('heading', { name: 'Plan de pago' })).not.toBeInTheDocument();
+
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: 'project-1', input: expect.objectContaining({ isInternal: true }) }),
+      ),
+    );
+  });
+
+  it('solo Gerencia/PMO puede cambiar "Proyecto interno"', () => {
+    renderDialog({ open: true, project: buildProject(), onClose: vi.fn(), onSuccess: vi.fn(), isManagement: false });
+
+    expect(screen.getByLabelText('Proyecto interno')).toBeDisabled();
+    expect(screen.getByText('Solo Gerencia/PMO puede marcar o desmarcar un proyecto como interno.')).toBeInTheDocument();
+  });
+
+  it('muestra el tipo de soporte del contrato vigente y guarda el cambio en el contrato', async () => {
+    supportPlansForClientMock.mockReturnValue({
+      data: [
+        // Un contrato terminado del mismo proyecto no debe ser el que se edita.
+        { id: 'plan-0', projectId: 'project-1', status: 'ended', planType: 'bundle', surplusPolicy: null, contractedHours: 0 },
+        { id: 'plan-1', projectId: 'project-1', status: 'active', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 },
+      ],
+    });
+    supportPlanDetailMock.mockReturnValue({ data: activeMonthlyPlanDetail });
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ type: 'support', salesStage: null, phase: null }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    expect(screen.getByRole('radio', { name: 'Mensual' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: SUPPORT_SURPLUS_POLICY_LABELS.accumulate })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Cantidad de HH mensuales')).toHaveValue(10);
+    // Las HH del contenedor son las del plan: no hay un segundo campo "HH vendidas" que pueda contradecirlas.
+    expect(screen.queryByLabelText('HH vendidas')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Bolsa' }));
+    // La política de excedente es solo de los planes mensuales.
+    expect(screen.queryByRole('radiogroup', { name: 'Política de excedente' })).not.toBeInTheDocument();
+    const bundleHours = screen.getByLabelText('Cantidad de HH de la bolsa');
+    await user.clear(bundleHours);
+    await user.type(bundleHours, '40');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith({
+        planType: 'bundle',
+        surplusPolicy: null,
+        contractedHours: 40,
+        planValueUf: 0.6,
+        extraHourValueUf: 1.1,
+        currency: 'UF',
+      }),
+    );
+    const projectInput = mutateAsync.mock.calls.at(-1)?.[0].input;
+    expect(projectInput.soldHours).toBeUndefined();
+    expect(projectInput.supportHours).toBeUndefined();
+    supportPlansForClientMock.mockReturnValue({ data: [] });
+    supportPlanDetailMock.mockReturnValue({ data: undefined });
+  });
+
+  it('edita el valor de la hora del contrato y muestra la cuota que se facturará', async () => {
+    supportPlansForClientMock.mockReturnValue({
+      data: [{ id: 'plan-1', projectId: 'project-1', status: 'active', planType: 'monthly', surplusPolicy: 'accumulate', contractedHours: 10 }],
+    });
+    supportPlanDetailMock.mockReturnValue({ data: activeMonthlyPlanDetail });
+    const user = userEvent.setup();
+    renderDialog({
+      open: true,
+      project: buildProject({ type: 'support', salesStage: null, phase: null }),
+      onClose: vi.fn(),
+      onSuccess: vi.fn(),
+      isManagement: true,
+    });
+
+    const hourValue = screen.getByLabelText('Valor de la hora');
+    expect(hourValue).toHaveValue(0.6);
+    expect(screen.getByLabelText('Valor de horas extra')).toHaveValue(1.1);
+    await user.clear(hourValue);
+    await user.type(hourValue, '1.5');
+    expect(screen.getByText(/Cuota mensual: 10 HH ×/)).toBeInTheDocument();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(updateSupportPlanMutateAsync).toHaveBeenCalledWith(expect.objectContaining({ planValueUf: 1.5, extraHourValueUf: 1.1, currency: 'UF' })),
+    );
+    supportPlansForClientMock.mockReturnValue({ data: [] });
+    supportPlanDetailMock.mockReturnValue({ data: undefined });
+  });
+});
+
+/** Solo los campos del detalle que lee el diálogo. */
+const activeMonthlyPlanDetail = {
+  id: 'plan-1',
+  planType: 'monthly',
+  surplusPolicy: 'accumulate',
+  contractedHours: 10,
+  planValueUf: 0.6,
+  extraHourValueUf: 1.1,
+  currency: 'UF',
+  linkedProjects: [],
+  summary: { currentPeriod: null },
+};
+
+
+describe('Editar proyecto de desarrollo · contenido acotado a la referencia v5.02', () => {
+  beforeEach(() => {
+    useUsersListMock.mockReturnValue({ data: { items: [] } });
+    projectQuotationMock.mockReset().mockReturnValue({ data: null });
+    mutateAsync.mockReset().mockResolvedValue(undefined);
+    changeStatusMutateAsync.mockReset().mockResolvedValue(undefined);
+  });
+
+  const props = (overrides: Partial<ProjectDetail> = {}, onViewQuotations = vi.fn()) => ({
+    open: true,
+    project: buildProject({ commercialManager: {
+      id: '22222222-2222-4222-8222-222222222222', fullName: 'Rodrigo Viveros',
+    }, ...overrides }),
+    onClose: vi.fn(),
+    onSuccess: vi.fn(),
+    onViewQuotations,
+    isManagement: true,
+  });
+
+  it.each(['prospect', 'quoted'] as const)(
+    'editor v5.02: permite detener %s sin aprobarlo ni activar Hito 0',
+    async (salesStage) => {
+      const user = userEvent.setup();
+      renderDevelopmentDialog(props({ salesStage, status: 'draft', phase: null, hito0At: null }));
+      const tipo = screen.getByLabelText('Tipo de proyecto');
+      expect(tipo).toHaveValue(salesStage === 'prospect' ? 'prospecto' : 'cotizacion');
+      const estado = screen.getByLabelText('Estado') as HTMLSelectElement;
+      expect(estado).toBeEnabled();
+      expect(Array.from(estado.options).map((option) => option.value)).toEqual(['draft', 'on_hold']);
+      await user.selectOptions(estado, 'on_hold');
+      expect(screen.getByLabelText('Motivo del detenimiento')).toBeInTheDocument();
+      expect(screen.getByLabelText('Etapa de avance')).toBeDisabled();
+      expect(screen.queryByLabelText('Motivo de activación manual')).not.toBeInTheDocument();
+      await user.type(screen.getByLabelText('Motivo del detenimiento'), 'Cliente solicita pausa');
+      fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+      await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+        projectId: 'project-1', input: { status: 'on_hold' },
+      }));
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        projectId: 'project-1',
+        input: expect.objectContaining({ salesStage, onHoldReason: 'Cliente solicita pausa' }),
+      }));
+      expect(screen.queryByText(/Activación manual \(Hito 0/)).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(['prospect', 'quoted'] as const)(
+    'editor v5.02: permite reanudar %s a No iniciado sin aprobación',
+    async (salesStage) => {
+      const user = userEvent.setup();
+      renderDevelopmentDialog(props({
+        salesStage, status: 'on_hold', phase: null,
+        hito0At: null, onHoldReason: 'En pausa',
+      }));
+      await user.selectOptions(screen.getByLabelText('Estado'), 'draft');
+      fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+      await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+        projectId: 'project-1', input: { status: 'draft' },
+      }));
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+        input: expect.objectContaining({ salesStage }),
+      }));
+    },
+  );
+
+  it('editor v5.02: detiene un Aprobado activo antes de retrocederlo a Cotización', async () => {
+    const user = userEvent.setup();
+    renderDevelopmentDialog(props({ salesStage: 'approved', status: 'active',
+      hito0At: '2026-10-01T00:00:00.000Z' }));
+    await user.selectOptions(screen.getByLabelText('Tipo de proyecto'), 'cotizacion');
+    expect(screen.getByLabelText('Estado')).toHaveValue('draft');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'draft' },
+    }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(changeStatusMutateAsync.mock.invocationCallOrder[0]).toBeLessThan(
+      mutateAsync.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('editor v5.02: un Aprobado detenido sin Hito 0 sigue exigiendo motivo de activación', async () => {
+    const user = userEvent.setup();
+    renderDevelopmentDialog(props({ salesStage: 'approved', status: 'on_hold', hito0At: null }));
+    await user.selectOptions(screen.getByLabelText('Estado'), 'active');
+    expect(screen.getByLabelText('Motivo de activación manual')).toBeInTheDocument();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    expect(changeStatusMutateAsync).not.toHaveBeenCalled();
+    await user.type(screen.getByLabelText('Motivo de activación manual'), 'OC aprobada');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(changeStatusMutateAsync).toHaveBeenCalledWith({
+      projectId: 'project-1', input: { status: 'active', reason: 'OC aprobada' },
+    }));
+  });
+
+  it('muestra exclusivamente los bloques de la imagen y ningún editor de equipos/fases', () => {
+    renderDevelopmentDialog(props({ canAuthorizeOvertime: true }));
+    expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('projectEditSide');
+    expect(screen.getByRole('dialog', { name: 'Editar proyecto' })).toHaveClass('bodyScrollOnly');
+    for (const name of [
+      'Nombre del proyecto', 'Cliente', 'Líder Kabeli a cargo', 'Responsable comercial',
+      'Tipo de proyecto', 'Estado', 'Etapa de avance', 'Proyecto interno',
+      'Fecha de inicio', 'Fecha de fin', 'HH vendidas', 'Autorizar horas extra',
+      'Cotización', 'Contrato',
+    ]) {
+      expect(screen.getByLabelText(new RegExp(`^${name}`))).toBeInTheDocument();
+    }
+    for (const section of ['Fechas y horas', 'Plan de pago', 'Documentación']) {
+      expect(screen.getByRole('heading', { name: section })).toBeInTheDocument();
+    }
+    expect(screen.getByText(/se gestionan en la ficha/)).toBeInTheDocument();
+    expect(screen.getByText('Equipos asignados')).toBeInTheDocument();
+    expect(screen.getByText('Roadmap')).toBeInTheDocument();
+    for (const removed of [
+      'Equipos e involucrados', 'Fases · Módulos', 'Contrato de soporte',
+      'Tiempos de respuesta (SLA)', 'Agregar fase / módulo',
+      'Notas de alcance', 'Horas totales (equipos)',
+      'Documentación de entrega',
+    ]) {
+      expect(screen.queryByText(removed)).not.toBeInTheDocument();
+    }
+  });
+
+  it('muestra el estado real de la cotización y abre su pestaña desde el aviso', async () => {
+    const onView = vi.fn();
+    renderDevelopmentDialog(props({ quotationStatus: 'approved_pending' }, onView));
+    expect(screen.getByText('Cotización · Aprobada · traspaso pendiente')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver cotizaciones' }));
+    expect(onView).toHaveBeenCalledOnce();
+  });
+
+  it('presenta versión y fecha verificadas del evento de traspaso, con enlace al tab Cotizaciones', async () => {
+    const openQuotations = vi.fn();
+    projectQuotationMock.mockReturnValue({
+      data: {
+        transferredVersionId: 'version-1',
+        transferredAt: '2026-09-02T15:00:00.000Z',
+        versions: [{ id: 'version-1', versionNumber: 1, status: 'approved' }],
+      },
+    });
+    renderDevelopmentDialog(props({ quotationStatus: 'transferred' }, openQuotations));
+    expect(screen.getByText('Cotización · v1 traspasada el 02 sept 2026')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver cotizaciones' }));
+    expect(openQuotations).toHaveBeenCalledOnce();
+    expect(projectQuotationMock).toHaveBeenCalledWith('project-1', true);
+  });
+
+  it('evita inventar la fecha si no hay evento de traspaso', () => {
+    projectQuotationMock.mockReturnValue({
+      data: {
+        transferredVersionId: 'version-1',
+        transferredAt: null,
+        versions: [{ id: 'version-1', versionNumber: 1, status: 'approved' }],
+      },
+    });
+    renderDevelopmentDialog(props({ quotationStatus: 'planning_applied' }));
+    expect(screen.getByText('Cotización · v1 traspasada')).toBeInTheDocument();
+    expect(screen.queryByText(/traspasada el/)).not.toBeInTheDocument();
+  });
+
+  it('guarda solo datos generales y no envía relaciones de equipos ni módulos', async () => {
+    const p = props({
+      teams: [{
+        teamId: '33333333-3333-4333-8333-333333333333',
+        teamName: 'UX-UI',
+        assignedHours: 120,
+        leader: null,
+      }] as ProjectDetail['teams'],
+    });
+    renderDevelopmentDialog(p);
+    await userEvent.clear(screen.getByLabelText(/^Nombre del proyecto/));
+    await userEvent.type(screen.getByLabelText(/^Nombre del proyecto/), 'Portal actualizado');
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    const input = mutateAsync.mock.calls.at(-1)?.[0].input;
+    expect(input.name).toBe('Portal actualizado');
+    expect(input).not.toHaveProperty('teams');
+    expect(input).not.toHaveProperty('modules');
+    expect(input).not.toHaveProperty('deliveries');
+    expect(input).not.toHaveProperty('paymentMilestones');
+    expect(p.onSuccess).toHaveBeenCalledWith('Se actualizaron los datos de Portal actualizado.');
+  });
+
+  it('conserva el motivo obligatorio al cambiar HH después del Hito 0', async () => {
+    renderDevelopmentDialog(props({ hito0At: '2026-10-01T00:00:00.000Z' }));
+    const sold = screen.getByLabelText('HH vendidas');
+    fireEvent.change(sold, { target: { value: '650' } });
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Motivo del ajuste de HH vendidas'), {
+      target: { value: 'Alcance ampliado y aprobado' },
+    });
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({
+        soldHours: 650, soldHoursChangeReason: 'Alcance ampliado y aprobado',
+      }),
+    })));
+  });
+
+  it('con proyecto interno oculta el plan de pago sin borrar su contrato guardado', async () => {
+    renderDevelopmentDialog(props());
+    fireEvent.click(screen.getByLabelText('Proyecto interno'));
+    expect(screen.queryByRole('heading', { name: 'Plan de pago' })).not.toBeInTheDocument();
+    fireEvent.submit(document.getElementById('edit-project-form') as HTMLFormElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      input: expect.objectContaining({ isInternal: true }),
+    })));
+    const input = mutateAsync.mock.calls.at(-1)?.[0].input;
+    expect(input).not.toHaveProperty('paymentMilestones');
   });
 });

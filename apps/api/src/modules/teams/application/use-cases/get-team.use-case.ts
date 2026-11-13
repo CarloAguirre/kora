@@ -31,13 +31,14 @@ export class GetTeamUseCase implements UseCase<GetTeamCommand, TeamDetail, Appli
       : await this.teams.findBySlug(command.teamId);
     if (!team || team.isDeleted) return err(new TeamNotFoundError(command.teamId));
 
-    const [activeMembers, memberList, leader, teamType] = await Promise.all([
-      this.teams.countActiveMembers(team.id),
+    const [allMembers, leader, teamType] = await Promise.all([
       this.members.listActiveForTeam(team.id),
       team.leaderUserId ? this.users.findById(team.leaderUserId) : Promise.resolve(null),
       team.teamTypeId ? this.teamTypes.findById(team.teamTypeId) : Promise.resolve(null),
     ]);
 
+    // Un deshabilitado ya no trabaja: no se lista como miembro del equipo.
+    const memberList = allMembers.filter((member) => member.userStatus !== 'disabled');
     const snapshot = team.toSnapshot();
 
     return ok({
@@ -48,7 +49,7 @@ export class GetTeamUseCase implements UseCase<GetTeamCommand, TeamDetail, Appli
       isActive: snapshot.isActive,
       leader: leader ? { id: leader.id, fullName: leader.fullName } : null,
       teamType: teamType ? { id: teamType.id, name: teamType.name, color: teamType.color, icon: teamType.icon } : null,
-      memberCount: activeMembers,
+      memberCount: memberList.length,
       members: memberList.map((member) => ({
         id: member.id,
         userId: member.userId,

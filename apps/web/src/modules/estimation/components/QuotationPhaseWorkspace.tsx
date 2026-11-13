@@ -1,6 +1,8 @@
 import type { QuotationDraftData, QuotationReferenceEdt } from '@kora/contracts';
 import { quotationEdtAssignments } from '@kora/contracts';
 import { Card } from '@/shared/components/ui/Card';
+import { Button } from '@/shared/components/ui/Button';
+import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
 import { downloadQuotationTaskTemplate } from '../lib/quotation-task-excel';
@@ -62,6 +64,15 @@ export function referenceTasksForPhase(
     }
   }
   return rows;
+}
+
+/** La nueva fase debe comenzar inmediatamente DESPUÉS del último tramo visible,
+ * no desde las semanas del snapshot IA previo a la replanificación. */
+export function nextQuotationPhaseStartWeek(
+  phases: readonly Pick<Phase, 'startWeek' | 'durationWeeks'>[],
+): number {
+  return Math.max(0, ...phases.map((phase) =>
+    phase.startWeek + phase.durationWeeks - 1)) + 1;
 }
 
 /** Vista referencial: toma semanas de Gemini y enmiendas comerciales guardadas,
@@ -144,13 +155,14 @@ export function QuotationPhaseWorkspace({
   onOpenRoleMapping?: () => void;
   onAddTask?: (stageCode: string) => void;
   onDeleteTask?: (wbs: string) => void;
-  onEditTaskName?: (wbs: string, name: string) => void;
+  onEditTaskName?: (wbs: string, name: string, role?: string) => void;
   onImportTaskExcel?: (stageCode: string, phaseName: string, file: File) => Promise<void>;
   onRemoveCommercialPhase?: (stageCode: string) => void;
   onEditPhase: (index: number, patch: Partial<Phase>) => void;
   onAddPhase: () => void;
   onRemovePhase: (index: number) => void;
 }) {
+  const { confirm, dialog: removalConfirmationDialog } = useConfirmAction();
   const mapping = roleTeamIds ?? {};
   const displayPhases = edt
     ? referencePhasesFromEdt(edt, mapping, teamNames, draft)
@@ -177,8 +189,8 @@ export function QuotationPhaseWorkspace({
             <p>{unmappedRoles.length} perfil(es) pendientes. La EDT conserva las actividades y HH,
               pero sus perfiles no son equipos. Completa la asociación antes de distribuir tareas.</p>
           </div>
-          {onOpenRoleMapping && <button type="button" disabled={!editable}
-            onClick={onOpenRoleMapping}>Asignar equipos Kora</button>}
+          {onOpenRoleMapping && <Button variant="secondary" size="sm" disabled={!editable}
+            onClick={onOpenRoleMapping}>Asignar equipos Kora</Button>}
         </div>
       )}
       <div className={styles.phases}>
@@ -191,7 +203,11 @@ export function QuotationPhaseWorkspace({
           const visibleName = prefix ? phase.name.slice(prefix.length) : phase.name;
           const total = phase.teamHours.reduce((sum, row) => sum + row.hours, 0);
           const tasks = referenceTasksForPhase(phase, edt, mapping, teamNames, draft);
+          // Cada fila representa una asignación WBS × perfil, no una tarea única.
+          // Si una actividad involucra varios perfiles, el desplegable tiene
+          // más filas que WBS únicos; informar ambas cifras sin confundirlas.
           const uniqueTasks = new Set(tasks.map((task) => task.wbs)).size;
+          const assignmentCount = tasks.length;
           const taskTotal = tasks.reduce((sum, task) => sum + task.hours, 0);
           const editStage = (patch: {name?:string;startWeek?:number;durationWeeks?:number}) => {
             if (edt && stageCode && onEditStage) onEditStage(stageCode, patch);
@@ -206,13 +222,19 @@ export function QuotationPhaseWorkspace({
                 <span className={styles.phaseDescription}>
                   {hh(total)} HH · semanas {phase.startWeek} a {phase.startWeek + phase.durationWeeks - 1}
                 </span>
-                {editable && (!edt || stageCode?.startsWith('KS-')) && (
-                  <button type="button" className={styles.remove}
-                    onClick={() => {
-                      if (!window.confirm('¿Eliminar esta fase y sus tareas comerciales?')) return;
-                      if (stageCode?.startsWith('KS-')) onRemoveCommercialPhase?.(stageCode);
+                {editable && (!edt || stageCode) && (
+                  <Button variant="tertiary" size="sm" className={styles.remove}
+                    onClick={() => void (async () => {
+                      const accepted = await confirm({
+                        title: 'Eliminar fase de la cotización',
+                        description: '¿Excluir «' + visibleName + '» y todas sus tareas del presupuesto?',
+                        warning: 'Se descontarán sus HH de la cotización. La EDT original de Gemini se conservará para auditoría.',
+                        confirmLabel: 'Eliminar fase', destructive: true,
+                      });
+                      if (!accepted) return;
+                      if (stageCode) onRemoveCommercialPhase?.(stageCode);
                       else onRemovePhase(index);
-                    }}>Eliminar</button>
+                    })()}>Eliminar</Button>
                 )}
               </div>
               <div className={styles.phaseFields}>
@@ -266,8 +288,10 @@ export function QuotationPhaseWorkspace({
               {edt && (
                 <details className={styles.tasks}>
                   <summary><strong>Tareas</strong>
-                    <span>{uniqueTasks} {uniqueTasks === 1 ? 'tarea' : 'tareas'}
-                      {uniqueTasks > 0 && ' · ' + hh(taskTotal) + ' HH'}</span>
+                    <span>{assignmentCount} {assignmentCount === 1 ? 'tarea' : 'tareas'}
+                      {assignmentCount !== uniqueTasks && ' · ' + uniqueTasks +
+                        (uniqueTasks === 1 ? ' actividad' : ' actividades')}
+                      {assignmentCount > 0 && ' · ' + hh(taskTotal) + ' HH'}</span>
                   </summary>
                   {tasks.length > 0 && (
                     <div className={styles.tableScroll}>
@@ -284,7 +308,8 @@ export function QuotationPhaseWorkspace({
                             disabled={!editable}
                             onBlur={(e) => {
                               const name = e.target.value.trim();
-                              if (name && name !== task.name) onEditTaskName?.(task.wbs, name);
+                              if (name && name !== task.name)
+                                onEditTaskName?.(task.wbs, name, task.role);
                             }}/>
                           <select className={styles.teamSelect} disabled={!editable || needsRoleMapping}
                             aria-label={'Equipo de ' + task.wbs + ' · ' + task.role}
@@ -321,21 +346,31 @@ export function QuotationPhaseWorkspace({
                               onChange={(e) => onEditTaskFixed?.(
                                 task.wbs, task.role, e.target.checked)}/>
                           </label>
-                          {task.wbs.startsWith('KT-') && editable
-                            ? <button type="button" className={styles.deleteTask}
+                          {editable && onDeleteTask
+                            ? <Button variant="ghost" size="icon" className={styles.deleteTask}
                                 aria-label={'Quitar tarea ' + task.wbs}
-                                title="Quitar tarea añadida (no altera Gemini)"
-                                onClick={() => onDeleteTask?.(task.wbs)}>×</button>
-                            : <span className={styles.noDelete} title="Tarea original conservada como evidencia"/>}
+                                title={task.wbs.startsWith('KT-')
+                                  ? 'Quitar tarea añadida'
+                                  : 'Excluir actividad del presupuesto; conservar evidencia Gemini'}
+                                onClick={() => void (async () => {
+                                  const accepted = await confirm({
+                                    title: 'Eliminar tarea de la cotización',
+                                    description: '¿Excluir «' + task.name + '» de esta cotización?',
+                                    warning: 'Se quitarán las HH de todas sus asignaciones por perfil. La evidencia original de Gemini permanece intacta.',
+                                    confirmLabel: 'Eliminar tarea', destructive: true,
+                                  });
+                                  if (accepted) onDeleteTask(task.wbs);
+                                })()}>×</Button>
+                            : <span className={styles.noDelete}/>}
                         </div>
                       ))}
                     </div>
                   )}
                   {editable && edt && stageCode && onAddTask && (
                     <div className={styles.addRow}>
-                      <button type="button" className={styles.add} onClick={() => onAddTask(stageCode)}>
+                      <Button variant="outline" size="sm" onClick={() => onAddTask(stageCode)}>
                         + Agregar tarea
-                      </button>
+                      </Button>
                       <label className={styles.add + ' ' + styles.importAction}>
                         Importar Excel
                         <input type="file" accept=".xlsx,.xls,.csv" hidden
@@ -346,11 +381,11 @@ export function QuotationPhaseWorkspace({
                             if (file) void onImportTaskExcel?.(stageCode, visibleName, file);
                           }}/>
                       </label>
-                      <button type="button" className={styles.templateLink}
+                      <Button variant="tertiary" size="sm"
                         disabled={!activeTeams.length}
                         onClick={() => downloadQuotationTaskTemplate(visibleName, activeTeams)}>
                         Ver plantilla
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </details>
@@ -362,9 +397,9 @@ export function QuotationPhaseWorkspace({
           <p className={styles.empty}>Todavía no hay fases definidas.</p>}
       </div>
       {editable && (
-        <button className={styles.add} type="button" onClick={onAddPhase}>
+        <Button variant="outline" size="sm" onClick={onAddPhase}>
           + Agregar fase / módulo
-        </button>
+        </Button>
       )}
       {displayPhases.length > 0 && (
         <section className={styles.roadmap} aria-labelledby="quotation-roadmap-title">
@@ -405,6 +440,7 @@ export function QuotationPhaseWorkspace({
           </div>
         </section>
       )}
+      {removalConfirmationDialog}
     </Card>
   );
 }

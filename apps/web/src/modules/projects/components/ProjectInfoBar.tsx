@@ -28,29 +28,40 @@ export interface ProjectDocument {
 export function ProjectInfoBar({
   clientName,
   leaderName,
+  commercialManagerName,
   dateRange,
   salesStage,
   status,
   phase,
+  isInternal = false,
   documents,
 }: {
   clientName: string;
   leaderName: string;
+  commercialManagerName: string;
   dateRange: string;
   salesStage: ProjectSalesStage | null;
   status: ProjectStatus;
   phase: ProjectPhase | null;
+  /** Proyecto interno (sin facturación): se marca junto al tipo para que no se confunda con un proyecto de cliente. */
+  isInternal?: boolean;
   documents: readonly ProjectDocument[];
 }) {
   return (
     <div className={styles.bar}>
       <InfoItem icon={<BuildingIcon size={16} />} label="Cliente" value={clientName} />
       <InfoItem icon={<UserIcon size={16} />} label="Líder - PM Responsable" value={leaderName} />
+      <InfoItem icon={<UserIcon size={16} />} label="Responsable comercial" value={commercialManagerName} />
       <InfoItem icon={<CalendarIcon size={16} />} label="Fecha de inicio - fin" value={dateRange} />
       <InfoItem
         icon={<TrendingUpIcon size={16} />}
         label="Tipo del proyecto"
-        value={<Badge tone="info">{salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : 'Sin definir'}</Badge>}
+        value={
+          <span className={styles.badgeRow}>
+            <Badge tone="info">{salesStage ? PROJECT_SALES_STAGE_LABELS[salesStage] : 'Sin definir'}</Badge>
+            {isInternal && <Badge tone="neutral">Interno</Badge>}
+          </span>
+        }
       />
       <InfoItem icon={<CheckIcon size={16} />} label="Estado del proyecto" value={<ProjectStatusBadge status={status} />} />
       <InfoItem icon={<FolderOpenIcon size={16} />} label="Etapa de avance" value={<ProjectPhaseBadge phase={phase} />} />

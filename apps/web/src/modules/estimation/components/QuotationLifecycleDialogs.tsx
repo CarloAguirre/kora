@@ -25,7 +25,7 @@ export function QuotationApprovalDialog({
   project, version, previouslyApprovedVersionNumber, timing, onTimingChange,
   onCancel, onApprove, pending, error,
 }: ApprovalProps) {
-  const canTransferNow = project.status === 'draft';
+  const canTransferNow = project.status === 'draft' || project.status === 'active';
   return (
     <Modal open title="Registrar aprobación del cliente"
       className={styles.approvalDialog} dismissible={!pending} onClose={onCancel}
@@ -68,10 +68,18 @@ export function QuotationApprovalDialog({
           </span>
         </label>
       </fieldset>
+      {project.status === 'active' && (
+        <p className={styles.warning}>
+          El proyecto está Activo. El traspaso inmediato solo será posible si todavía no existen
+          fases ni ejecución operativa que reemplazar. Kora verificará los registros y conservará
+          las HH históricas. Si encuentra conflictos, la aprobación quedará registrada y el
+          traspaso permanecerá pendiente de conciliación.
+        </p>
+      )}
       {!canTransferNow && (
         <p className={styles.warning}>
-          El proyecto no está en «No iniciado». Podrás registrar la aprobación, pero el traspaso
-          exige conciliación de la ejecución existente.
+          Este estado operativo no permite un traspaso inicial. Puedes aprobar la versión y
+          dejar el traspaso pendiente.
         </p>
       )}
       {error && <p role="alert" className={styles.dialogError}>{error}</p>}
@@ -105,21 +113,50 @@ export function QuotationTransferDialog({
         (team.unit === 'day' ? 1 / 5 : 1) * team.dedicationPercent / 100;
     return { id: team.teamId, name: teamName, collaborators: team.collaborators, hours };
   });
+  const previousTeamHours = project.teams.reduce((sum, row) =>
+    sum + (row.assignedHours ?? 0), 0);
+  const previousSoldHours = project.soldHours ?? 0;
+  const prospectConsumed = project.prospectPhaseHours ?? project.usedHours ?? 0;
+  const hasHistoricalPhase = project.teams.length > 0 ||
+    previousSoldHours > 0 || prospectConsumed > 0;
+  const quotedTeamIds = new Set(teams.map((row) => row.id));
   const weeks = version.draft.phases.length
     ? Math.max(...version.draft.phases.map((phase) => phase.startWeek + phase.durationWeeks - 1))
     : null;
   const entries: { key: string; source: string; target: string }[] = [
     { key: 'approval', source: 'Aprobación', target: 'Tipo de proyecto: Proyecto aprobado' },
-    { key: 'hours', source: 'Total de horas',
-      target: 'HH vendidas: ' + formatted(version.totalHours) +
+    ...(hasHistoricalPhase ? [
+      { key: 'phase1', source: 'Fase 1 · Prospecto/Cotización',
+        target: formatted(previousTeamHours) + ' HH previamente asignadas, sin calendario. ' +
+          formatted(prospectConsumed) + ' HH consumidas históricas conservadas.' },
+      { key: 'previous-sold', source: 'HH vendidas anteriores',
+        target: formatted(previousSoldHours) + ' HH; no se reemplazan.' },
+    ] : []),
+    { key: 'hours', source: 'Fase 2 en adelante · Cotización',
+      target: formatted(version.totalHours) + ' HH nuevas' +
         (weeks ? ' · ' + weeks + ' semanas estimadas' : '') },
-    ...teams.map((team) => ({
-      key: 'team-' + team.id,
-      source: team.name,
-      target: 'Equipo ' + team.name + ': ' + team.collaborators + ' colaborador' +
-        (team.collaborators === 1 ? '' : 'es') + ' · ' +
-        formatted(team.hours) + ' horas estimadas',
-    })),
+    { key: 'total-project-hours', source: 'Total HH vendidas tras traspaso',
+      target: formatted(previousSoldHours + version.totalHours) +
+        ' HH (anteriores + cotización)' },
+    ...teams.map((team) => {
+      const existing = project.teams.find((item) => item.teamId === team.id);
+      const prior = existing?.assignedHours ?? 0;
+      return {
+        key: 'team-' + team.id, source: team.name,
+        target: 'Equipo ' + team.name + ': ' +
+          (existing ? 'se conservan cupo, líder e integrantes · ' : '') +
+          formatted(prior) + ' HH previas + ' + formatted(team.hours) +
+          ' HH nuevas = ' + formatted(prior + team.hours) + ' HH asignadas',
+      };
+    }),
+    ...project.teams.filter((team) => !quotedTeamIds.has(team.teamId))
+      .map((team) => ({
+        key: 'historic-team-' + team.teamId, source: team.teamName,
+        target: 'Equipo histórico conservado: ' +
+          (team.assignedHours === null ? 'sin presupuesto declarado' :
+            formatted(team.assignedHours) + ' HH previas') +
+          ' · cupo, líder e integrantes sin cambios',
+      })),
     ...(version.draft.phases.length > 0
       ? version.draft.phases.map((phase, index) => ({
           key: 'phase-' + index,
@@ -152,8 +189,10 @@ export function QuotationTransferDialog({
       </div>}>
       <p className={styles.transferIntro}>
         Se completarán los campos comerciales y de planificación de <strong>{project.name}</strong>.
-        {' '}Los líderes de equipo, fechas, responsables y registros operativos existentes están
-        protegidos por las validaciones de Kora; si requieren conciliación, el traspaso no se realizará automáticamente.
+        {' '}Las HH y equipos históricos de prospección corresponden a la Fase 1,
+        sin calendario. La nueva cotización aporta las fases de ejecución. Los líderes,
+        integrantes y registros operativos se conservan; si hay ejecución distinta a
+        la preparación comercial, el traspaso exigirá conciliación.
       </p>
       <div className={styles.mapping} aria-label="Resumen del traspaso">
         <span className={styles.columnHead}>COTIZACIÓN V{version.versionNumber}</span>

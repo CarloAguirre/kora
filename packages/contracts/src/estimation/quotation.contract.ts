@@ -72,13 +72,15 @@ export const quotationPaymentItemSchema = z.object({
 /** Evidencia de una propuesta Gemini obtenida desde el documento de demostración KDM.
  * Distinta del artefacto EDT: no simula requerimientos ni entregables inexistentes. */
 export const quotationAiPocSnapshotSchema = z.object({
-  source: z.literal('kdm_demo'),
+  source: z.enum(['kdm_demo', 'drive']),
   proposal: estimationPocProposalSchema,
   answers: z.array(submitEstimationAnswerSchema),
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),
   confirmedUnderstanding: z.string().trim().max(4000).nullish(),
   edt: quotationReferenceEdtSchema.nullish(),
   roleTeamIds: z.record(z.string(), uuidSchema).default({}),
+  /** Restricción comercial elegida en F03; las asignaciones efectivas quedan en roleTeamIds. */
+  selectedTeamIds: z.array(uuidSchema).max(12).default([]),
 });
 export type QuotationAiPocSnapshot = z.infer<typeof quotationAiPocSnapshotSchema>;
 
@@ -95,6 +97,11 @@ export const quotationDraftDataSchema = z.object({
     role: z.string().trim().min(1).max(120),
     hours: z.number().positive().max(1000000),
   })).max(240).optional(),
+  /** Equipos con jornada editada explícitamente; los borradores IA antiguos
+   * parten de 40 HH/semana y 100% sin mutar su EDT original. */
+  edtCapacityCustomizedTeamIds: z.array(uuidSchema).max(100).optional(),
+  /** Actividades de Gemini excluidas solo del presupuesto comercial; la evidencia IA sigue intacta. */
+  edtExcludedWbs: z.array(z.string().trim().min(1).max(40)).max(120).optional(),
   /** Configuración comercial por asignación WBS×perfil, sin modificar Gemini. */
   edtTaskSettings: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
@@ -124,6 +131,8 @@ export const quotationDraftDataSchema = z.object({
   })).max(240).optional(),
   edtTaskNames: z.array(z.object({
     wbs: z.string().trim().min(1).max(40),
+    /** Sin role: ajuste comercial anterior para toda la actividad. */
+    role: z.string().trim().min(1).max(120).optional(),
     name: nonEmptyTrimmed(300, 'El nombre de la tarea'),
   })).max(240).optional(),
   /** Fechas relativas y nombre comercial del tramo, sin mutar las etapas Gemini. */
@@ -133,11 +142,23 @@ export const quotationDraftDataSchema = z.object({
     startWeek: z.number().int().min(1).max(520),
     durationWeeks: z.number().int().min(1).max(520),
   })).max(100).optional(),
+  /**
+   * Calendario de referencia ESTABLE para recalcular dotación en EDT v2.
+   * Nunca se rellena desde las duraciones derivadas de una replanificación:
+   * nace de aiPoc.edt.stages y solo cambia cuando el usuario edita
+   * explícitamente inicio/duración de una fase.
+   * Guardado en el snapshot JSON existente (sin migración).
+   */
+  edtWorkforceReferenceStages: z.array(z.object({
+    stageCode: z.string().trim().min(1).max(40),
+    startWeek: z.number().int().min(1).max(520),
+    durationWeeks: z.number().int().min(1).max(520),
+  })).max(100).optional(),
   costs: z.array(quotationExternalCostSchema).max(100).default([]),
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
   assumptions: z.array(z.string().trim().max(2000)).max(100).default([]),
   exclusions: z.array(z.string().trim().max(2000)).max(100).default([]),
-  sourceRefs: z.array(z.string().trim().max(1000)).max(100).default([]),
+  sourceRefs: z.array(z.string().trim()).max(100).default([]),
   answers: z.record(z.string(), z.unknown()).default({}),
   /** Snapshot de evidencia de IA o simulación. Nunca se descarta al editar HH. */
   analysis: estimationAnalysisArtifactSchema.nullish(),
@@ -240,5 +261,7 @@ export const projectQuotationSchema = z.object({
   projectId: uuidSchema,
   versions: z.array(quotationVersionSchema),
   transferredVersionId: uuidSchema.nullable().optional(),
+  /** Timestamp del último evento 'quotation_transferred', no la fecha de edición de la versión. */
+  transferredAt: isoDateTimeSchema.nullable().optional(),
 });
 export type ProjectQuotation = z.infer<typeof projectQuotationSchema>;

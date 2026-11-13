@@ -6,13 +6,21 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Select } from '@/shared/components/ui/Select';
 import { Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { DropdownMenu } from '@/shared/components/ui/DropdownMenu';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
+import { useToast } from '@/shared/components/ui/Toast';
 import { DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
-import { useCapacityReport } from '../api/hours.queries';
+import { useCapacityReport, useDeleteHourEntry, useHourEntryDetail } from '../api/hours.queries';
 import { hoursApi } from '../api/hours.api';
 import { useCapacityReportState } from '../hooks/useCapacityReportState';
 import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
 import { exportCapacityReport } from '../lib/hours-export';
+import { canEditAnyMonth } from '../lib/edit-window';
+import { HourEntryFormDialog } from './HourEntryFormDialog';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
+
+const EXPORT_PAGE_SIZE = 200;
 
 const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -42,13 +50,60 @@ const COLUMNS: ReadonlyArray<Column<CapacityReportRow>> = [
   { key: 'dedicationPercent', header: '% dedicación', sortable: true, align: 'right', render: (r) => `${r.dedicationPercent}%` },
 ];
 
-/** Pestaña "Capacity" de Administración — ver la v1 `Usuarios/index.tsx` (pestaña `capacity`). */
+/**
+ * Pestaña "Capacity" de Administración — ver la v1 `Usuarios/index.tsx` (pestaña `capacity`).
+ * Cada fila es un registro de horas aprobado: admin/PMO pueden editarlo o
+ * eliminarlo desde aquí, sin la restricción del mes en curso.
+ */
 export function CapacityReportTable() {
+  const { user } = useAuth();
+  const toast = useToast();
   const state = useCapacityReportState();
-  const { data, isLoading, error } = useCapacityReport(state.query);
+  const { data, isLoading, error } = useCapacityReport(state.query, { enabled: state.rangeError === null });
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  // Mismo Excel que "Descargar registro de horas" de la consola del líder,
+  const [dialog, setDialog] = useState<{ kind: 'view' | 'edit'; entryId: string } | null>(null);
+  const [deleting, setDeleting] = useState<CapacityReportRow | null>(null);
+  // La fila del reporte no trae todo lo que necesita el formulario: se pide el detalle del registro.
+  const { data: dialogEntry } = useHourEntryDetail(dialog?.entryId ?? null);
+  const deleteEntry = useDeleteHourEntry();
+  const canManage = canEditAnyMonth(user?.role);
+
+  const columns: ReadonlyArray<Column<CapacityReportRow>> = canManage
+    ? [
+        ...COLUMNS,
+        {
+          key: 'actions',
+          header: 'Acciones',
+          align: 'right',
+          width: '80px',
+          render: (row) => (
+            <div className={styles.actions}>
+              <DropdownMenu
+                items={[
+                  { key: 'ver', label: 'Ver detalle', onSelect: () => setDialog({ kind: 'view', entryId: row.id }) },
+                  { key: 'editar', label: 'Editar', onSelect: () => setDialog({ kind: 'edit', entryId: row.id }) },
+                  { key: 'eliminar', label: 'Eliminar', tone: 'danger', onSelect: () => setDeleting(row) },
+                ]}
+                trigger={({ onClick }) => (
+                  <Button variant="ghost" size="icon" onClick={onClick} aria-label={`Acciones — ${row.collaboratorFullName}`} title="Acciones">
+                    ⋮
+                  </Button>
+                )}
+              />
+            </div>
+          ),
+        },
+      ]
+    : COLUMNS;
+
+  // Sin try/catch: si falla, `ConfirmActionDialog` queda abierto y muestra el error.
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    await deleteEntry.mutateAsync(deleting.id);
+    toast.success('Se eliminó el registro de horas.');
+  };
+  // "Descargar todo": mismo Excel que "Descargar registro de horas" de la consola del líder,
   // pero sin filtros: con `hours:read_all` el backend devuelve los registros
   // de toda la organización (comentarios incluidos).
   const hourEntriesExport = useHourEntriesExport();
@@ -57,15 +112,21 @@ export function CapacityReportTable() {
     setExportError(null);
     setExporting(true);
     try {
-      const all = await hoursApi.capacityReport({
+      // El contrato limita `pageSize` a 200: se pagina hasta traer el reporte completo.
+      const baseQuery = {
         search: state.query.search,
-        periodStart: state.periodStart,
+        dateFrom: state.dateFrom,
+        dateTo: state.dateTo,
         sortField: state.sort.field,
         sortDirection: state.sort.direction,
-        page: 1,
-        pageSize: 10_000,
-      });
-      exportCapacityReport(all.items, state.periodStart);
+      };
+      const first = await hoursApi.capacityReport({ ...baseQuery, page: 1, pageSize: EXPORT_PAGE_SIZE });
+      const rest = await Promise.all(
+        Array.from({ length: first.pageCount - 1 }, (_, index) =>
+          hoursApi.capacityReport({ ...baseQuery, page: index + 2, pageSize: EXPORT_PAGE_SIZE }),
+        ),
+      );
+      exportCapacityReport([...first.items, ...rest.flatMap((page) => page.items)], state.dateFrom, state.dateTo);
     } catch (exportErr) {
       setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {
@@ -87,10 +148,17 @@ export function CapacityReportTable() {
             loadingText="Generando…"
             onClick={() => void hourEntriesExport.exportEntries({ sortField: 'date', sortDirection: 'desc' })}
           >
-            Descargar registro de horas
+            Descargar todo
           </Button>
-          <Button iconLeft={<DownloadIcon size={18} />} loading={exporting} loadingText="Generando…" onClick={() => void handleExport()}>
-            Descargar Excel
+          <Button
+            variant="outlineDark"
+            iconLeft={<DownloadIcon size={18} />}
+            loading={exporting}
+            loadingText="Generando…"
+            disabled={state.rangeError !== null}
+            onClick={() => void handleExport()}
+          >
+            Descargar datos filtrados
           </Button>
         </div>
       </div>
@@ -114,14 +182,32 @@ export function CapacityReportTable() {
         <Select
           className={styles.period}
           label="Periodo"
+          placeholder="Personalizado"
           options={state.periodOptions}
           value={state.periodStart}
           onChange={(event) => state.setPeriodStart(event.target.value)}
         />
+        <TextField
+          className={styles.date}
+          label="Fecha inicio"
+          type="date"
+          required
+          value={state.dateFrom}
+          onChange={(event) => state.setDateFrom(event.target.value)}
+        />
+        <TextField
+          className={styles.date}
+          label="Fecha fin"
+          type="date"
+          required
+          value={state.dateTo}
+          errorText={state.rangeError ?? undefined}
+          onChange={(event) => state.setDateTo(event.target.value)}
+        />
       </div>
 
       <DataTable
-        columns={COLUMNS}
+        columns={columns}
         items={data?.items ?? []}
         getRowKey={(row) => row.id}
         loading={isLoading}
@@ -141,6 +227,32 @@ export function CapacityReportTable() {
           onPageSizeChange={state.setPageSize}
         />
       )}
+
+      <HourEntryFormDialog
+        open={dialog !== null && dialogEntry?.id === dialog.entryId}
+        entry={dialogEntry ?? null}
+        readOnly={dialog?.kind === 'view'}
+        onClose={() => setDialog(null)}
+        onSuccess={(message) => {
+          toast.success(message);
+          setDialog(null);
+        }}
+      />
+
+      <ConfirmActionDialog
+        open={deleting !== null}
+        title="Eliminar registro de horas"
+        description={
+          deleting
+            ? `Se eliminarán ${deleting.dedicatedHours.toLocaleString('es-CL')} h de ${deleting.collaboratorFullName} del ${formatPeriod(deleting.periodDate)}. Esta acción no se puede deshacer.`
+            : ''
+        }
+        warning="El registro ya está aprobado: se descontará del consumo del proyecto."
+        confirmLabel="Eliminar"
+        destructive
+        onConfirm={confirmDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 }

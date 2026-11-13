@@ -43,43 +43,7 @@
   line-height: 16px;
 }
 
-.filterTabs {
-  display: inline-flex;
-  align-items: stretch;
-  height: var(--kora-field-height);
-  padding: 3px;
-  border: 1px solid var(--kora-blue-200);
-  border-radius: var(--kora-radius-input);
-  background: var(--kora-surface);
-  flex-shrink: 0;
-}
-
-.filterTab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  padding: 0 var(--kora-space-4);
-  border-radius: calc(var(--kora-radius-input) - 3px);
-  background: transparent;
-  color: var(--kora-text-muted);
-  font-family: var(--kora-font);
-  font-size: var(--kora-text-sm);
-  font-weight: var(--kora-weight-semibold);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--kora-transition), color var(--kora-transition);
-}
-
-.filterTab:hover {
-  color: var(--kora-navy);
-}
-
-.filterTabActive,
-.filterTabActive:hover {
-  background: var(--kora-lime);
-  color: var(--kora-navy);
-}
+/* La apariencia de las opciones Tipo se comparte con Roadmap vía PillSwitcher. */
 
 .eventsSearch {
   flex: 1;

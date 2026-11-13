@@ -58,6 +58,14 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/kora2_test
 
+      # Reproduce la base existente que avanzó hasta 0067 sin ejecutar 0063:
+      # la reparación 0068 debe poder reconstruir el portal sin tocar el
+      # historial ni alterar datos; la prueba usa una transacción con ROLLBACK.
+      - name: Reparación del portal con migración omitida
+        run: psql -X -h localhost -p 5432 -U postgres -d kora2_test -v ON_ERROR_STOP=1 -f packages/db/tests/0068_repair_client_portal_tables.sql
+        env:
+          PGPASSWORD: postgres
+
       - name: Siembra del catálogo de acceso
         run: pnpm --filter @kora/db seed
         env:

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, UnauthorizedError, ForbiddenError, type ApplicationError, type Result } from '@kora/core';
 import { AUTH_ERROR_CODES } from '@kora/contracts';
 import { Email } from '../../../users/domain/value-objects/email.vo';
+import { ClientPortalLoginAccessService } from '../../infrastructure/client-portal-login-access.service';
 import {
   USER_REPOSITORY,
   type UserRepository,
@@ -47,6 +48,7 @@ export class GoogleLoginUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly sessionIssuer: SessionIssuerService,
     private readonly config: AppConfigService,
+    private readonly portalLoginAccess: ClientPortalLoginAccessService,
   ) {}
 
   async execute(command: GoogleLoginCommand): Promise<Result<LoginOutcome, ApplicationError>> {
@@ -82,7 +84,9 @@ export class GoogleLoginUseCase
     }
     const email = emailResult.value;
 
-    if (!email.belongsToAnyDomain(this.config.auth.allowedEmailDomains)) {
+    const user = await this.users.findByEmail(email);
+    const isClientAccount = !!user && !user.isDeleted && user.role === 'cliente';
+    if (!isClientAccount && !email.belongsToAnyDomain(this.config.auth.allowedEmailDomains)) {
       await this.recordFailure(command, null, email.value, 'domain_not_allowed');
       return err(
         new ForbiddenError(
@@ -91,8 +95,6 @@ export class GoogleLoginUseCase
         ),
       );
     }
-
-    const user = await this.users.findByEmail(email);
     if (!user || user.isDeleted) {
       await this.recordFailure(command, null, email.value, 'no_account');
       return err(
@@ -114,6 +116,18 @@ export class GoogleLoginUseCase
           : 'Tu cuenta está deshabilitada. Contacta a un administrador.';
       await this.recordFailure(command, user.id, email.value, 'account_not_signinable');
       return err(new ForbiddenError(message, code));
+    }
+
+    // Google ya verificó que la persona controla el correo. El rol cliente
+    // requiere igualmente un vínculo activo con un contacto y su empresa.
+    if (isClientAccount && !await this.portalLoginAccess.isEnabled(user.id, email.value)) {
+      await this.recordFailure(command, user.id, email.value, 'client_portal_not_enabled');
+      return err(
+        new ForbiddenError(
+          'Tu cuenta de cliente aún no tiene acceso al portal. Solicita que te vinculen como contacto desde la ficha de tu empresa y habiliten tus proyectos o contratos.',
+          AUTH_ERROR_CODES.CLIENT_PORTAL_NOT_ENABLED,
+        ),
+      );
     }
 
     const outcome = await this.sessionIssuer.issue(user, command.ipAddress, command.userAgent, {

@@ -86,6 +86,31 @@ describe('Cuestionario confirmado para Gemini sin llamadas de red', () => {
     })).toThrow(/no tiene pregunta asociada/);
   });
 
+  it('traduce Otro (especificar) a decisión legible en selección simple y múltiple', () => {
+    const extraQuestion: EstimationQuestion = {
+      ...dynamic[0]!, id: 'D03', answerType: 'multi_choice',
+      question: '¿Qué canales necesita?', options: [
+        { value: 'web', label: 'Portal web' },
+        { value: 'other', label: 'Otro (especificar)' },
+      ],
+    };
+    const answers = resolveEstimationQuestionnaireContext({
+      ...sample,
+      dynamicQuestions: [...dynamic, extraQuestion],
+      answers: [
+        { questionId: 'D03', value: ['web', 'other:App móvil con trabajo offline'],
+          usedAssumption: false },
+        { questionId: 'D01', value: 'other:Integración mediante SFTP',
+          usedAssumption: false },
+      ],
+    });
+    expect(answers[0]?.answer).toBe(
+      'Portal web; Otro (especificado por el usuario): App móvil con trabajo offline');
+    // D01 no tiene opción Otro, por eso no se interpreta como elección válida:
+    // su código técnico no se convierte artificialmente en un escenario.
+    expect(answers[1]?.answer).toBe('other:Integración mediante SFTP');
+  });
+
   it('funciona con la llamada antigua sin cuestionario ni respuestas', () => {
     expect(resolveEstimationQuestionnaireContext({ ...sample, answers: [], dynamicQuestions: [] }))
       .toEqual([]);

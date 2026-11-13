@@ -6,10 +6,20 @@ const teamId = '0777e456-fd76-445e-83f1-afc25061c101';
 describe('calculateQuotation', () => {
   it('convierte días en semanas de 5 días y aplica cupos/dedicación', () => {
     const draft = quotationDraftDataSchema.parse({
-      teams: [{ teamId, collaborators: 2, unit: 'day', duration: 10, hoursPerWeek: 40, dedicationPercent: 50 }],
+      teams: [{ teamId, collaborators: 2, unit: 'day', duration: 10, hoursPerWeek: 20, dedicationPercent: 50 }],
       costs: [{ description: 'Licencia', amount: 2, recurrence: 'once' }, { description: 'SaaS', amount: 4, recurrence: 'monthly' }],
     });
     expect(calculateQuotation(draft, 0.5, 'iva19')).toEqual({ totalHours: 80, netAmount: 42, totalAmount: 49.98 });
+  });
+
+  it('no duplica dedicación: 40 HH con 50% histórico son una sola jornada de 40 HH', () => {
+    const draft = quotationDraftDataSchema.parse({
+      mode: 'team', teams: [{
+        teamId, collaborators: 2, unit: 'week', duration: 2,
+        hoursPerWeek: 40, dedicationPercent: 50,
+      }],
+    });
+    expect(calculateQuotation(draft, null, 'exempt').totalHours).toBe(160);
   });
 
   it('calcula por fases sin duplicar HH y deja la tarifa vacía hasta definirla', () => {

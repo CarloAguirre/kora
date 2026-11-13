@@ -19,6 +19,60 @@ const request = {
 };
 
 describe('GeminiAiProvider · respuestas de infraestructura sin llamadas reales', () => {
+
+  it('transmite resúmenes reales de Gemini y conserva la respuesta JSON de la misma llamada', async () => {
+    const summary: string[] = [];
+    const sse = [
+      'data: '+ JSON.stringify({ candidates: [{ content: { parts: [
+        { thought: true, text: 'Analizando el alcance y ' },
+      ] } }] }) + '\n\n',
+      'data: '+ JSON.stringify({ candidates: [{ content: { parts: [
+        { thought: true, text: 'las dependencias del proyecto.' },
+        { thought: false, text: '{"stages":' },
+      ] } }] }) + '\n\n',
+      'data: '+ JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [
+        { text: '["T01"]}' },
+      ] } }] }) + '\n\n',
+    ].join('');
+    const encoder = new TextEncoder();
+    const encoded = encoder.encode(sse);
+    const splitAt = Math.floor(encoded.length / 3);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoded.subarray(0, splitAt));
+        controller.enqueue(encoded.subarray(splitAt));
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(body, { status: 200,
+      headers: { 'Content-Type': 'text/event-stream' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(provider().generateStructured(request, (part) => summary.push(part)))
+      .resolves.toEqual({ stages: ['T01'] });
+    expect(summary).toEqual(['Analizando el alcance y ', 'las dependencias del proyecto.']);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0]![0])).toContain('streamGenerateContent?alt=sse');
+    const config = JSON.parse(fetchMock.mock.calls[0]![1]!.body as string) as {
+      generationConfig: { thinkingConfig: { includeThoughts: boolean }; responseMimeType: string };
+    };
+    expect(config.generationConfig.thinkingConfig.includeThoughts).toBe(true);
+    expect(config.generationConfig.responseMimeType).toBe('application/json');
+  });
+
+  it('no inventa pensamiento si Gemini sólo transmite la respuesta JSON', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      'data: '+JSON.stringify({ candidates: [{ finishReason: 'STOP', content: {
+        parts: [{ text: '{"stages":[]}' }],
+      } }] })+'\n\n',
+      { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+    const thoughts: string[] = [];
+    await expect(provider().generateStructured(request, (part) => thoughts.push(part)))
+      .resolves.toEqual({ stages: [] });
+    expect(thoughts).toEqual([]);
+  });
+
   afterEach(() => vi.unstubAllGlobals());
 
   it('envía esquema estructurado y conserva la respuesta sin modificar HH', async () => {
@@ -36,6 +90,17 @@ describe('GeminiAiProvider · respuestas de infraestructura sin llamadas reales'
     };
     expect(sent.generationConfig.responseMimeType).toBe('application/json');
     expect(sent.generationConfig.responseSchema).toEqual(request.responseJsonSchema);
+  });
+
+  it('SSE preserva HTTP 429 de Gemini y nunca realiza otro request', async () => {
+    const mock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' },
+    }), { status: 429 }));
+    vi.stubGlobal('fetch', mock);
+    const error = await provider().generateStructured(request, () => {}).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(429);
+    expect(mock).toHaveBeenCalledOnce();
   });
 
   it('identifica cuota agotada con HTTP 429, sin hacer segundo request', async () => {
@@ -69,7 +134,7 @@ describe('GeminiAiProvider · respuestas de infraestructura sin llamadas reales'
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(503);
     expect((error as HttpException).message).toMatch(/HTTP 503/);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('distingue JSON parcial de Gemini y nunca retorna el resultado cortado', async () => {

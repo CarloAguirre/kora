@@ -1,4 +1,4 @@
-import { quotationEdtAssignments, type QuotationDraftData } from '@kora/contracts';
+import { effectiveQuotationEdt, quotationEdtAssignments, type QuotationDraftData } from '@kora/contracts';
 
 export type QuotationTeamWeeklyRow = {
   teamKey: string;
@@ -34,25 +34,32 @@ const hours = (value: number) => value / 100;
 export function quotationTeamWeeklyPlan(
   draft: QuotationDraftData,
 ): QuotationTeamWeeklyPlan | null {
-  const edt = draft.aiPoc?.edt;
+  const edt = effectiveQuotationEdt(draft);
   if (!edt && (draft.mode !== 'phases' || !draft.phases.length)) return null;
   const overrides = new Map((draft.edtStageSettings ?? []).map((setting) =>
     [setting.stageCode, setting]));
   const isV2 = edt?.schemaVersion === 'kora.quotation.reference-edt.v2';
+  // Incluir las fases comerciales añadidas por el usuario: sin ellas
+  // los picos y totales de capacidad omitirían tareas KT- (falsa holgura).
+  const commercialStages = (draft.edtCommercialStages ?? []).map((stage) => ({
+    code: stage.code, startWeek: stage.startWeek,
+    durationWeeks: stage.durationWeeks,
+  }));
   const stages = edt
-    ? isV2
-      ? (edt.stages ?? []).map((stage) => ({
+    ? [
+        ...(isV2 ? (edt.stages ?? []).map((stage) => ({
           code: stage.code,
           startWeek: overrides.get(stage.code)?.startWeek ?? stage.startWeek,
           durationWeeks: overrides.get(stage.code)?.durationWeeks ?? stage.durationWeeks,
-        }))
-      : edt.modules.map((module) => {
+        })) : edt.modules.map((module) => {
           const code = 'module:' + module.name;
           const explicit = overrides.get(code);
           return explicit ? {
             code, startWeek: explicit.startWeek, durationWeeks: explicit.durationWeeks,
           } : null;
-        })
+        })),
+        ...commercialStages,
+      ]
     : draft.phases.map((phase, index) => ({
         code: 'phase:' + index,
         startWeek: phase.startWeek,
@@ -70,7 +77,10 @@ export function quotationTeamWeeklyPlan(
   const assignments = edt
     ? quotationEdtAssignments(draft).map((row) => ({
         teamKey: row.teamKey,
-        stageCode: isV2 ? row.stageCode : 'module:' + row.module,
+        // Las tareas comerciales usan su fase KS- en EDT v1 y v2;
+        // las originales v1 se calendarizan por módulo explícito.
+        stageCode: row.wbs.startsWith('KT-') ? row.stageCode
+          : isV2 ? row.stageCode : 'module:' + row.module,
         hours: row.hours,
       }))
     : draft.phases.flatMap((phase, index) =>
