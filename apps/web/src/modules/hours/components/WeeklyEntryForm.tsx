@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
-  isLegacyHourEntryProject,
   PROJECT_REQUIRING_ASSIGNMENTS,
   hourEntryRequiresApproval,
   type CreateHourEntryInput,
@@ -106,33 +105,18 @@ export function WeeklyEntryForm({
 
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(assignment as HourEntryAssignment);
   const selectedProject = needsProject ? (projects?.items ?? []).find((p) => p.id === projectId) : undefined;
-  const legacyProject = selectedProject ? isLegacyHourEntryProject(selectedProject) : false;
   const selectableProjects = filterHourEntryProjects(projects?.items ?? [], assignment);
   // Colaborador usa /phases y no solicita detalle que podría estar prohibido.
   const { data: projectDetail } = useProjectDetail(
-    needsProject && projectId && !legacyProject && user?.role !== 'collaborator' ? projectId : null,
+    needsProject && projectId && user?.role !== 'collaborator' ? projectId : null,
   );
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
-  const { data: hourPhases } = useProjectPhases(needsProject && projectId && !legacyProject ? projectId : null);
+  const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
   const selectedHourPhase = hourPhases?.find((phase) => phase.id === moduleId);
-  const availableTasks = selectAttributableTasks(
-    hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [],
-    user?.id, segmentId,
-  );
-  const allowedTeamIds = new Set([
-    ...(projectDetail?.members ?? []).filter((member) => member.userId === user?.id && !member.blockedAt)
-      .map((member) => member.teamId),
-    ...(projectDetail?.teams ?? []).filter((team) => team.leader?.id === user?.id)
-      .map((team) => team.teamId),
-  ]);
-  // Usar /phases si el actor sólo tiene permiso hours:register.
-  const availableSegments = selectedModule
-    ? selectedModule.segments.filter((segment) => allowedTeamIds.has(segment.teamId))
-    : (selectedHourPhase?.segments ?? []);
-  const hasEligibleRoadmapBlocks = projectDetail
-    ? projectDetail.modules.some((module) =>
-        module.segments.some((segment) => allowedTeamIds.has(segment.teamId)))
-    : (hourPhases ?? []).some((phase) => phase.segments.length > 0);
+  const availableTasks = selectAttributableTasks(selectedHourPhase?.tasks ?? [], user?.id);
+  const availableSegments = (selectedHourPhase?.segments ?? [])
+    .filter((segment) => segment.eligibleForHours === true);
+  const hasProjectPhases = (hourPhases ?? []).length > 0;
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const weekTotal = dayHours.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
@@ -215,12 +199,13 @@ export function WeeklyEntryForm({
     if (needsProject && !projectId) return 'Selecciona un proyecto para esta asignación.';
     if (needsProject && !selectableProjects.some((p) => p.id === projectId))
       return 'Selecciona un proyecto disponible para esta asignación.';
-    if (needsProject && !legacyProject && hasEligibleRoadmapBlocks && !moduleId)
-      return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
-    if (needsProject && !legacyProject && availableSegments.length > 0 && !segmentId)
-      return 'Selecciona el bloque al que corresponden estas HH.';
-    if (needsProject && !legacyProject && segmentId && availableTasks.length > 0 && !taskId)
-      return 'Selecciona una tarea o «Otro trabajo del bloque».';
+    if (needsProject && hasProjectPhases && !moduleId)
+      return 'Selecciona una fase para imputar estas horas.';
+    if (needsProject && moduleId && !taskId)
+      return 'Selecciona tu tarea o «Asignar a otra».';
+    if (needsProject && moduleId && availableSegments.length > 0 && !segmentId &&
+        (!taskId || taskId === OTHER_TASK_OPTION))
+      return 'Selecciona el bloque de tu equipo para este trabajo.';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (unauthorizedOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
     if (!category.trim()) return 'Indica la actividad realizada.';
@@ -251,9 +236,9 @@ export function WeeklyEntryForm({
         const input: CreateHourEntryInput = {
           assignment: assignment as HourEntryAssignment,
           projectId: needsProject ? projectId : undefined,
-          moduleId: needsProject && !legacyProject && moduleId ? moduleId : undefined,
-          segmentId: needsProject && !legacyProject && moduleId && segmentId ? segmentId : undefined,
-          taskId: needsProject && !legacyProject && moduleId ? toHourTaskId(taskId) : undefined,
+          moduleId: needsProject && moduleId ? moduleId : undefined,
+          segmentId: needsProject && moduleId && segmentId ? segmentId : undefined,
+          taskId: needsProject && moduleId ? toHourTaskId(taskId) : undefined,
           category: category.trim(),
           description: description || undefined,
           hours: day.hours,
@@ -369,21 +354,20 @@ export function WeeklyEntryForm({
         )}
       </div>
 
-      {needsProject && projectId && legacyProject && (
+      {needsProject && projectId && hourPhases && hourPhases.length === 0 && (
         <p className={styles.noticeInfo} role="status">
-          Proyecto historico (sin planificación).
-          Registra las HH directamente al proyecto.
+          Este proyecto no tiene fases configuradas. Puedes registrar HH generales.
         </p>
       )}
-      {needsProject && projectId && !legacyProject && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+      {needsProject && projectId && (hourPhases ?? []).length > 0 && (
         <ProjectHourPlanFields
-          phases={projectDetail?.modules ?? hourPhases ?? []}
+          phases={hourPhases ?? []}
           phaseId={moduleId}
           segments={availableSegments}
           segmentId={segmentId}
           tasks={availableTasks}
           taskId={taskId}
-          requiresPhase={hasEligibleRoadmapBlocks}
+          requiresPhase={hasProjectPhases}
           approverName={projectDetail?.teams.find((team) =>
             team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
           )?.leader?.fullName ?? resolveHourApprover(hourPhases, user?.id, segmentId)}
@@ -400,11 +384,15 @@ export function WeeklyEntryForm({
             ));
           }}
           onTaskChange={(id) => {
+            const task = availableTasks.find((item) => item.id === id);
             setCategory((previous) => activityForTaskChange(
-              previous,
-              availableTasks.find((task) => task.id === taskId)?.name,
-              availableTasks.find((task) => task.id === id)?.name,
+              previous, availableTasks.find((item) => item.id === taskId)?.name,
+              task?.name,
             ));
+            if (task) setSegmentId(
+              availableSegments.some((segment) => segment.id === task.segmentId)
+                ? task.segmentId ?? '' : '',
+            );
             setTaskId(id);
           }}
         />
