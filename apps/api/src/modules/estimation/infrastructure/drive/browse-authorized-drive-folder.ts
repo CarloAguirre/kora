@@ -58,12 +58,13 @@ export async function browseAuthorizedDriveFolder(
       selectedId === 'kora-poc-fallback') {
     throw new BadRequestException('Selecciona una carpeta real de Google Drive.');
   }
-  const folderToken = oauth.getAuthorizedAccessToken(actorId, originalId);
-  // Solo tras consentimiento de Drive del MISMO usuario; nunca inferir tokens
-  // de otro usuario ni de una URL proporcionada por el cliente.
-  const delegatedToken = folderToken ??
+  // En modo corporativo siempre se consulta Drive con la cuenta de servicio.
+  // OAuth del usuario se reserva para la PoC cuando NO hay identidad técnica.
+  const useServiceAccount = config.googleDrive.enabled;
+  const folderToken = useServiceAccount ? null : oauth.getAuthorizedAccessToken(actorId, originalId);
+  const delegatedToken = useServiceAccount ? null : folderToken ??
     oauth.getAuthorizedAccessToken(actorId, DRIVE_DISCOVERY_SESSION);
-  if (!delegatedToken && !config.googleDrive.enabled) {
+  if (!useServiceAccount && !delegatedToken) {
     throw new BadRequestException('Autoriza Google Drive antes de explorar carpetas.');
   }
   const drive = driveOverride ?? new GoogleDriveFolderClient(config, delegatedToken ?? undefined);
@@ -97,7 +98,7 @@ export async function browseAuthorizedDriveFolder(
       cursor = await drive.getMetadata(parentId);
     }
     if (!allowed) {
-      throw new BadRequestException('La carpeta seleccionada no pertenece al grupo de carpetas autorizado. Introduce el enlace y autoriza Google nuevamente.');
+      throw new BadRequestException('La carpeta seleccionada no pertenece al grupo de carpetas autorizado. Introduce un enlace de carpeta accesible para Kora.');
     }
   }
 
