@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
-  isLegacyHourEntryProject,
   PROJECT_REQUIRING_ASSIGNMENTS,
   hourEntryRequiresApproval,
   type HourEntryAssignment,
@@ -190,7 +189,6 @@ function EditEntryForm({
     .reduce((sum, e) => sum + e.hours, 0);
   const nonOvertimeTotal = otherNonOvertimeHours + (block.isOvertime ? 0 : Number(block.hours) || 0);
   const editableProject = projects.find((project) => project.id === block.projectId);
-  const legacyProject = editableProject ? isLegacyHourEntryProject(editableProject) : false;
   const filteredProjects = filterHourEntryProjects(projects, block.assignment);
   const selectableProjects = editableProject && entry.project?.id === block.projectId &&
     !filteredProjects.some((p) => p.id === block.projectId)
@@ -249,9 +247,9 @@ function EditEntryForm({
         input: {
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : null,
-          moduleId: needsProject && (!legacyProject || entry.project?.id === block.projectId) && block.moduleId ? block.moduleId : null,
-          segmentId: needsProject && (!legacyProject || entry.project?.id === block.projectId) && block.moduleId && block.segmentId ? block.segmentId : null,
-          taskId: needsProject && (!legacyProject || entry.project?.id === block.projectId) && block.moduleId ? (toHourTaskId(block.taskId) ?? null) : null,
+          moduleId: needsProject && block.moduleId ? block.moduleId : null,
+          segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : null,
+          taskId: needsProject && block.moduleId ? (toHourTaskId(block.taskId) ?? null) : null,
           category: block.category.trim(),
           description: block.description,
           hours: Number(block.hours),
