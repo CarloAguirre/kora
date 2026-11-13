@@ -9,11 +9,13 @@ import { UpdateHourEntryUseCase } from './update-hour-entry.use-case';
 
 const actor = { userId: 'worker-1', email: 'worker@example.com' };
 
-function setup() {
+function setup(withPlan = true) {
   const result = HourEntry.create({
     id: 'entry-1', userId: 'worker-1', assignment: 'Proyecto',
-    projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
-    taskId: 'task-1',
+    projectId: 'project-1',
+    moduleId: withPlan ? 'module-1' : null,
+    segmentId: withPlan ? 'segment-1' : null,
+    taskId: withPlan ? 'task-1' : null,
     hours: 4, date: new Date('2026-11-04T00:00:00Z'),
     ownerRequiresApproval: true, now: new Date('2026-11-04T12:00:00Z'),
   });
@@ -54,6 +56,35 @@ function setup() {
 }
 
 describe('edición de horas y atribución a bloque', () => {
+  it('conserva editable un registro histórico sin fase aunque el proyecto tenga fases nuevas', async () => {
+    const { useCase, entry, projects } = setup(false);
+    projects.findById.mockResolvedValue({
+      id: 'project-1', status: 'active', allowsOvertime: false,
+      startDate: new Date('2026-10-01T00:00:00Z'),
+    });
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { projectId: 'project-1', hours: 3 },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({
+      moduleId: null, segmentId: null, taskId: null, hours: 3,
+    });
+  });
+
+  it('permite cambiar a una tarea propia de otro bloque sin forzar el bloque', async () => {
+    const { useCase, entry } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1',
+      data: { moduleId: 'module-1', segmentId: null, taskId: 'task-2' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({
+      moduleId: 'module-1', segmentId: null, taskId: 'task-2',
+    });
+  });
+
   it('conserva taskId mientras cambian únicamente HH y descripción', async () => {
     const { useCase, entry } = setup();
     const result = await useCase.execute({

@@ -137,6 +137,7 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     const editingExistingUnlinkedEntry =
       projectId === previous.projectId && !previous.moduleId && !moduleId;
     if (projectId && !moduleId && data.projectId !== undefined &&
+        (data.assignment ?? entry.assignment) === 'Proyecto' &&
         !editingExistingUnlinkedEntry &&
         await this.projects.hasProjectPhases(projectId)) {
       return err(new ForbiddenError('Selecciona una fase del proyecto antes de registrar las horas.', 'HOUR_ENTRY_PHASE_REQUIRED'));
