@@ -24,7 +24,7 @@ import { AiPocRoleMappingCard } from '../components/AiPocRoleMappingCard';
 import { QuotationPlanningAcceptanceCard } from '../components/QuotationPlanningAcceptanceCard';
 import { QuotationCommercialLifecycleCard } from '../components/QuotationCommercialLifecycleCard';
 import { QuotationCommercialSummary } from '../components/QuotationCommercialSummary';
-import { QuotationPhaseWorkspace } from '../components/QuotationPhaseWorkspace';
+import { QuotationPhaseWorkspace, referencePhasesFromEdt, nextQuotationPhaseStartWeek } from '../components/QuotationPhaseWorkspace';
 import {
   alignQuotationEdtTeamsWithSchedule, replanQuotationEdtForWorkforce,
 } from '../lib/quotation-fulltime-plan';
@@ -421,23 +421,27 @@ export function QuotationWorkspacePage() {
   /** Las nuevas fases y tareas no modifican el artefacto de origen Gemini. */
   const addPhase = () => {
     if (!editable || !form) return;
-    if (!form.draft.aiPoc?.edt) {
-      updateDraft({ phases: [...phaseRows, {
-        name: 'Nuevo módulo', startWeek: 1, durationWeeks: 2, teamHours: [],
-      }] });
-      return;
-    }
     try {
-      const previous = [...(form.draft.aiPoc.edt.stages ?? []),
-        ...(form.draft.edtCommercialStages ?? [])];
-      const last = Math.max(0, ...previous.map((stage) =>
-        stage.startWeek + stage.durationWeeks - 1));
-      if (last >= 520) throw new Error('El calendario ya alcanzó la semana 520.');
-      const stage = {
+      // Usar el mismo calendario EFECTIVO que muestra el roadmap, no el
+      // snapshot inmutable de la IA. Las ediciones de semanas y la
+      // replanificación por colaboradores viven en edtStageSettings.
+      const visiblePhases = effectiveEdt && form.draft.aiPoc
+        ? referencePhasesFromEdt(effectiveEdt, form.draft.aiPoc.roleTeamIds,
+          teamById, form.draft)
+        : phaseRows;
+      const startWeek = nextQuotationPhaseStartWeek(visiblePhases);
+      if (startWeek > 520) throw new Error('El calendario ya alcanzó la semana 520.');
+      const durationWeeks = Math.min(2, 521 - startWeek);
+      if (!form.draft.aiPoc?.edt) {
+        updateDraft({ phases: [...phaseRows, {
+          name: 'Nuevo módulo', startWeek, durationWeeks, teamHours: [],
+        }] });
+        return;
+      }
+      applyEdtChanges(withQuotationCommercialStage(form.draft, {
         code: 'KS-' + crypto.randomUUID(), name: 'Nuevo módulo',
-        startWeek: last + 1, durationWeeks: Math.min(2, 520 - last),
-      };
-      applyEdtChanges(withQuotationCommercialStage(form.draft, stage));
+        startWeek, durationWeeks,
+      }));
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo agregar la fase.');
     }

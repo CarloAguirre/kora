@@ -72,7 +72,8 @@ export class EstimationController {
   @Get('drive/oauth-poc/status')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   driveOAuthPocStatus(): { enabled: boolean; serviceAccountEnabled: boolean } {
-    return { enabled: this.config.googleDriveOauthPocEnabled && this.config.google.enabled,
+    return { enabled: !this.config.googleDrive.enabled &&
+        this.config.googleDriveOauthPocEnabled && this.config.google.enabled,
       serviceAccountEnabled: this.config.googleDrive.enabled };
   }
 
@@ -83,7 +84,8 @@ export class EstimationController {
     @CurrentUser() actor: RequestUser,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<StartDriveOAuthPocResponse> {
-    if (!this.config.googleDriveOauthPocEnabled || !this.config.google.enabled) {
+    if (this.config.googleDrive.enabled ||
+        !this.config.googleDriveOauthPocEnabled || !this.config.google.enabled) {
       throw new ServiceUnavailableException('La prueba OAuth de Drive no está habilitada en este entorno.');
     }
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
@@ -113,14 +115,13 @@ export class EstimationController {
     const id = input.driveFolderUrl
       ? extractDriveFolderId(input.driveFolderUrl) : DRIVE_DISCOVERY_SESSION;
     void reply.header('Cache-Control', 'no-store');
-    // El permiso del service account NO demuestra consentimiento del usuario
-    // para buscar en "mi Drive". Sin URL se exige su token OAuth delegado.
-    const authorized = id === DRIVE_DISCOVERY_SESSION
+    // Esta ruta mide exclusivamente el consentimiento OAuth del usuario.
+    // El acceso corporativo se informa mediante serviceAccountEnabled.
+    const authorized = !this.config.googleDrive.enabled && (id === DRIVE_DISCOVERY_SESSION
       ? this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION)
       : id && id !== 'kora-poc-fallback' && (
-        this.config.googleDrive.enabled ||
         this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, id) ||
-        this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION));
+        this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION)));
     return { authorized: Boolean(authorized) };
   }
 
@@ -153,9 +154,10 @@ export class EstimationController {
     @CurrentUser() actor: RequestUser,
   ): Promise<EstimationDriveFolderResolution> {
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
-    // Un OAuth de descubrimiento consulta el Drive del usuario conectado,
-    // nunca la cuenta de servicio de otra organización por accidente.
-    const delegated = this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION);
+    // La cuenta corporativa es prioritaria; el OAuth delegado es solo fallback
+    // cuando no hay identidad técnica habilitada.
+    const delegated = this.config.googleDrive.enabled ? null :
+      this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION);
     return this.resolveDriveFolder.execute(input, delegated
       ? new GoogleDriveFolderClient(this.config, delegated) : undefined);
   }

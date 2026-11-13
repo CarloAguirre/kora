@@ -96,15 +96,23 @@ describe('EstimationController · líder PM de proyecto asignado', () => {
       .toHaveBeenCalledWith(actor.id, 'kora-drive-discovery-session');
   });
 
-  it('la cuenta de servicio no suplanta consentimiento OAuth personal de descubrimiento', async () => {
+  it('con cuenta corporativa activa deshabilita el consentimiento personal de Drive', async () => {
     const { controller, config, driveOAuthPoc } = setup();
     config.googleDrive.enabled = true;
-    const reply = { header: vi.fn() };
+    const reply = { header: vi.fn(), setCookie: vi.fn() };
+    expect(controller.driveOAuthPocStatus()).toEqual({
+      enabled: false, serviceAccountEnabled: true,
+    });
     expect(await controller.driveOAuthPocAccess({ projectId }, actor as never, reply as never))
       .toEqual({ authorized: false });
-    driveOAuthPoc.getAuthorizedAccessToken.mockReturnValueOnce('token-usuario-1');
+    driveOAuthPoc.getAuthorizedAccessToken.mockReturnValue('token-usuario-anterior');
     expect(await controller.driveOAuthPocAccess({ projectId }, actor as never, reply as never))
-      .toEqual({ authorized: true });
+      .toEqual({ authorized: false });
+    expect(driveOAuthPoc.getAuthorizedAccessToken).not.toHaveBeenCalled();
+    await expect(controller.startDriveOAuthPoc({ projectId }, actor as never, reply as never))
+      .rejects.toThrow('La prueba OAuth de Drive no está habilitada');
+    expect(driveOAuthPoc.start).not.toHaveBeenCalled();
+    expect(reply.setCookie).not.toHaveBeenCalled();
   });
 
   it('un proyecto ajeno no puede iniciar búsqueda sin URL', async () => {

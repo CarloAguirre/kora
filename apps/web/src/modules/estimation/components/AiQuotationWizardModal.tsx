@@ -475,10 +475,10 @@ export function AiQuotationWizardModal({ project, onClose }: {
   };
 
   const connectAndDiscover = async () => {
-    // Para "mi Drive" priorizamos OAuth del usuario, no la cuenta técnica.
-    // El service account queda como alternativa si OAuth no está habilitado.
+    // En Kora corporativo el botón busca directamente con la cuenta de servicio.
+    // OAuth del usuario queda disponible solo en entornos sin cuenta técnica.
+    if (serviceAccountEnabled) { await discoverFolders(); return; }
     if (driveStatus.data?.enabled !== true) {
-      if (serviceAccountEnabled) { await discoverFolders(); return; }
       reportError('La conexión Google Drive no está habilitada.');
       return;
     }
@@ -587,9 +587,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
       reportError('Ingresa una URL válida de carpeta de Google Drive.');
       return;
     }
-    // Primero la cuenta autorizada del usuario. La cuenta técnica es
-    // alternativa únicamente cuando OAuth no está habilitado.
-    if (driveStatus.data?.enabled !== true && serviceAccountEnabled) {
+    // La carpeta se inspecciona inmediatamente con la cuenta de servicio.
+    // No abrimos ventana de consentimiento si existe identidad corporativa.
+    if (serviceAccountEnabled) {
       await loadDocuments(url, url);
       return;
     }
@@ -920,7 +920,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
                 <>
                   <p className={styles.intro}>
                     La carpeta de documentación ya está registrada en Extras.
-                    Conecta tu cuenta de Google Drive para que el agente pueda leerla.
+                    {serviceAccountEnabled
+                      ? ' Kora comprobará su contenido con el acceso corporativo a Drive.'
+                      : ' Conecta tu cuenta de Google Drive para que el agente pueda leerla.'}
                   </p>
                   <Button variant="secondary" size="sm" className={styles.driveConnectAction}
                     disabled={driveStatus.isLoading}
@@ -935,8 +937,9 @@ export function AiQuotationWizardModal({ project, onClose }: {
                     {extrasFolderUrl
                       ? 'El enlace registrado en Extras no corresponde a una carpeta de Drive.'
                       : 'El proyecto no tiene una carpeta en Extras.'}{' '}
-                    Conecta tu cuenta de Google: solo se buscará en las carpetas a las que
-                    esta conexión tiene acceso.
+                    {serviceAccountEnabled
+                      ? ' Kora buscará automáticamente carpetas de proyectos accesibles con la cuenta de servicio corporativa.'
+                      : ' Conecta tu cuenta de Google: solo se buscará en las carpetas a las que esta conexión tiene acceso.'}
                   </p>
                   {extrasFolderUrl && <p role="alert" className={styles.coverageNote}>
                     Puedes localizar otra carpeta y actualizar el enlace de Extras.
@@ -957,7 +960,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
               <span className={styles.bigSpinner} aria-hidden="true" />
               <strong>Buscando carpetas de levantamiento</strong>
               <p>Kora coteja proyecto y cliente con carpetas accesibles. No lee
-                ni descarga todo tu Drive.</p>
+                ni descarga documentos ajenos a la carpeta seleccionada.</p>
             </div>
           )}
           {sourceStep === 'candidates' && (
@@ -980,7 +983,8 @@ export function AiQuotationWizardModal({ project, onClose }: {
                       <strong>{candidate.name}</strong>
                       <small>{candidate.confidence === 'high' ? 'Coincidencia alta' :
                         candidate.confidence === 'medium' ? 'Coincidencia media' : 'Coincidencia baja'}
-                        {' · '}{[...candidate.ancestorNames].reverse().join(' / ') || 'Mi Drive'}
+                        {' · '}{[...candidate.ancestorNames].reverse().join(' / ') ||
+                          (serviceAccountEnabled ? 'Drive corporativo' : 'Mi Drive')}
                       </small>
                       <small>{candidate.reasons.join(' ')}</small>
                     </span>
@@ -1033,7 +1037,7 @@ export function AiQuotationWizardModal({ project, onClose }: {
             <ol role="status" className={styles.analysisMilestones}
               aria-label="Preparación de la documentación">
               <li className={styles.milestoneDone}>
-                <CheckIcon size={15} /> Carpeta autorizada con Google
+                <CheckIcon size={15} /> Acceso a la carpeta verificado
               </li>
               <li className={styles.milestoneActive}>
                 <span className={styles.milestoneSpinner} aria-hidden="true" />

@@ -51,11 +51,13 @@ describe('resolveAuthorizedDriveReader · usuario y carpeta vinculados', () => {
       .toThrow(BadRequestException);
   });
 
-  it('permite usar lector de cuenta de servicio cuando está configurada', () => {
+  it('prioriza cuenta corporativa incluso cuando el usuario tiene OAuth delegado', () => {
+    const oauth = { getAuthorizedAccessToken: vi.fn().mockReturnValue('token-personal') };
     const result = resolveAuthorizedDriveReader(folder, 'usuario-1',
-      { googleDrive: { enabled: true } } as never,
-      { getAuthorizedAccessToken: vi.fn().mockReturnValue(null) } as never);
+      { googleDrive: { enabled: true } } as never, oauth as never);
+    // undefined indica que se utilizará el lector de cuenta de servicio inyectado.
     expect(result).toBeUndefined();
+    expect(oauth.getAuthorizedAccessToken).not.toHaveBeenCalled();
   });
 
   it('no permite URL ajena a Google Drive', () => {

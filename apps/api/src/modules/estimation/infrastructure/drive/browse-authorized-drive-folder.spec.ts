@@ -127,6 +127,14 @@ describe('Exploración Drive autorizada y evidencia real para Gemini', () => {
     expect(oauth.getAuthorizedAccessToken).toHaveBeenCalledWith('usuario-1', DRIVE_DISCOVERY_SESSION);
   });
 
+  it('prioriza identidad corporativa sobre token personal y conserva navegación de hermanas', async () => {
+    const { browse, oauth } = setup({ serviceAccount: true });
+    const result = await browse('carpeta-hermana');
+    expect(result.documents.map((doc) => doc.id)).toEqual(['doc-hermana']);
+    expect(oauth.getAuthorizedAccessToken).not.toHaveBeenCalled();
+    expect(oauth.authorizeRelatedFolder).not.toHaveBeenCalled();
+  });
+
   it('sin autorización delegada ni cuenta de servicio no permite navegar', async () => {
     const { browse } = setup({ delegated: false, serviceAccount: false });
     await expect(browse('carpeta-inicial')).rejects.toBeInstanceOf(BadRequestException);

@@ -66,6 +66,15 @@ export function referenceTasksForPhase(
   return rows;
 }
 
+/** La nueva fase debe comenzar inmediatamente DESPUÉS del último tramo visible,
+ * no desde las semanas del snapshot IA previo a la replanificación. */
+export function nextQuotationPhaseStartWeek(
+  phases: readonly Pick<Phase, 'startWeek' | 'durationWeeks'>[],
+): number {
+  return Math.max(0, ...phases.map((phase) =>
+    phase.startWeek + phase.durationWeeks - 1)) + 1;
+}
+
 /** Vista referencial: toma semanas de Gemini y enmiendas comerciales guardadas,
  * agrupando por equipo real o por perfil aún no asignado. */
 export function referencePhasesFromEdt(
