@@ -114,7 +114,7 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
           segment.id === data.segmentId && segment.projectId === data.projectId);
         if (!selected || (!await this.projects.isUserOnSegmentTeam(
           selected.projectId, selected.teamId, ownerId,
-        ) && !module.tasks?.some((task) =>
+        ) && !(await this.projects.findModuleById(data.moduleId))?.tasks?.some((task) =>
           task.id === data.taskId && !task.cancelledAt &&
           task.assigneeUserId === ownerId && task.segmentId === selected.id))) {
           return err(new InvalidHourEntrySegmentError());
