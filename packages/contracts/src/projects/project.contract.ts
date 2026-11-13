@@ -423,6 +423,9 @@ export type ProjectModule = z.infer<typeof projectModuleSchema>;
  */
 export const projectPhaseOptionSchema = projectModuleSchema.pick({ id: true, name: true, currentStage: true }).extend({
   segments: z.array(projectModuleSegmentSchema.pick({ id: true, teamName: true, name: true, startDate: true, endDate: true }).extend({
+    teamId: uuidSchema.optional(),
+    /** Elegibilidad del actor autenticado según membresía en el equipo del proyecto. */
+    eligibleForHours: z.boolean().optional(),
     leaderName: z.string().nullable().optional(),
   })),
   /** Sólo metadatos necesarios para imputar HH, sin datos sensibles de la ficha. */

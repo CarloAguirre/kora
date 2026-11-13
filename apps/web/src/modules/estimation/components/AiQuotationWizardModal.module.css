@@ -236,6 +236,8 @@
 .teamReview { display: block; font-size: 11.5px; font-weight: 400; color: var(--ia-muted); margin-top: 3px; }
 .choiceAssumption { border-style: dashed; color: var(--ia-muted); }
 .choiceAssumption.choiceSelected { background: var(--ia-gray); color: var(--ia-text); border-color: var(--ia-muted); }
+/* El subtítulo del supuesto está sobre fondo gris claro, no azul marino. */
+.choiceAssumption.choiceSelected small { color: #344054; }
 .question .source { font-size: 11.5px; margin-top: 1px; }
 .question .reason { font-size: 12px; }
 .sourceBadge { color: var(--ia-purple); font-weight: 600; }

@@ -62,7 +62,31 @@ describe('Vincula estas horas al plan', () => {
     expect(resolveHourApprover([ambiguous] as unknown as ProjectPhaseOption[], 'user-1', 'segment-2')).toBe('Otro líder');
   });
 
-  it('permite elegir explícitamente Otro trabajo del bloque sin enviar un ID inexistente', () => {
+  it('ofrece tareas incluso cuando la fase no tiene bloques disponibles', () => {
+    const props = callbacks();
+    render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
+      segments={[]} segmentId="" tasks={tasks} taskId=""
+      requiresPhase {...props} />);
+    expect(screen.queryByLabelText('Bloque de trabajo')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Tarea')).toBeEnabled();
+    expect(screen.getByRole('option', { name: 'Modelo de datos' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Asignar a otra/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Tarea'),
+      { target: { value: OTHER_TASK_OPTION } });
+    expect(props.onTaskChange).toHaveBeenCalledWith(OTHER_TASK_OPTION);
+  });
+
+  it('deja «Asignar a otra» aun cuando no existen tareas del usuario', () => {
+    render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
+      segments={[]} segmentId="" tasks={[]} taskId=""
+      requiresPhase {...callbacks()} />);
+    expect(screen.getByLabelText('Tarea')).toBeEnabled();
+    expect(screen.getAllByRole('option')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ textContent: 'Asignar a otra (sin tarea vinculada)' }),
+    ]));
+  });
+
+  it('permite elegir explícitamente Asignar a otra sin enviar un ID inexistente', () => {
     const props = callbacks();
     render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
       segments={segments} segmentId="segment-1" tasks={tasks}

@@ -24,8 +24,9 @@ export interface ProjectHourPlanFieldsProps {
 
 /**
  * Selector compartido por registro diario, semanal y edición.
- * Fase -> Bloque -> Tarea: la tarea siempre queda ligada al bloque elegido.
- * «Otro» es una opción explícita de UI, no se envía como task_id.
+ * Fase -> Bloques elegibles si existen -> Tareas propias de la fase.
+ * La tarea puede no pertenecer a un bloque del equipo. «Asignar a otra»
+ * es una opción explícita de UI y no se envía como task_id.
  */
 export function ProjectHourPlanFields({
   phases, phaseId, segments, segmentId, tasks, taskId, requiresPhase, approverName,
@@ -39,7 +40,7 @@ export function ProjectHourPlanFields({
         <strong>Vincula estas horas al plan</strong>
         <span>{approverName ? `Aprobador: ${approverName}` : 'Las horas serán revisadas por el líder correspondiente'}</span>
       </div>
-      <div className={showTriplet ? styles.planFieldsTriple : styles.planFieldsSingle}>
+      <div className={showTriplet && segments.length > 0 ? styles.planFieldsTriple : styles.planFieldsSingle}>
         <Select label="Fase" required={requiresPhase}
           placeholder={phases.length > 0 ? 'Seleccionar fase...' : 'El proyecto no tiene fases'}
           options={phases.map((phase, index) => ({ value: phase.id, label: `Fase ${index + 1}: ${phase.name}` }))}
@@ -47,21 +48,18 @@ export function ProjectHourPlanFields({
           onChange={(event) => onPhaseChange(event.target.value)}
         />
         {showTriplet && <>
-          <Select label="Bloque de trabajo" required={segments.length > 0}
-            placeholder={segments.length ? 'Seleccionar bloque...' : 'Sin bloques disponibles'}
-            disabled={!segments.length}
+          {segments.length > 0 && <Select label="Bloque de trabajo"
+            placeholder="Seleccionar bloque..."
             options={segments.map((segment) => ({
-              value: segment.id,
-              label: segment.name,
+              value: segment.id, label: segment.name,
             }))}
             value={segmentId} onChange={(event) => onSegmentChange(event.target.value)}
-          />
-          <Select label="Tarea" required={tasks.length > 0}
-            placeholder={segmentId ? tasks.length ? 'Seleccionar tarea...' : 'Otro trabajo del bloque' : 'Selecciona un bloque'}
-            disabled={!segmentId || tasks.length === 0}
+          />}
+          <Select label="Tarea" required
+            placeholder="Seleccionar tarea o asignar a otra..."
             options={[
               ...tasks.map((task) => ({ value: task.id, label: task.name })),
-              { value: OTHER_TASK_OPTION, label: 'Otro trabajo del bloque' },
+              { value: OTHER_TASK_OPTION, label: 'Asignar a otra (sin tarea vinculada)' },
             ]}
             value={taskId} onChange={(event) => onTaskChange(event.target.value)}
           />
@@ -78,9 +76,9 @@ export function ProjectHourPlanFields({
           <span>Las nuevas HH se registran por separado. Solo las aprobadas se suman a las reales del Roadmap.</span>
         </div>
       ) : <p className={styles.planHelp}>
-        {phaseId && segmentId && tasks.length > 0
-          ? 'Elige tu tarea asignada o «Otro trabajo del bloque» y describe la actividad que realizaste.'
-          : 'Selecciona la fase y el bloque de tu equipo para vincular el registro. Las HH aprobadas se reflejarán en el Roadmap.'}
+        {phaseId
+          ? 'Elige una de tus tareas asignadas o «Asignar a otra» para describir un trabajo sin tarea vinculada.'
+          : 'Selecciona la fase del proyecto. Se mostrarán los bloques de tu equipo, si existen, y tus tareas asignadas.'}
       </p>}
     </section>
   );

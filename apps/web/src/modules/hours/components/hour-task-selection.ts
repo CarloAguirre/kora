@@ -1,8 +1,8 @@
 import type { ProjectPhaseOption } from '@kora/contracts';
 
 /**
- * «Otro trabajo del bloque» es una elección consciente del usuario sin tarea
- * operativa vinculada. No puede convertirse en FK ni inferirse por nombres.
+ * «Asignar a otra» permite registrar una actividad sin vincularla a una tarea.
+ * Es una elección consciente, nunca una reasignación automática ni una FK.
  */
 export const OTHER_TASK_OPTION = '__other__';
 

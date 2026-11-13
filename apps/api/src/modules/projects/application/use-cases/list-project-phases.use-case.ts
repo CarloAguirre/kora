@@ -55,6 +55,14 @@ export class ListProjectPhasesUseCase
     }
 
     const modules = await this.modules.listForProject(project.id);
+    const members = await this.members.listForProject(project.id);
+    const eligibleTeams = new Set([
+      ...members.filter((member) =>
+        member.userId === command.actorUserId && !member.blockedAt)
+        .map((member) => member.teamId),
+      ...projectTeams.filter((team) => team.leaderUserId === command.actorUserId)
+        .map((team) => team.teamId),
+    ]);
     return ok(
       modules.map((module) => ({
         id: module.id,
@@ -62,6 +70,8 @@ export class ListProjectPhasesUseCase
         currentStage: module.currentStage,
         segments: module.segments.map((segment) => ({
           id: segment.id,
+          teamId: segment.teamId,
+          eligibleForHours: eligibleTeams.has(segment.teamId),
           teamName: segment.teamName,
           name: segment.name,
           startDate: segment.startDate.toISOString().slice(0, 10),
