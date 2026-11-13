@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { hourEntryRequiresApproval, isLegacyHourEntryProject, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
+import { hourEntryRequiresApproval, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
   InvalidDesignatedApproverError,
@@ -71,19 +71,11 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
 
     let projectStageAtEntry: string | null = null;
     let projectAllowsOvertime = false;
-    let legacyProject = false;
     if (data.projectId) {
       const project = await this.projects.findById(data.projectId);
       if (!project) return err(new ReferencedProjectNotFoundError(data.projectId));
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
       if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
-      legacyProject = isLegacyHourEntryProject(project);
-      if (legacyProject && (data.moduleId || data.segmentId || data.taskId)) {
-        return err(new ForbiddenError(
-          'Proyectos anteriores al 11-11-2026: registra HH sin seleccionar fase, bloque ni tarea.',
-          'HOUR_ENTRY_LEGACY_PLAN_DISABLED',
-        ));
-      }
       if (data.isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
       projectAllowsOvertime = project.allowsOvertime;
       projectStageAtEntry = project.status;
@@ -99,17 +91,18 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       }
       if (data.taskId && !module.tasks?.some((task) =>
         task.id === data.taskId && !task.cancelledAt &&
-        task.assigneeUserId === ownerId && task.segmentId === (segmentId ?? null))) {
-        return err(new ForbiddenError('Selecciona una tarea activa, asignada al autor y al bloque elegido.', 'HOUR_ENTRY_TASK_INVALID'));
+        task.assigneeUserId === ownerId &&
+        (!segmentId || task.segmentId === segmentId))) {
+        return err(new ForbiddenError('Selecciona una tarea activa y asignada al autor en esa fase.', 'HOUR_ENTRY_TASK_INVALID'));
       }
     }
     if (data.taskId && !data.moduleId) {
       return err(new ForbiddenError('Selecciona una fase antes de elegir la tarea.', 'HOUR_ENTRY_TASK_INVALID'));
     }
 
-    if (data.projectId && data.assignment === 'Proyecto' && !data.moduleId && !legacyProject &&
-      await this.projects.hasAttributableWorkBlocks(data.projectId, ownerId)) {
-      return err(new HourEntrySegmentRequiredError());
+    if (data.projectId && data.assignment === 'Proyecto' && !data.moduleId &&
+        await this.projects.hasProjectPhases(data.projectId)) {
+      return err(new ForbiddenError('Selecciona una fase del proyecto antes de registrar las horas.', 'HOUR_ENTRY_PHASE_REQUIRED'));
     }
     if (data.segmentId && !data.moduleId) {
       return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
@@ -119,10 +112,14 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       if (data.segmentId) {
         const selected = segments.find((segment) =>
           segment.id === data.segmentId && segment.projectId === data.projectId);
-        if (!selected || !await this.projects.isUserOnSegmentTeam(
+        if (!selected || (!await this.projects.isUserOnSegmentTeam(
           selected.projectId, selected.teamId, ownerId,
-        )) return err(new InvalidHourEntrySegmentError());
-      } else if (data.assignment === 'Proyecto' && (await Promise.all(
+        ) && !module.tasks?.some((task) =>
+          task.id === data.taskId && !task.cancelledAt &&
+          task.assigneeUserId === ownerId && task.segmentId === selected.id))) {
+          return err(new InvalidHourEntrySegmentError());
+        }
+      } else if (data.assignment === 'Proyecto' && !data.taskId && (await Promise.all(
         segments.map((segment) => this.projects.isUserOnSegmentTeam(
           segment.projectId, segment.teamId, ownerId,
         )),

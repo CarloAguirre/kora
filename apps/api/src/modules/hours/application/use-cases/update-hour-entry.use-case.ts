@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { hourEntryRequiresApproval, isLegacyHourEntryProject, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
+import { hourEntryRequiresApproval, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { splitByDailyCap, type HoursTranche } from '../../domain/services/daily-cap';
 import {
@@ -112,16 +112,6 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       ? data.taskId
       : (moduleId === previous.moduleId && segmentId === previous.segmentId &&
          projectId === previous.projectId ? previous.taskId ?? null : null);
-    // Se preservan vínculos históricos sin permitir nuevos vínculos/cambios.
-    if (project && isLegacyHourEntryProject(project) &&
-        (moduleId || segmentId || taskId) &&
-        (projectId !== previous.projectId || moduleId !== previous.moduleId ||
-         segmentId !== previous.segmentId || taskId !== (previous.taskId ?? null))) {
-      return err(new ForbiddenError(
-        'Fase, bloque y tarea deshabilitados para proyectos anteriores al 11-11-2026.',
-        'HOUR_ENTRY_LEGACY_PLAN_DISABLED',
-      ));
-    }
     if (moduleId) {
       const module = await this.projects.findModuleById(moduleId);
       if (!module) return err(new ReferencedModuleNotFoundError(moduleId));
@@ -132,8 +122,9 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       if (taskId && (taskId !== previous.taskId || segmentId !== previous.segmentId ||
         moduleId !== previous.moduleId || projectId !== previous.projectId) &&
         !module.tasks?.some((task) => task.id === taskId && !task.cancelledAt &&
-          task.assigneeUserId === entry.userId && task.segmentId === (segmentId ?? null))) {
-        return err(new ForbiddenError('Selecciona una tarea activa, asignada al autor y al bloque elegido.', 'HOUR_ENTRY_TASK_INVALID'));
+          task.assigneeUserId === entry.userId &&
+          (!segmentId || task.segmentId === segmentId))) {
+        return err(new ForbiddenError('Selecciona una tarea activa y asignada al autor en esa fase.', 'HOUR_ENTRY_TASK_INVALID'));
       }
     }
     if (taskId && !moduleId) {
@@ -141,9 +132,8 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     }
 
     if (projectId && !moduleId && data.projectId !== undefined &&
-      !isLegacyHourEntryProject(project ?? {}) &&
-      await this.projects.hasAttributableWorkBlocks(projectId, entry.userId)) {
-      return err(new HourEntrySegmentRequiredError());
+        await this.projects.hasProjectPhases(projectId)) {
+      return err(new ForbiddenError('Selecciona una fase del proyecto antes de registrar las horas.', 'HOUR_ENTRY_PHASE_REQUIRED'));
     }
     if (segmentId && !moduleId) {
       return err(new InvalidHourEntrySegmentError('Selecciona la fase antes de elegir un bloque.'));
@@ -153,15 +143,19 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       if (segmentId) {
         const selected = segments.find((segment) =>
           segment.id === segmentId && segment.projectId === projectId);
-        if (!selected || !await this.projects.isUserOnSegmentTeam(
+        if (!selected || (!await this.projects.isUserOnSegmentTeam(
           selected.projectId, selected.teamId, entry.userId,
-        )) return err(new InvalidHourEntrySegmentError());
+        ) && !(await this.projects.findModuleById(moduleId))?.tasks?.some((task) =>
+          task.id === taskId && !task.cancelledAt &&
+          task.assigneeUserId === entry.userId && task.segmentId === selected.id))) {
+          return err(new InvalidHourEntrySegmentError());
+        }
       } else if (data.segmentId !== undefined || (data.moduleId !== undefined &&
         data.moduleId !== previous.moduleId)) {
         const hasEligibleSegment = (await Promise.all(segments.map((segment) =>
           this.projects.isUserOnSegmentTeam(segment.projectId, segment.teamId, entry.userId),
         ))).some(Boolean);
-        if (hasEligibleSegment) return err(new HourEntrySegmentRequiredError());
+        if (hasEligibleSegment && !taskId) return err(new HourEntrySegmentRequiredError());
       }
     }
     // Una hora normal que con la edición pase de la jornada de 8h del día se
