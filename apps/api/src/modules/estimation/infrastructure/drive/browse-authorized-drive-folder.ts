@@ -41,8 +41,8 @@ function isFolder(value: DriveFolderMetadata | null): value is DriveFolderMetada
 }
 
 /**
- * Un token delegado por usuario + carpeta raíz. Se pueden navegar la carpeta
- * original, sus hermanas, y las carpetas descendientes del padre de la original.
+ * Navega una carpeta raíz, sus hermanas y sus descendientes, validando jerarquía.
+ * La identidad corporativa tiene prioridad; la PoC conserva OAuth como fallback.
  * No se permite consultar un ID arbitrario de Drive como "hermano".
  */
 export async function browseAuthorizedDriveFolder(
@@ -128,8 +128,8 @@ export async function browseAuthorizedDriveFolder(
     new GoogleDriveDocumentSourceReader(drive), folderUrl(selectedId),
   );
 
-  // La autorización derivada ocurre solo tras validar la jerarquía y la
-  // accesibilidad del recurso; /poc/analyze sigue exigiendo usuario+carpeta.
+  // Solo en modo OAuth delegado: autorizar una carpeta relacionada después
+  // de validar su jerarquía. En modo corporativo no hay token personal.
   if (delegatedToken && selectedId !== originalId) {
     oauth.authorizeRelatedFolder(actorId,
       folderToken ? originalId : DRIVE_DISCOVERY_SESSION, selectedId);
