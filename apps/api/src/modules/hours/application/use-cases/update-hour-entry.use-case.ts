@@ -131,7 +131,13 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
       return err(new ForbiddenError('Selecciona una fase antes de elegir la tarea.', 'HOUR_ENTRY_TASK_INVALID'));
     }
 
+    // No forzar a replanificar una HH histórica ya registrada SIN fase:
+    // puede corregirse su descripción o duración aunque el proyecto se haya
+    // planificado posteriormente. Solo bloquear nuevos vínculos sin fase.
+    const editingExistingUnlinkedEntry =
+      projectId === previous.projectId && !previous.moduleId && !moduleId;
     if (projectId && !moduleId && data.projectId !== undefined &&
+        !editingExistingUnlinkedEntry &&
         await this.projects.hasProjectPhases(projectId)) {
       return err(new ForbiddenError('Selecciona una fase del proyecto antes de registrar las horas.', 'HOUR_ENTRY_PHASE_REQUIRED'));
     }
