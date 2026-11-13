@@ -84,6 +84,37 @@ describe('política de estimación profesional', () => {
       .toThrow(/Supervisión técnica duplicada/);
   });
 
+  it('no confunde una supervisión técnica puntual con gobierno semanal duplicado', () => {
+    const data = base(4);
+    data.activities[0]!.name = 'Supervisión técnica de integración SOAP';
+    data.activities[0]!.description =
+      'Verificar contratos, respuestas, errores y calidad de la integración.';
+    data.roleHours.push({ wbs: 'T01.01', role: 'Líder Técnico', hours: 12 });
+    const result = addMandatoryTechLeadSupervision(data, 'Líder Técnico');
+    expect(result.roleHours.filter((row) => row.role === 'Líder Técnico')
+      .reduce((sum, row) => sum + row.hours, 0)).toBe(32);
+    expect(result.roleHours.find((row) => row.wbs === 'T01.01' &&
+      row.role === 'Líder Técnico')?.hours).toBe(12);
+  });
+
+  it('no rechaza una revisión técnica porque otra frase aluda a planificación semanal', () => {
+    const data = base(4);
+    data.activities[0]!.name = 'Supervisión de seguridad de integraciones';
+    data.activities[0]!.description =
+      'Control concreto de autorizaciones, pruebas y entregables.';
+    data.roleHours.push({ wbs: 'T01.01', role: 'Líder Técnico', hours: 8 });
+    expect(addMandatoryTechLeadSupervision(data, 'Líder Técnico')
+      .roleHours.find((row) => row.wbs === 'TL-GOV.01')?.hours).toBe(20);
+  });
+
+  it('rechaza seguimiento semanal de riesgos duplicado, no lo suma dos veces', () => {
+    const data = base(4);
+    data.activities[0]!.name = 'Seguimiento semanal de riesgos y avances';
+    data.roleHours.push({ wbs: 'T01.01', role: 'Líder Técnico', hours: 20 });
+    expect(() => addMandatoryTechLeadSupervision(data, 'Líder Técnico'))
+      .toThrow(/Supervisión técnica duplicada en WBS T01.01/);
+  });
+
   it('permite trabajo de arquitectura hands-on adicional pero conserva la base aparte', () => {
     const data = base(4);
     data.roleHours.push({ wbs: 'T01.01', role: 'Líder Técnico', hours: 8 });

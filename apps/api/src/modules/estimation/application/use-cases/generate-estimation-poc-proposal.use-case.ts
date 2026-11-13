@@ -6,6 +6,7 @@ import { extractDriveFolderId } from '../drive-source-selection';
 import { resolveEstimationQuestionnaireContext, type EstimationInputWithQuestions } from '../resolve-estimation-questionnaire-context';
 import {
   ESTIMATION_METHODOLOGY_VERSION,
+  EstimationMethodologyValidationError,
   ESTIMATION_TEAM_GUIDANCE,
   ESTIMATION_EDT_GUIDANCE,
   TECH_LEAD_HOURS_PER_WEEK,
@@ -326,7 +327,7 @@ export class GenerateEstimationPocProposalUseCase {
         'classification: SOLO una etiqueta de categoría corta (máximo 40 caracteres), nunca una explicación. Si no aplica, cadena vacía. La explicación detallada pertenece a description.',
         'roleHours.hours siempre mayor a 0 y con hasta dos decimales. Cada actividad debe tener al menos un perfil. No inventes personas, responsables nominales ni estados de ejecución.',
         'reservePercent: solo usa el porcentaje expresamente pedido en el documento o cuestionario; si no aparece, devuelve 0. La reserva no integra las HH base.',
-        'Máximo 20 módulos, 120 actividades WBS únicas, 20 tramos y 240 filas roleHours.',
+        'Máximo 19 módulos, 119 actividades WBS únicas, 19 tramos y 239 filas roleHours: Kora reserva una fila de cada tipo para la supervisión técnica semanal.',
         'Controla el tamaño de salida: para un proyecto de complejidad media busca unas 20 a 45 actividades WBS concretas; no fragmentes tareas triviales. Prioriza cubrir todo el alcance documentado sin exceder los límites de respuesta del proveedor IA.',
         'Evita entregables genéricos; describe actividades que un desarrollador o QA pueda implementar y revisar.',
         'No reutilices horas ni reservas de otros proyectos. Usa únicamente estos antecedentes y respuestas.',
@@ -376,7 +377,9 @@ export class GenerateEstimationPocProposalUseCase {
           ' módulos y ' + verified.totalHours + ' HH.');
         return verified;
       } catch (error) {
-        if (!(error instanceof BadRequestException) && !(error instanceof z.ZodError)) {
+        if (!(error instanceof BadRequestException) &&
+            !(error instanceof z.ZodError) &&
+            !(error instanceof EstimationMethodologyValidationError)) {
           throw error;
         }
         validationIssue = error instanceof z.ZodError
