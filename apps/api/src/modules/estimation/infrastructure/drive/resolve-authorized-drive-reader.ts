@@ -22,12 +22,15 @@ export function resolveAuthorizedDriveReader(
   if (folderId === 'kora-poc-fallback') return undefined; // compatibilidad con tests legados
   if (!config) throw new BadRequestException('Configuración de Drive no disponible.');
 
+  // La identidad corporativa es prioritaria: si existe, el lector inyectado
+  // usa sus propias credenciales, aunque haya un token personal previo.
+  if (config.googleDrive.enabled) return undefined;
+
   const delegatedToken = oauth?.getAuthorizedAccessToken(userId, folderId) ??
     oauth?.getAuthorizedAccessToken(userId, DRIVE_DISCOVERY_SESSION);
   if (delegatedToken) {
     return new GoogleDriveDocumentSourceReader(new GoogleDriveFolderClient(config, delegatedToken));
   }
-  if (config.googleDrive.enabled) return undefined;
 
   throw new BadRequestException(
     'Autoriza primero esta carpeta con Google desde el asistente. ' +
