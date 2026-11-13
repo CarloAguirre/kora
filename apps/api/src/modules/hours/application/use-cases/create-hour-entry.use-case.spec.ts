@@ -210,6 +210,7 @@ function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, own
     }),
     recalculateUsedHours: vi.fn().mockResolvedValue(undefined),
     hasAttributableWorkBlocks: vi.fn().mockResolvedValue(false),
+    hasProjectPhases: vi.fn().mockResolvedValue(false),
   } as unknown as HourEntryProjectReader;
 
   const useCase = new CreateHourEntryUseCase(

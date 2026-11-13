@@ -68,10 +68,10 @@ describe('Vincula estas horas al plan', () => {
       segments={[]} segmentId="" tasks={tasks} taskId=""
       requiresPhase {...props} />);
     expect(screen.queryByLabelText('Bloque de trabajo')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Tarea')).toBeEnabled();
+    expect(screen.getByLabelText(/^Tarea/)).toBeEnabled();
     expect(screen.getByRole('option', { name: 'Modelo de datos' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Asignar a otra/ })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Tarea'),
+    fireEvent.change(screen.getByLabelText(/^Tarea/),
       { target: { value: OTHER_TASK_OPTION } });
     expect(props.onTaskChange).toHaveBeenCalledWith(OTHER_TASK_OPTION);
   });
@@ -80,7 +80,7 @@ describe('Vincula estas horas al plan', () => {
     render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
       segments={[]} segmentId="" tasks={[]} taskId=""
       requiresPhase {...callbacks()} />);
-    expect(screen.getByLabelText('Tarea')).toBeEnabled();
+    expect(screen.getByLabelText(/^Tarea/)).toBeEnabled();
     expect(screen.getAllByRole('option')).toEqual(expect.arrayContaining([
       expect.objectContaining({ textContent: 'Asignar a otra (sin tarea vinculada)' }),
     ]));

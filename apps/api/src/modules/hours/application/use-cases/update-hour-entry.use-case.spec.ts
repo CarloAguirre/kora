@@ -105,7 +105,7 @@ describe('edición de horas y atribución a bloque', () => {
     expect(entry.toSnapshot()).toMatchObject({ taskId: 'task-2', segmentId: 'segment-2' });
   });
 
-  it('histórico: preserva atribuciones existentes y bloquea cambios de vínculo', async () => {
+  it('histórico: preserva atribuciones existentes y permite reasignar a otra tarea propia', async () => {
     const { useCase, entry, projects, save } = setup();
     projects.findById.mockResolvedValue({
       id: 'project-1', status: 'active', allowsOvertime: false,
@@ -117,12 +117,13 @@ describe('edición de horas y atribución a bloque', () => {
     });
     expect(okResult.isOk()).toBe(true);
     expect(entry.toSnapshot().segmentId).toBe('segment-1');
-    const denied = await useCase.execute({
+    const relinked = await useCase.execute({
       entryId: 'entry-1', data: { segmentId: 'segment-2', taskId: 'task-2' },
       actor, actorRole: 'collaborator',
     });
-    expect(denied.isErr() && denied.error.code).toBe('HOUR_ENTRY_LEGACY_PLAN_DISABLED');
-    expect(save).toHaveBeenCalledOnce();
+    expect(relinked.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({ segmentId: 'segment-2', taskId: 'task-2' });
+    expect(save).toHaveBeenCalledTimes(2);
   });
 
   it('no permite vincular una tarea ajena al autor', async () => {
