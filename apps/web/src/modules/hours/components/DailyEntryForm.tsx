@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
-  isLegacyHourEntryProject,
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_REQUIRING_ASSIGNMENTS,
   hourEntryRequiresApproval,
@@ -42,20 +41,17 @@ export const isWeekend = (isoDate: string) => {
 };
 
 /**
- * Solo se pueden imputar HH a tareas activas asignadas al autor y pertenecientes
- * al bloque seleccionado. El filtro se replica y refuerza en el backend.
+ * Todas las tareas activas asignadas al autor en la fase, incluso cuando
+ * no hay bloques elegibles para su equipo. El backend verifica titularidad.
  */
 export function selectAttributableTasks<
   T extends Pick<ProjectPhaseOption['tasks'][number], 'assigneeUserId' | 'segmentId' | 'cancelledAt'>,
 >(
   tasks: readonly T[],
   ownerId: string | null | undefined,
-  segmentId: string | null | undefined,
 ): T[] {
   if (!ownerId) return [];
-  return tasks.filter((task) =>
-    !task.cancelledAt && task.assigneeUserId === ownerId &&
-    (task.segmentId ?? null) === (segmentId || null));
+  return tasks.filter((task) => !task.cancelledAt && task.assigneeUserId === ownerId);
 }
 
 export interface DailyBlock {
@@ -191,13 +187,13 @@ export function validateDailyBlock(
   if (needsProject && !block.projectId) return 'Selecciona un proyecto para esta asignación.';
   const selectedProject = projects.find((project) => project.id === block.projectId);
   if (needsProject && !selectedProject) return 'Selecciona un proyecto disponible para esta asignación.';
-  const legacyProject = selectedProject ? isLegacyHourEntryProject(selectedProject) : false;
-  if (!legacyProject && block.assignment === 'Proyecto' && block.roadmapNeedsPhase && !block.moduleId)
-    return 'Selecciona una fase y su bloque de trabajo para imputar estas horas.';
-  if (!legacyProject && block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId)
-    return 'Selecciona el bloque al que corresponden estas HH.';
-  if (!legacyProject && block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
-    return 'Selecciona una tarea o «Otro trabajo del bloque».';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsPhase && !block.moduleId)
+    return 'Selecciona una fase para imputar estas horas.';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
+    return 'Selecciona tu tarea o «Asignar a otra».';
+  if (block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId &&
+      (!block.taskId || block.taskId === OTHER_TASK_OPTION))
+    return 'Selecciona el bloque de tu equipo para este trabajo.';
   if (needsProject && ((block.isOvertime && !overtimeAlreadyGranted) || exceedsDailyCap)) {
     const project = projects.find((p) => p.id === block.projectId);
     if (!project?.allowsOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
@@ -275,10 +271,7 @@ export function DailyEntryForm({
       block.taskId === taskId && block.segmentId !== segmentId
         ? { ...block, segmentId } : block));
   }, [initialTask, targetAllowed, targetTask]);
-  const legacyTaskTarget = Boolean(initialTask &&
-    isLegacyHourEntryProject((projects?.items ?? []).find((p) => p.id === initialTask.projectId) ?? {}));
-  const validTaskPrefill = !legacyTaskTarget &&
-    matchesTaskHourTarget(blocks, initialTask, taskPhases, user?.id);
+  const validTaskPrefill = matchesTaskHourTarget(blocks, initialTask, taskPhases, user?.id);
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -373,14 +366,12 @@ export function DailyEntryForm({
       while (remaining.length > 0) {
         const block = remaining[0]!;
         const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
-        const chosenProject = (projects?.items ?? []).find((p) => p.id === block.projectId);
-        const noPlanLink = chosenProject ? isLegacyHourEntryProject(chosenProject) : false;
         const input: CreateHourEntryInput = {
           assignment: block.assignment as HourEntryAssignment,
           projectId: needsProject ? block.projectId : undefined,
-          moduleId: needsProject && !noPlanLink && block.moduleId ? block.moduleId : undefined,
-          segmentId: needsProject && !noPlanLink && block.moduleId && block.segmentId ? block.segmentId : undefined,
-          taskId: needsProject && !noPlanLink && block.moduleId ? toHourTaskId(block.taskId) : undefined,
+          moduleId: needsProject && block.moduleId ? block.moduleId : undefined,
+          segmentId: needsProject && block.moduleId && block.segmentId ? block.segmentId : undefined,
+          taskId: needsProject && block.moduleId ? toHourTaskId(block.taskId) : undefined,
           category: block.category.trim(),
           description: block.description || undefined,
           hours: Number(block.hours),
@@ -408,10 +399,6 @@ export function DailyEntryForm({
         ? 'Registra las horas de «' + initialTask.taskTitle +
           '». Al guardarlas, la tarea se enviará a aprobación.'
         : 'Agrega uno o más registros y registra tus horas del día'}</p>
-      {legacyTaskTarget && <p className={styles.noticeWarning} role="status">
-        En proyectos iniciados antes del 11-11-2026, las HH no se vinculan a tareas.
-        Para registrar horas, usa «Registrar horas» sin iniciar desde una tarea.
-      </p>}
       {initialTask && taskPhasesError &&
         <p className={styles.alert} role="alert">
           No se pudo consultar la tarea. Cancela e inténtalo nuevamente.
@@ -632,7 +619,6 @@ export function DailyEntryBlockFields({
   const showApproverInRow =
     block.assignment !== '' && !needsProject && (isCollaborator || (overtimeNeedsApproval && (block.isOvertime || exceedsDailyCap)));
   const selectedProject = needsProject ? projects.find((p) => p.id === block.projectId) : undefined;
-  const legacyProject = selectedProject ? isLegacyHourEntryProject(selectedProject) : false;
   const selectableProjects = filterHourEntryProjects(projects, block.assignment);
   // En edición, el proyecto puede haber cambiado de etapa comercial desde
   // que se registraron las HH: mantenerlo visible solo mientras NO se cambie
@@ -647,14 +633,13 @@ export function DailyEntryBlockFields({
   // Los colaboradores no requieren projects:read para registrar horas; /phases
   // entrega el contexto autorizado. Evita un GET de detalle innecesario/403.
   const { data: projectDetail } = useProjectDetail(
-    needsProject && block.projectId && !legacyProject && user?.role !== 'collaborator' ? block.projectId : null,
+    needsProject && block.projectId && user?.role !== 'collaborator' ? block.projectId : null,
   );
   const selectedModule = projectDetail?.modules.find((m) => m.id === block.moduleId);
-  const { data: hourPhases } = useProjectPhases(needsProject && block.projectId && !legacyProject ? block.projectId : null);
+  const { data: hourPhases } = useProjectPhases(needsProject && block.projectId ? block.projectId : null);
   const selectedHourPhase = hourPhases?.find((phase) => phase.id === block.moduleId);
   const availableTasks = selectAttributableTasks(
-    hourPhases?.find((phase) => phase.id === block.moduleId)?.tasks ?? [],
-    ownerUserId ?? user?.id, block.segmentId,
+    selectedHourPhase?.tasks ?? [], ownerUserId ?? user?.id,
   );
   const selectedTask = availableTasks.find((task) => task.id === block.taskId);
   const allowedTeamIds = new Set([
@@ -666,27 +651,25 @@ export function DailyEntryBlockFields({
   // Un colaborador puede registrar HH aunque no tenga projects:read_assigned.
   // En ese caso, la ruta /phases (hours:register) es la fuente de selección.
   // La API valida equipo y autor siempre, incluso si aparecen otros bloques.
-  const availableSegments = selectedModule
-    ? selectedModule.segments.filter((segment) => allowedTeamIds.has(segment.teamId))
-    : (selectedHourPhase?.segments ?? []);
-  const requiresPhase = projectDetail
-    ? projectDetail.modules.some((module) =>
-        module.segments.some((segment) => allowedTeamIds.has(segment.teamId)))
-    : (hourPhases ?? []).some((phase) => phase.segments.length > 0);
+  const availableSegments = (selectedHourPhase?.segments ?? []).filter((segment) =>
+    ownerUserId && ownerUserId !== user?.id
+      ? allowedTeamIds.has(segment.teamId ?? '')
+      : segment.eligibleForHours === true);
+  const requiresPhase = (hourPhases ?? []).length > 0;
 
   // La obligatoriedad depende de los equipos REALES del autor en este proyecto.
   // La capa de API conserva la misma regla y vuelve a comprobarla al guardar.
   useEffect(() => {
-    const roadmapNeedsPhase = Boolean(needsProject && !legacyProject && block.projectId && requiresPhase);
-    const roadmapNeedsSegment = Boolean(needsProject && !legacyProject && block.moduleId && availableSegments.length > 0);
-    const roadmapNeedsTask = Boolean(needsProject && !legacyProject && block.segmentId && availableTasks.length > 0);
+    const roadmapNeedsPhase = Boolean(needsProject && block.projectId && requiresPhase);
+    const roadmapNeedsSegment = Boolean(needsProject && block.moduleId && availableSegments.length > 0);
+    const roadmapNeedsTask = Boolean(needsProject && block.moduleId);
     if (block.roadmapNeedsPhase !== roadmapNeedsPhase ||
       block.roadmapNeedsSegment !== roadmapNeedsSegment || block.roadmapNeedsTask !== roadmapNeedsTask) {
       onUpdate({ roadmapNeedsPhase, roadmapNeedsSegment, roadmapNeedsTask });
     }
   }, [needsProject, block.projectId, block.moduleId, block.segmentId,
     block.roadmapNeedsPhase, block.roadmapNeedsSegment, block.roadmapNeedsTask,
-    legacyProject, requiresPhase, availableSegments.length, availableTasks.length, onUpdate]);
+    requiresPhase, availableSegments.length, onUpdate]);
 
   return (
     <div className={styles.block}>
@@ -778,15 +761,14 @@ export function DailyEntryBlockFields({
             )}
           </div>
 
-          {needsProject && block.projectId && legacyProject && (
+          {needsProject && block.projectId && hourPhases && hourPhases.length === 0 && (
             <p className={styles.noticeInfo} role="status">
-              Proyecto historico (sin planificación).
-              Registra las HH directamente al proyecto.
+              Este proyecto no tiene fases configuradas. Puedes registrar HH generales.
             </p>
           )}
-          {needsProject && block.projectId && !legacyProject && (projectDetail?.modules ?? hourPhases ?? []).length > 0 && (
+          {needsProject && block.projectId && (hourPhases ?? []).length > 0 && (
             <ProjectHourPlanFields
-              phases={projectDetail?.modules ?? hourPhases ?? []}
+              phases={hourPhases ?? []}
               phaseId={block.moduleId}
               segments={availableSegments}
               segmentId={block.segmentId ?? ''}
@@ -806,13 +788,19 @@ export function DailyEntryBlockFields({
                 segmentId, taskId: '',
                 category: activityForTaskChange(block.category, selectedTask?.name, undefined),
               })}
-              onTaskChange={(taskId) => onUpdate({
-                taskId,
-                category: activityForTaskChange(
-                  block.category, selectedTask?.name,
-                  availableTasks.find((task) => task.id === taskId)?.name,
-                ),
-              })}
+              onTaskChange={(taskId) => {
+                const selected = availableTasks.find((task) => task.id === taskId);
+                onUpdate({
+                  taskId,
+                  segmentId: selected
+                    ? availableSegments.some((segment) => segment.id === selected.segmentId)
+                      ? selected.segmentId ?? '' : ''
+                    : block.segmentId,
+                  category: activityForTaskChange(
+                    block.category, selectedTask?.name, selected?.name,
+                  ),
+                });
+              }}
             />
           )}
 
