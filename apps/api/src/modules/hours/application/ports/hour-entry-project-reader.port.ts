@@ -51,6 +51,8 @@ export interface HourEntryProjectReader {
   findModuleById(moduleId: string): Promise<HourEntryModuleReference | null>;
   /** Bloques reales de una fase, sin acceso a DB desde casos de uso. */
   findSegmentsForModule(moduleId: string): Promise<HourEntrySegmentReference[]>;
+  /** Una fase disponible exige elegirla, con independencia de la fecha de inicio. */
+  hasProjectPhases(projectId: string): Promise<boolean>;
   /** Si el autor no participa en los equipos del Roadmap, puede imputar HH generales sin bloque. */
   hasAttributableWorkBlocks(projectId: string, userId: string): Promise<boolean>;
   /** Un usuario puede registrar HH en su equipo activo del proyecto o si es su líder. */

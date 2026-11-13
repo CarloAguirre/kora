@@ -59,6 +59,7 @@ class FakeProjectReader implements HourEntryProjectReader {
   async findSegmentsForModule(): Promise<[]> {
     return [];
   }
+  async hasProjectPhases(): Promise<boolean> { return false; }
   async hasAttributableWorkBlocks(): Promise<boolean> {
     return false;
   }

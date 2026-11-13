@@ -15,15 +15,23 @@ const project = (date: string) => ({
   startDate: date, createdAt: '2026-10-15T00:00:00Z', allowsOvertime: false,
 } as ProjectSummary);
 
-describe('validación de horas según fecha de inicio de proyecto', () => {
-  it('legacy permite registrar HH sin fase/bloque/tarea', () => {
-    expect(validateDailyBlock(block, {
-      projects: [project('2026-11-10')], isCollaborator: true,
-    })).toBeNull();
-  });
-  it('11-11 mantiene obligatoriedad de fase cuando hay bloques', () => {
-    expect(validateDailyBlock(block, {
-      projects: [project('2026-11-11')], isCollaborator: true,
-    })).toMatch(/fase y su bloque/i);
-  });
+describe('validación de horas según planificación disponible (no fecha)', () => {
+  it.each(['2026-11-10', '2026-11-11', '2026-11-13'])(
+    'requiere fase con planificación incluso en proyecto iniciado el %s', (date) => {
+      expect(validateDailyBlock(block, {
+        projects: [project(date)], isCollaborator: true,
+      })).toBe('Selecciona una fase para imputar estas horas.');
+    },
+  );
+
+  it.each(['2026-11-10', '2026-11-11', '2026-11-13'])(
+    'permite HH sin fase si el proyecto del %s no tiene fases', (date) => {
+      expect(validateDailyBlock({
+        ...block, roadmapNeedsPhase: false,
+        roadmapNeedsSegment: false, roadmapNeedsTask: false,
+      }, {
+        projects: [project(date)], isCollaborator: true,
+      })).toBeNull();
+    },
+  );
 });

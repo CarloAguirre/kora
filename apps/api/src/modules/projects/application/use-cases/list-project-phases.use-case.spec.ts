@@ -31,7 +31,7 @@ describe('Fases para registrar horas · consumo progresivo por tarea', () => {
     } as unknown as ProjectModuleRepository;
     return new ListProjectPhasesUseCase(
       projects,
-      { listForProject: vi.fn() } as unknown as ProjectTeamMemberRepository,
+      { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamMemberRepository,
       { findByProject: vi.fn().mockResolvedValue([{
         teamId: 'team-1', leaderName: 'Eduardo Aranda', leaderUserId: 'leader-1',
       }]) } as unknown as ProjectTeamRepository,
@@ -54,6 +54,7 @@ describe('Fases para registrar horas · consumo progresivo por tarea', () => {
       });
       expect(result.value[0]?.segments[0]).toMatchObject({
         name: 'Calculadora', leaderName: 'Eduardo Aranda',
+        teamId: 'team-1', eligibleForHours: false,
       });
     }
   });

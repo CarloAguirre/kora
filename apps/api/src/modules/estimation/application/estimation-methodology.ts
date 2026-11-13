@@ -8,6 +8,30 @@ export const ESTIMATION_METHODOLOGY_VERSION = '2026-11-06.ai-e2e.v1';
 export const TECH_LEAD_HOURS_PER_WEEK = 5;
 export const WEEKLY_HOURS_PER_PERSON = 40;
 
+/** Errores de negocio en la EDT generada, aptos para devolución al
+ * cuestionario y reintento opcional. No confundir con fallos de infraestructura. */
+export class EstimationMethodologyValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'EstimationMethodologyValidationError';
+  }
+}
+
+/** Solo detectar gobierno técnico SEMANAL ordinario. «Supervisión» a secas
+ * también describe inspecciones y revisiones hands-on presupuestables.
+ * El reconocimiento conservador evita rechazar sus HH legítimas. */
+function isOrdinaryWeeklyTechLeadSupervision(value: string): boolean {
+  const text = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ');
+  return [
+    /\bsupervision (?:tecnica |de avances? |de riesgos? |transversal )?semanal\b/,
+    /\bseguimiento semanal (?:de |del )?(?:avances?|riesgos?|calidad|equipo|proyecto|decisiones?)\b/,
+    /\bcontrol tecnico semanal\b/,
+    /\bsupervisar (?:avances?|riesgos?|decisiones?|calidad|al equipo|el proyecto)[^.;]{0,100}\bcada semana\b/,
+    /\b(?:supervision|seguimiento) (?:de )?(?:avances?|riesgos?|calidad|proyecto)[^.;]{0,100}\b(?:cada semana|todas las semanas|semanalmente)\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
 export const ESTIMATION_ANALYSIS_GUIDANCE = [
   'Identifica alcance explícito, exclusiones, actores, flujos, datos, reglas, interfaces e integraciones; separa hechos, derivaciones y supuestos.',
   'Una maqueta simula comportamientos: no conviertas sus datos de ejemplo en requisitos confirmados.',
@@ -77,19 +101,24 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
   edt: T, leadRole: string,
 ): T {
   if (!edt.stages.length || !edt.activities.length) {
-    throw new Error('La EDT no contiene tramos y actividades verificables.');
+    throw new EstimationMethodologyValidationError('La EDT no contiene tramos y actividades verificables.');
   }
   if (edt.stages.length >= 20 || edt.activities.length >= 120 ||
       edt.roleHours.length >= 240) {
-    throw new Error('La EDT no dejó espacio reservado para la supervisión técnica semanal.');
+    throw new EstimationMethodologyValidationError('La EDT no dejó espacio reservado para la supervisión técnica semanal.');
   }
   const overlapping = edt.activities.find((activity) =>
-    edt.roleHours.some((hours) => hours.wbs === activity.wbs &&
-      hours.role === leadRole) &&
-    /supervisi[oó]n|seguimiento semanal|control t[eé]cnico semanal/i
-      .test(activity.name + ' ' + activity.description));
+    edt.roleHours.some((hours) =>
+      hours.wbs === activity.wbs && hours.role === leadRole &&
+      isOrdinaryWeeklyTechLeadSupervision([
+        activity.name, activity.description,
+        ...('taskName' in hours && typeof hours.taskName === 'string'
+          ? [hours.taskName] : []),
+        ...('taskDescription' in hours && typeof hours.taskDescription === 'string'
+          ? [hours.taskDescription] : []),
+      ].join('. '))));
   if (overlapping) {
-    throw new Error('Supervisión técnica duplicada en WBS ' + overlapping.wbs +
+    throw new EstimationMethodologyValidationError('Supervisión técnica duplicada en WBS ' + overlapping.wbs +
       ': la supervisión semanal la incorpora el servidor, no Gemini.');
   }
   // Un tramo sin actividades no debe aumentar la duración contractual ni
@@ -97,18 +126,18 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
   const referencedStages = new Set(edt.activities.map((activity) => activity.stageCode));
   const activeStages = edt.stages.filter((stage) => referencedStages.has(stage.code));
   if (activeStages.length === 0) {
-    throw new Error('Ninguna actividad de la EDT referencia un tramo cronológico declarado.');
+    throw new EstimationMethodologyValidationError('Ninguna actividad de la EDT referencia un tramo cronológico declarado.');
   }
   const horizonWeeks = Math.max(...activeStages.map((stage) =>
     stage.startWeek + stage.durationWeeks - 1));
   if (!Number.isInteger(horizonWeeks) || horizonWeeks < 1 || horizonWeeks > 520) {
-    throw new Error('Horizonte semanal de la EDT fuera de rango.');
+    throw new EstimationMethodologyValidationError('Horizonte semanal de la EDT fuera de rango.');
   }
   const stageCode = 'TL-GOV';
   const wbs = 'TL-GOV.01';
   if (edt.stages.some((stage) => stage.code === stageCode) ||
       edt.activities.some((activity) => activity.wbs === wbs)) {
-    throw new Error('La EDT reserva TL-GOV para supervisión obligatoria; código duplicado.');
+    throw new EstimationMethodologyValidationError('La EDT reserva TL-GOV para supervisión obligatoria; código duplicado.');
   }
   return {
     ...edt,
