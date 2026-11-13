@@ -336,6 +336,7 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
 
   it('con Extras válido conecta directamente a su carpeta sin descubrir ni modificar Extras', async () => {
     renderWizard();
+    expect(screen.getByText(/acceso corporativo a Drive/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Analizar proyecto' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Buscar carpeta de levantamiento en mi Drive' }))
       .not.toBeInTheDocument();
@@ -353,7 +354,6 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
     expect(mocks.updateExtras).not.toHaveBeenCalled();
     expect(mocks.driveAccess).not.toHaveBeenCalled();
     expect(mocks.oauthStart).not.toHaveBeenCalled();
-    expect(screen.getByText(/acceso corporativo a Drive/)).toBeInTheDocument();
   });
 
   it('sin candidatas presenta el aviso amarillo, enlace manual y confirmación protegida', async () => {
