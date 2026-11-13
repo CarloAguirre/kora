@@ -8,7 +8,7 @@ import { AiQuotationWizardModal } from './AiQuotationWizardModal';
 
 const mocks = vi.hoisted(() => ({
   analyze: vi.fn(), generate: vi.fn(), onClose: vi.fn(), toastError: vi.fn(),
-  serviceAccountEnabled: true,
+  serviceAccountEnabled: true, oauthEnabled: true,
   browse: vi.fn(), driveAccess: vi.fn(), oauthStart: vi.fn(),
   resolve: vi.fn(), updateExtras: vi.fn(),
   activeTeams: [
@@ -119,7 +119,7 @@ vi.mock('@/shared/components/ui/Modal', () => ({
 vi.mock('../api/estimation.queries', async () => {
   const React = await import('react');
   return {
-    useEstimationDriveOAuthPocStatus: () => ({ data: { enabled: !mocks.serviceAccountEnabled, serviceAccountEnabled: mocks.serviceAccountEnabled }, isLoading: false }),
+    useEstimationDriveOAuthPocStatus: () => ({ data: { enabled: mocks.oauthEnabled, serviceAccountEnabled: mocks.serviceAccountEnabled }, isLoading: false }),
     useEstimationQuestionnaireDefinition: () => ({
       data: { fixedQuestions, maxDynamicFirstRound: 5,
         maxDynamicFollowUp: 2, targetMinutesMin: 3, targetMinutesMax: 5 },
@@ -163,6 +163,7 @@ beforeEach(() => {
   mocks.onClose.mockClear();
   mocks.toastError.mockReset();
   mocks.serviceAccountEnabled = true;
+  mocks.oauthEnabled = true;
   mocks.activeTeams = [
     { teamId: '0777e456-fd76-445e-83f1-afc25061c121', name: 'Desarrollo', isActive: true },
     { teamId: '0777e456-fd76-445e-83f1-afc25061c122', name: 'QA', isActive: true },
@@ -307,6 +308,10 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       input: { documentationLink: 'https://drive.google.com/drive/folders/levantamiento-antiguo' },
     }));
     expect(mocks.analyze).not.toHaveBeenCalled();
+    // Aun si OAuth experimental sigue encendido, la identidad corporativa
+    // permite descubrir carpetas sin popup ni permiso del usuario.
+    expect(mocks.driveAccess).not.toHaveBeenCalled();
+    expect(mocks.oauthStart).not.toHaveBeenCalled();
   });
 
 
@@ -346,6 +351,9 @@ describe('Asistente v5 de cotización · sistema visual Kora', () => {
       .toBeInTheDocument();
     expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.updateExtras).not.toHaveBeenCalled();
+    expect(mocks.driveAccess).not.toHaveBeenCalled();
+    expect(mocks.oauthStart).not.toHaveBeenCalled();
+    expect(screen.getByText(/acceso corporativo a Drive/)).toBeInTheDocument();
   });
 
   it('sin candidatas presenta el aviso amarillo, enlace manual y confirmación protegida', async () => {
