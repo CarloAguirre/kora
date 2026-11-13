@@ -34,6 +34,7 @@ function setup() {
       ],
     }),
     hasAttributableWorkBlocks: vi.fn().mockResolvedValue(false),
+    hasProjectPhases: vi.fn().mockResolvedValue(false),
     findSegmentsForModule: vi.fn().mockResolvedValue([
       { id: 'segment-1', moduleId: 'module-1', projectId: 'project-1', teamId: 'team-1', name: 'Bloque' },
     ]),
@@ -115,35 +116,49 @@ describe('imputación verificable de HH a un bloque de trabajo', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('histórico: permite HH generales incluso con bloques y rechaza la vinculación nueva', async () => {
+  it('proyecto histórico con fases: enlaza HH y requiere elegir fase', async () => {
     const { useCase, save, projects } = setup();
     projects.findById.mockResolvedValue({
       id: 'project-1', status: 'active', allowsOvertime: true,
       startDate: new Date('2026-03-30T00:00:00Z'),
     });
-    projects.hasAttributableWorkBlocks.mockResolvedValue(true);
-    const general = await useCase.execute({
+    projects.hasProjectPhases.mockResolvedValue(true);
+    const withoutPhase = await useCase.execute({
       data: { ...data, moduleId: undefined, segmentId: undefined },
       actor, actorRole: 'collaborator',
     });
-    expect(general.isOk()).toBe(true);
-    const linked = await useCase.execute({ data, actor, actorRole: 'collaborator' });
-    expect(linked.isErr() && linked.error.code).toBe('HOUR_ENTRY_LEGACY_PLAN_DISABLED');
+    expect(withoutPhase.isErr() && withoutPhase.error.code).toBe('HOUR_ENTRY_PHASE_REQUIRED');
+    const linked = await useCase.execute({ data: { ...data, taskId: 'task-1' },
+      actor, actorRole: 'collaborator' });
+    expect(linked.isOk()).toBe(true);
     expect(save).toHaveBeenCalledOnce();
   });
 
-  it('desde 11-11 se mantiene la obligatoriedad del bloque', async () => {
+  it('desde 11-11 requiere fase si existen fases configuradas', async () => {
     const { useCase, projects } = setup();
     projects.findById.mockResolvedValue({
       id: 'project-1', status: 'active', allowsOvertime: true,
       startDate: new Date('2026-11-11T00:00:00Z'),
     });
-    projects.hasAttributableWorkBlocks.mockResolvedValue(true);
+    projects.hasProjectPhases.mockResolvedValue(true);
     const result = await useCase.execute({
       data: { ...data, moduleId: undefined, segmentId: undefined },
       actor, actorRole: 'collaborator',
     });
-    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_SEGMENT_REQUIRED');
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_PHASE_REQUIRED');
+  });
+
+  it('permite vincular una tarea propia sin un segmento disponible para su equipo', async () => {
+    const { useCase, save, projects } = setup();
+    projects.hasProjectPhases.mockResolvedValue(true);
+    projects.findSegmentsForModule.mockResolvedValue([]);
+    const result = await useCase.execute({
+      data: { ...data, segmentId: undefined, taskId: 'task-1' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(save.mock.calls[0]![0].toSnapshot())
+      .toMatchObject({ moduleId: 'module-1', segmentId: null, taskId: 'task-1' });
   });
 
   it('permite registros sin módulo de proyectos que todavía no tienen Roadmap', async () => {

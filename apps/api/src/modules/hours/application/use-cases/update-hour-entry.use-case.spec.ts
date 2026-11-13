@@ -37,6 +37,7 @@ function setup() {
     ]),
     isUserOnSegmentTeam: vi.fn().mockResolvedValue(true),
     hasAttributableWorkBlocks: vi.fn().mockResolvedValue(true),
+    hasProjectPhases: vi.fn().mockResolvedValue(true),
   };
   const useCase = new UpdateHourEntryUseCase(
     { findById: vi.fn().mockResolvedValue(entry), save,
