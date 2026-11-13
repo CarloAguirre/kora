@@ -72,7 +72,8 @@ export class EstimationController {
   @Get('drive/oauth-poc/status')
   @RequireAnyPermission('projects:manage', 'projects:read_assigned')
   driveOAuthPocStatus(): { enabled: boolean; serviceAccountEnabled: boolean } {
-    return { enabled: this.config.googleDriveOauthPocEnabled && this.config.google.enabled,
+    return { enabled: !this.config.googleDrive.enabled &&
+        this.config.googleDriveOauthPocEnabled && this.config.google.enabled,
       serviceAccountEnabled: this.config.googleDrive.enabled };
   }
 
@@ -83,7 +84,8 @@ export class EstimationController {
     @CurrentUser() actor: RequestUser,
     @Res({ passthrough: true }) reply: FastifyReply,
   ): Promise<StartDriveOAuthPocResponse> {
-    if (!this.config.googleDriveOauthPocEnabled || !this.config.google.enabled) {
+    if (this.config.googleDrive.enabled ||
+        !this.config.googleDriveOauthPocEnabled || !this.config.google.enabled) {
       throw new ServiceUnavailableException('La prueba OAuth de Drive no está habilitada en este entorno.');
     }
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
@@ -155,7 +157,8 @@ export class EstimationController {
     await this.quotationDrafts.authorizeAiPoc(input.projectId, actor);
     // Un OAuth de descubrimiento consulta el Drive del usuario conectado,
     // nunca la cuenta de servicio de otra organización por accidente.
-    const delegated = this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION);
+    const delegated = this.config.googleDrive.enabled ? null :
+      this.driveOAuthPoc.getAuthorizedAccessToken(actor.id, DRIVE_DISCOVERY_SESSION);
     return this.resolveDriveFolder.execute(input, delegated
       ? new GoogleDriveFolderClient(this.config, delegated) : undefined);
   }
