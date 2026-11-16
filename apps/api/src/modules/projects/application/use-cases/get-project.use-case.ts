@@ -253,6 +253,8 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         leaderLastActivityAt,
         prospectPhaseHours,
         phaseZeroHours,
+        phaseZeroEntries,
+        phaseZeroEntriesTruncated: historical.truncated,
         actorUserId: command.actorUserId,
         canManagePendings,
         ledTeamIds,
