@@ -897,7 +897,7 @@ export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: 
    * después: foto inmutable de consumo al traspasar la primera cotización.
    * Ya están en usedHours y nunca se suman otra vez a soldHours.
    */
-  phaseZeroHours: z.number().nonnegative(),
+  phaseZeroHours: z.number().nonnegative().default(0),
   /** Monto total del contrato — base del % de cada tramo. */
   contractAmount: z.number().nullable(),
   /** Moneda de todos los tramos de pago del proyecto. */
