@@ -51,9 +51,9 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
   }
 
   async phaseZeroSnapshotForProject(projectId: string): Promise<{
-    transferred: boolean; hours: number | null;
+    transferred: boolean; hours: number | null; cutoffAt: Date | null;
   }> {
-    const [event] = await this.database.select({ metadata: quotationEvents.metadata })
+    const [event] = await this.database.select({ metadata: quotationEvents.metadata, transferredAt: quotationEvents.occurredAt })
       .from(quotationEvents)
       .innerJoin(quotationVersions, eq(quotationVersions.id, quotationEvents.versionId))
       .innerJoin(projectQuotations, eq(projectQuotations.id, quotationVersions.quotationId))
