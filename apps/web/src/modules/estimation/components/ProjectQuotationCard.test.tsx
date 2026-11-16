@@ -75,6 +75,13 @@ beforeEach(() => {
   mocks.remove.mockReset().mockResolvedValue({ deletedVersionId: v1.id });
 });
 describe('Cotizaciones del proyecto', () => {
+  it('muestra HH cobrables históricas sin mezclarlas con equipos futuros', () => {
+    mocks.versions = [{ ...v1, draft: { ...v1.draft, phaseZeroBillableHours: 15 } }];
+    render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
+    expect(screen.getByText(/15 HH Fase 0/)).toBeInTheDocument();
+    expect(screen.getByText(/55 HH cobrables/)).toBeInTheDocument();
+  });
+
   it('permite crear una cotizacion desde el proyecto sin versiones', () => {
     mocks.versions = [];
     render(<MemoryRouter><ProjectQuotationCard project={project}/></MemoryRouter>);
