@@ -9,6 +9,7 @@ import { approvedCalendarPeriod, quotationDraftDataSchema } from '@kora/contract
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { buildQuotationTransferReferences } from '../../../estimation/domain/quotation-transfer-references';
 import type { ApprovedProjectCalendar } from '../../application/ports/approved-project-calendar.port';
+import { quotationCalendarAnchor } from './quotation-calendar-anchor';
 
 type Period = { startDate: string; endDate: string };
 const utcDate = (iso: string) => new Date(iso + 'T00:00:00.000Z');
@@ -35,13 +36,13 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
       }).from(projects).where(and(
         eq(projects.id, projectId), isNull(projects.deletedAt),
       )).limit(1);
-      if (!project || project.type !== 'development' || project.status !== 'active' ||
-          !(project.startDate || project.hito0At)) return false;
+      if (!project || project.type !== 'development' || project.status !== 'active') return false;
 
       const [source] = await tx.select({
         versionId: quotationVersions.id,
         draft: quotationVersions.draft,
         transfer: quotationEvents.metadata,
+        transferredAt: quotationEvents.occurredAt,
       }).from(quotationEvents)
         .innerJoin(quotationVersions, eq(quotationVersions.id, quotationEvents.versionId))
         .innerJoin(projectQuotations, eq(projectQuotations.id, quotationVersions.quotationId))
@@ -118,15 +119,17 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         bounds.set(segment.moduleId, list);
       }
 
-      // Hito 0 es un TIMESTAMP: usamos el día calendario chileno, no su día
-      // UTC, que podría adelantarse si el PM inició el proyecto de noche.
-      // Una fecha explícita start_date (tipo DATE) siempre tiene prioridad.
-      const startIso = project.startDate
-        ? project.startDate.toISOString().slice(0, 10)
-        : new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'America/Santiago',
-            year: 'numeric', month: '2-digit', day: '2-digit',
-          }).format(project.hito0At!);
+      // Si ya había registros de Fase 0 al traspasar, no proyectar las
+      // semanas nuevas sobre el trabajo histórico. Anclar la primera semana al
+      // día LOCAL del evento de traspaso, sin alterar projects.start_date.
+      const anchor = quotationCalendarAnchor({
+        projectStartDate: project.startDate,
+        hito0At: project.hito0At,
+        transferredAt: source.transferredAt,
+        transferMetadata: source.transfer,
+      });
+      if (!anchor.startIso) return false;
+      const startIso = anchor.startIso;
       let generated = 0;
       for (const reference of references.modules) {
         const moduleId = reference.moduleId;
@@ -187,6 +190,7 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         actorUserId: null,
         metadata: {
           projectId, startDate: startIso, generatedBlocks: generated,
+          anchor: anchor.usedTransferDate ? 'quotation_transfer_with_phase_zero' : 'project_start',
           source: 'approved_quotation_start', moduleIds,
         },
       });
