@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationEdtStage, withQuotationCommercialTask, withoutQuotationEdtTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { assertQuotationPhaseCapacity, estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationEdtStage, withQuotationCommercialTask, withoutQuotationEdtTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -345,9 +345,21 @@ export function QuotationWorkspacePage() {
         'No se pudo modificar la dedicación del equipo.');
     }
   };
-  const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
-    updateDraft({ phases: phaseRows.map((row, position) =>
-      position === index ? { ...row, ...patch } : row) });
+  const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>): boolean => {
+    if (!editable || !form) return false;
+    try {
+      const phases = phaseRows.map((row, position) =>
+        position === index ? { ...row, ...patch } : row);
+      if (patch.startWeek !== undefined || patch.durationWeeks !== undefined) {
+        assertQuotationPhaseCapacity({ ...form.draft, phases },
+          (id) => teamById.get(id) ?? id);
+      }
+      updateDraft({ phases });
+      return true;
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message : 'El plazo no es viable para el equipo.');
+      return false;
+    }
   };
   const applyEdtChanges = (draft: QuotationDraftData) => {
     try {
@@ -425,12 +437,19 @@ export function QuotationWorkspacePage() {
   };
   const editEdtStage = (
     stageCode: string, patch: { name?: string; startWeek?: number; durationWeeks?: number },
-  ) => {
-    if (!editable || !form) return;
+  ): boolean => {
+    if (!editable || !form) return false;
     try {
-      applyEdtChanges(withQuotationEdtStageSetting(form.draft, stageCode, patch));
+      const next = withQuotationEdtStageSetting(form.draft, stageCode, patch);
+      if (patch.startWeek !== undefined || patch.durationWeeks !== undefined) {
+        const projected = reconcilePocCommercialDraft(next);
+        assertQuotationPhaseCapacity(projected, (id) => teamById.get(id) ?? id);
+      }
+      applyEdtChanges(next);
+      return true;
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo actualizar el tramo.');
+      return false;
     }
   };
   /** Las nuevas fases y tareas no modifican el artefacto de origen Gemini. */
