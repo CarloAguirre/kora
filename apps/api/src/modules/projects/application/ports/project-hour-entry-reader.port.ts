@@ -34,6 +34,14 @@ export interface ProjectHourEntryReader {
    * del corte ya corresponden a ejecución. No altera filas de horas.
    */
   sumApprovedHoursBeforeDateForProject(projectId: string, beforeDate: Date): Promise<number>;
+  /**
+   * Foto del consumo anterior al traspaso inicial. No equivale al corte del Hito 0:
+   * un proyecto que comenzó antes de cotizar también conserva esas HH en Fase 0.
+   * En transferencias antiguas sin metadatos retorna hours=null (fallback legado).
+   */
+  phaseZeroSnapshotForProject(projectId: string): Promise<{
+    transferred: boolean; hours: number | null;
+  }>;
 }
 
 export const PROJECT_HOUR_ENTRY_READER = Symbol('ProjectHourEntryReader');
