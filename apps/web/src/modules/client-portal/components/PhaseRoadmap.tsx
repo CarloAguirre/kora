@@ -162,6 +162,24 @@ function phaseRange(phase: PhaseRoadmapPhase): DateRange | null {
  * columna de pistas hace scroll horizontal: los nombres de cada fila quedan
  * siempre visibles a la izquierda.
  */
+/** Fase histórica virtual: no existe como módulo editable ni genera HH nuevas. */
+export function HistoricalPhaseZero({ hours }: { hours: number }) {
+  return <section className={styles.historicalPhaseZero}
+    aria-label="Fase 0 · Prospecto y levantamiento">
+    <div className={styles.historicalPhaseZeroHeader}>
+      <span className={styles.phaseBadge}>FASE 0</span>
+      <strong>Prospecto y levantamiento</strong>
+      <span className={styles.historicalPhaseZeroLock}>Solo lectura</span>
+    </div>
+    <div className={styles.historicalPhaseZeroBody}>
+      <strong>{new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(hours)} HH consumidas</strong>
+      <p>Reuniones, levantamiento y documentación antes del inicio.
+        Estas HH aprobadas ya forman parte del consumo histórico del proyecto.
+        No se agregan al presupuesto de las fases planificadas.</p>
+    </div>
+  </section>;
+}
+
 export function PhaseRoadmap({
   phaseRoadmap, renderPhaseExtras, renderPhaseReferences, renderSelectionDetail,
   toolbarActions, operationalNotice, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
@@ -224,7 +242,7 @@ export function PhaseRoadmap({
       <div className={[styles.summaryRow, borderlessSummary ? styles.summaryRowBorderless : ''].filter(Boolean).join(' ')}>
         <div className={styles.summaryChips}>
           <span className={styles.summaryChip}>
-            <b>{phaseRoadmap.phaseCount}</b> {operationalView ? 'fases' : 'Fases'}
+            <b>{phaseRoadmap.phaseCount}</b> {operationalView ? 'fases planificadas' : 'Fases'}
           </span>
           <span className={styles.summaryChip}>
             <b>{operationalView ? (operationalBlockCount ?? phaseRoadmap.teamSegmentCount) : phaseRoadmap.teamSegmentCount}</b> {operationalView ? 'bloques de trabajo' : 'tramos de equipo'}
@@ -324,12 +342,8 @@ export function PhaseRoadmap({
         {!operationalView && <span className={styles.hint}>Usa el zoom de cada fase para ver días y tareas.</span>}
         </>}
       </div>
-      {operationalView && operationalPresaleHours != null && operationalPresaleHours > 0 && (
-        <p className={styles.operationalPresale}>
-          Preventa: {new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(operationalPresaleHours)} HH
-          de prospecto y cotización registradas antes del inicio. Cuentan como HH consumidas,
-          pero no forman parte del plan.
-        </p>
+      {operationalView && operationalPresaleHours != null && (
+        <HistoricalPhaseZero hours={operationalPresaleHours} />
       )}
 
       <div className={styles.phaseList}>
