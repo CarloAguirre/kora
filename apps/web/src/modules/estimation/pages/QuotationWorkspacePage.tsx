@@ -805,7 +805,7 @@ export function QuotationWorkspacePage() {
                       no la opción de presentación «Por equipo». */}
                   <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
-                      historicalHours={project?.prospectPhaseHours ?? 0}
+                      historicalHours={project?.phaseZeroHours ?? 0}
                       draft={form.draft}
                       phases={phaseRows}
                       teams={teamRows}
