@@ -202,6 +202,7 @@ function buildProject(): ProjectDetail {
     usedHoursUpdatedAt: null,
     leaderLastActivityAt: null,
     prospectPhaseHours: 0,
+    phaseZeroHours: 0,
     contractAmount: null,
     contractCurrency: 'UF',
     paymentMilestones: [],
