@@ -1,3 +1,4 @@
+import { isValidQuotationWeekSpan } from './quotation-phase-capacity';
 import type { QuotationDraftData } from './quotation.contract';
 import { effectiveQuotationEdt } from './quotation-edt-adjustments';
 
@@ -292,7 +293,7 @@ export function withQuotationEdtStageSetting(
       name: patch.name ?? commercial.name,
       startWeek: patch.startWeek ?? commercial.startWeek,
       durationWeeks: patch.durationWeeks ?? commercial.durationWeeks };
-    if (!edited.name.trim() || edited.startWeek + edited.durationWeeks - 1 > 520) {
+    if (!edited.name.trim() || !isValidQuotationWeekSpan(edited.startWeek, edited.durationWeeks)) {
       throw new Error('La fase comercial tiene nombre o semanas inválidas.');
     }
     const next = { ...draft, edtCommercialStages: draft.edtCommercialStages!.map((item) =>
@@ -316,9 +317,7 @@ export function withQuotationEdtStageSetting(
     durationWeeks: patch.durationWeeks ?? previous?.durationWeeks ?? initial?.durationWeeks ?? 1,
   };
   if (!value.name.trim() || value.name.length > 300 ||
-      !Number.isInteger(value.startWeek) || !Number.isInteger(value.durationWeeks) ||
-      value.startWeek < 1 || value.durationWeeks < 1 ||
-      value.startWeek + value.durationWeeks - 1 > 520) {
+      !isValidQuotationWeekSpan(value.startWeek, value.durationWeeks)) {
     throw new Error('El nombre o las semanas del tramo son inválidos.');
   }
   const others = (draft.edtStageSettings ?? []).filter(
