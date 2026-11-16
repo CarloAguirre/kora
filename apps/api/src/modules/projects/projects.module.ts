@@ -170,6 +170,7 @@ import { DrizzleSupportContractStatusReader } from './infrastructure/services/dr
   ],
   exports: [
     PROJECT_REPOSITORY,
+    APPROVED_PROJECT_CALENDAR,
     GetProjectUseCase,
     PROJECT_MODULE_REPOSITORY,
     PROJECT_TEAM_MEMBER_REPOSITORY,
