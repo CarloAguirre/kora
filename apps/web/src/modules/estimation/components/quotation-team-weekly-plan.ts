@@ -9,7 +9,7 @@ export type QuotationTeamWeeklyRow = {
   averageHoursPerWeek: number;
   weeklyHours: ReadonlyMap<number, number>;
   /** Carga por media semana para evitar ocultar picos en períodos de 0,5. */
-  halfWeekHours: ReadonlyMap<number, number>;
+  halfWeekHours?: ReadonlyMap<number, number>;
 };
 export type QuotationTeamWeeklyPlan = {
   lastWeek: number;
