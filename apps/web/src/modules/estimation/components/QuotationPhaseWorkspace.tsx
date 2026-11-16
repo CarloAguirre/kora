@@ -145,6 +145,8 @@ export function QuotationPhaseWorkspace({
   activeTeams?: readonly { id: string; name: string }[];
   roleTeamIds?: Readonly<Record<string, string>>;
   editable: boolean;
+  /** HH consumidas previas al traspaso; solo lectura, fuera de la EDT cotizada. */
+  historicalHours?: number;
   commercialMode?: QuotationDraftData['mode'];
   onEditTaskHours?: (wbs: string, role: string, hours: number) => void;
   onEditTaskFixed?: (wbs: string, role: string, fixed: boolean) => void;
