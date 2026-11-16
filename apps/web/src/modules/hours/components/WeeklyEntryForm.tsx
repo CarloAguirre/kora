@@ -13,11 +13,12 @@ import { Select } from '@/shared/components/ui/Select';
 import { Combobox } from '@/shared/components/ui/Combobox';
 import { AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { useCreateHourEntry, useHolidays, useHourEntriesList } from '../api/hours.queries';
-import { useProjectDetail, useProjectPhases, useProjectsList } from '@/modules/projects/api/projects.queries';
+import { useProjectDetail, useProjectPhases } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { HOUR_ENTRY_PROJECT_STATUSES, filterHourEntryProjects } from '../lib/selectable-project-statuses';
+import { filterHourEntryProjects } from '../lib/selectable-project-statuses';
+import { useHourEntryProjectOptions } from '../hooks/useHourEntryProjectOptions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
@@ -76,15 +77,8 @@ export function WeeklyEntryForm({
 }) {
   const { user } = useAuth();
   const createEntry = useCreateHourEntry();
-  // El PMO puede registrar horas en cualquier proyecto; el resto solo en los que tiene asignados.
-  // Solo proyectos No iniciados o Activos (ver `HOUR_ENTRY_PROJECT_STATUSES`).
-  const { data: projects } = useProjectsList({
-    page: 1,
-    pageSize: 200,
-    sortField: 'name',
-    assignedToUserId: user?.role === 'pmo' ? undefined : user?.id,
-    status: HOUR_ENTRY_PROJECT_STATUSES,
-  });
+  const projectOptions = useHourEntryProjectOptions(user?.role === 'pmo' ? undefined : user?.id);
+  const projects = { items: projectOptions.items };
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const [monday, setMonday] = useState(() => mondayOf(new Date().toISOString().slice(0, 10)));
@@ -108,10 +102,10 @@ export function WeeklyEntryForm({
   const selectableProjects = filterHourEntryProjects(projects?.items ?? [], assignment);
   // Colaborador usa /phases y no solicita detalle que podría estar prohibido.
   const { data: projectDetail } = useProjectDetail(
-    needsProject && projectId && user?.role !== 'collaborator' ? projectId : null,
+    assignment === 'Proyecto' && projectId && user?.role !== 'collaborator' ? projectId : null,
   );
   const selectedModule = projectDetail?.modules.find((m) => m.id === moduleId);
-  const { data: hourPhases } = useProjectPhases(needsProject && projectId ? projectId : null);
+  const { data: hourPhases } = useProjectPhases(assignment === 'Proyecto' && projectId ? projectId : null);
   const selectedHourPhase = hourPhases?.find((phase) => phase.id === moduleId);
   const availableTasks = selectAttributableTasks(selectedHourPhase?.tasks ?? [], user?.id);
   const availableSegments = (selectedHourPhase?.segments ?? [])
