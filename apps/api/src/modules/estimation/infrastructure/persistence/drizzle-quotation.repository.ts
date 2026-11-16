@@ -1083,6 +1083,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         transferPlan = planCommercialPreparationTransfer({
           previousSoldHours: Number(project.soldHours),
           approvedQuotationHours: Number(version.totalHours),
+          phaseZeroBillableHours: draft.phaseZeroBillableHours ?? 0,
           existingTeams,
           quotationTeams: [...byTeam].map(([teamId, quotedHours]) => ({
             teamId, quotedHours,
@@ -1098,7 +1099,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (billablePhaseZero > Number(project.usedHours) + 0.01) {
         throw new ConflictException('Las HH cobrables de Fase 0 superan el consumo real. Revisa la cotización.');
       }
-      const commercialSoldHours = Math.round((transferPlan.projectSoldHours + billablePhaseZero) * 100) / 100;
+      const commercialSoldHours = transferPlan.projectSoldHours;
       if (!Number.isFinite(commercialSoldHours) || commercialSoldHours > 99999999.99) {
         throw new ConflictException('El total comercial de HH supera el rango permitido.');
       }
