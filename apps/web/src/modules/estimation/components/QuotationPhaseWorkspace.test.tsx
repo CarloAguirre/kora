@@ -210,6 +210,18 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(screen.getByLabelText('HH de T01.01 · Tester')).toBeEnabled();
   });
 
+  it('recibe medias semanas solo al confirmar y nunca concatena al valor anterior', () => {
+    renderEditor(mappedDraft);
+    const duration = screen.getByRole('textbox', { name: 'Duración de fase 1' });
+    fireEvent.focus(duration);
+    fireEvent.change(duration, { target: { value: '' } });
+    fireEvent.change(duration, { target: { value: '1,5' } });
+    expect(callbacks.onEditStage).not.toHaveBeenCalled();
+    fireEvent.blur(duration);
+    expect(callbacks.onEditStage).toHaveBeenCalledWith('T01', { durationWeeks: 1.5 });
+    expect(duration).toHaveValue('1,5');
+  });
+
   it('permite modificar HH por equipo Kora y fase; recalcular se delega a contratos', () => {
     renderEditor(mappedDraft);
     const groupHours = screen.getByLabelText('HH de Desarrollo para fase 1');

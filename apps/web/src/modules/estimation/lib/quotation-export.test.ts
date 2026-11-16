@@ -28,10 +28,24 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(workbook.SheetNames).toEqual(['Resumen', 'Carga_Equipo', 'Comercial']);
     expect(workbook.Sheets.Resumen?.B4?.v).toBe('Versión 1');
     expect(workbook.Sheets.Resumen?.B10?.v).toBe(0);
-    expect(workbook.Sheets.Resumen?.B13?.v).toBe('No definido');
+    expect(workbook.Sheets.Resumen?.B12?.v).toBe(0);
+    expect(workbook.Sheets.Resumen?.B15?.v).toBe('No definido');
     expect(workbook.SheetNames).not.toContain('Auditoria');
     expect(workbook.SheetNames).not.toContain('EDT_Detalle');
     expect(workbook.SheetNames).not.toContain('Plan_Diario');
+  });
+
+  it('Excel separa HH futuras y Fase 0 dentro de las HH totales cobrables', () => {
+    const quote = version({
+      totalHours: 1108, hourlyRate: 0.6,
+      netAmount: 993.9, totalAmount: 1182.741,
+      draft: { ...version().draft, phaseZeroBillableHours: 548.5 },
+    });
+    const workbook = buildQuotationWorkbook(context(quote));
+    expect(workbook.Sheets.Resumen?.B10?.v).toBe(1108);
+    expect(workbook.Sheets.Resumen?.B11?.v).toBe(548.5);
+    expect(workbook.Sheets.Resumen?.B12?.v).toBe(1656.5);
+    expect(workbook.Sheets.Resumen?.B16?.v).toBe(993.9);
   });
 
   it('no inventa arquitectura, cronograma aprobado ni importes cuando faltan', () => {

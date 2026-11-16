@@ -84,7 +84,7 @@ export function QuotationCommercialPreflightCard({ projectId, version, hasUnsave
               <div className={styles.metrics}>
                 <div><span>Bloqueos</span><strong>{preflight.blockerCount}</strong></div>
                 <div><span>Advertencias</span><strong>{preflight.warningCount}</strong></div>
-                <div><span>HH calculadas</span><strong>{number(preflight.summary.totalHours)}</strong></div>
+                <div><span>HH futuras planificadas</span><strong>{number(preflight.summary.totalHours)}</strong></div>
                 <div><span>Plan de pagos</span><strong>{number(preflight.summary.paymentPercent)} %</strong></div>
               </div>
               <p className={styles.status}>

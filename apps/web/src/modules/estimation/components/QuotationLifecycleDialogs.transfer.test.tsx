@@ -37,6 +37,19 @@ const version = {
 } as unknown as QuotationVersion;
 
 describe('Resumen de traspaso aditivo con HH previas conservadas', () => {
+  it('incluye Fase 0 en HH vendidas pero no en asignaciones nuevas', () => {
+    render(<QuotationTransferDialog project={project}
+      version={{ ...version, draft: { ...version.draft, phaseZeroBillableHours: 15 } }}
+      open afterApproval={false} pending={false} onClose={vi.fn()} onTransfer={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Fase 0 · Levantamiento cobrable')).toBeInTheDocument();
+    expect(within(dialog).getByText(/15 HH ya consumidas, incorporadas al precio/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/175 HH \(anteriores \+ fases futuras \+ Fase 0\)/))
+      .toBeInTheDocument();
+    expect(within(dialog).getByText(/40 HH previas \+ 80 HH nuevas = 120 HH asignadas/))
+      .toBeInTheDocument();
+  });
+
   it('muestra HH anteriores, cotización, totales y equipos históricos', () => {
     render(<QuotationTransferDialog project={project} version={version}
       open afterApproval={false} pending={false} onClose={vi.fn()}

@@ -17,6 +17,7 @@ function fixture(options: {
   existingSegment?: boolean;
   existingDates?: boolean;
   hitoOnly?: boolean;
+  historical?: boolean;
 } = {}) {
   const project = {
     id: projectId, type: 'development', status: options.active === false ? 'draft' : 'active',
@@ -34,7 +35,10 @@ function fixture(options: {
     }],
   };
   const source = options.transferred === false ? null : {
-    versionId, draft, transfer: { moduleIds: [moduleId] },
+    versionId, draft,
+    transferredAt: new Date('2026-11-16T14:00:00.000Z'),
+    transfer: { moduleIds: [moduleId],
+      priorCommercialState: { usedHours: options.historical ? 548.5 : 0 } },
   };
   const modules = [{
     id: moduleId, name: 'S1: Diseño UX',
@@ -152,6 +156,19 @@ describe('Materializar cronograma de cotización aprobada (sin segunda aprobaci�
       });
     expect(fx.persistedEvents[0]?.metadata).toMatchObject({ startDate: '2026-11-10' });
     expect(fx.tx.update).toHaveBeenCalledWith(projectModules);
+    expect(fx.tx.update).not.toHaveBeenCalledWith(projects);
+  });
+
+  it('traspaso a proyecto activo con Fase 0 comienza en fecha del traspaso, no en fecha histórica', async () => {
+    const fx = fixture({ historical: true });
+    expect(await fx.calendar.ensure(projectId)).toBe(true);
+    const block = fx.inserts.find((item) => item.table === projectModuleSegments)?.value;
+    // Semana 3: 14 días después del traspaso (16/11), NO del inicio (05/11).
+    expect(block?.startDate).toEqual(new Date('2026-11-30T00:00:00.000Z'));
+    expect(block?.endDate).toEqual(new Date('2027-01-03T00:00:00.000Z'));
+    expect(fx.persistedEvents[0]?.metadata).toMatchObject({
+      startDate: '2026-11-16', anchor: 'quotation_transfer_with_phase_zero',
+    });
     expect(fx.tx.update).not.toHaveBeenCalledWith(projects);
   });
 

@@ -58,6 +58,7 @@ export const projectsApi = {
       period: query.period?.map((period) => `${period.from}..${period.to}`),
       leaderUserId: query.leaderUserId,
       assignedToUserId: query.assignedToUserId,
+      hourEntryProspects: query.hourEntryProspects,
       teamId: query.teamId,
       sortField: query.sortField,
       sortDirection: query.sortDirection,

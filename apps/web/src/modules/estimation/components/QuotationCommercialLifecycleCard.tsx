@@ -138,13 +138,14 @@ export function QuotationCommercialLifecycleCard({
 
   const transfer = async () => {
     try {
-      await actions.transferApproved.mutateAsync({
+      const result = await actions.transferApproved.mutateAsync({
         versionId: version.id, revision: transferRevision ?? version.revision,
       });
       setTransferOpen(false);
       setTransferRevision(null);
       setTransferFromApproval(false);
-      toast.success('Traspaso registrado en el historial. La planificación quedó cargada.');
+      if (result.calendarWarning) toast.error(result.calendarWarning);
+      else toast.success('Traspaso registrado. Los bloques del proyecto activo quedaron planificados.');
     } catch (err) {
       reportError(err instanceof Error ? err.message : 'No fue posible traspasar la cotización.');
     }

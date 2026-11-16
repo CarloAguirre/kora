@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { quotationTeamColor } from './quotation-team-colors';
 import { QuotationGroupHoursInput } from './QuotationGroupHoursInput';
+import { QuotationWeekInput } from './QuotationWeekInput';
 import { downloadQuotationTaskTemplate } from '../lib/quotation-task-excel';
 import styles from './QuotationPhaseWorkspace.module.css';
 
@@ -153,14 +154,14 @@ export function QuotationPhaseWorkspace({
   onEditTaskTeam?: (wbs: string, role: string, teamId: string | null) => void;
   onEditGroupHours?: (teamKey: string, hours: number, stageCode?: string, module?: string) => void;
   onEditStage?: (stageCode: string,
-    patch: { name?: string; startWeek?: number; durationWeeks?: number }) => void;
+    patch: { name?: string; startWeek?: number; durationWeeks?: number }) => boolean | void;
   onOpenRoleMapping?: () => void;
   onAddTask?: (stageCode: string) => void;
   onDeleteTask?: (wbs: string) => void;
   onEditTaskName?: (wbs: string, name: string, role?: string) => void;
   onImportTaskExcel?: (stageCode: string, phaseName: string, file: File) => Promise<void>;
   onRemoveCommercialPhase?: (stageCode: string) => void;
-  onEditPhase: (index: number, patch: Partial<Phase>) => void;
+  onEditPhase: (index: number, patch: Partial<Phase>) => boolean | void;
   onAddPhase: () => void;
   onRemovePhase: (index: number) => void;
 }) {
@@ -169,7 +170,7 @@ export function QuotationPhaseWorkspace({
   const displayPhases = edt
     ? referencePhasesFromEdt(edt, mapping, teamNames, draft)
     : phases;
-  const maxWeek = Math.max(1, ...displayPhases.map((phase) =>
+  const maxWeek = Math.max(0.5, ...displayPhases.map((phase) =>
     phase.startWeek + phase.durationWeeks - 1));
   const projectAllowsEdit = editable && Boolean(edt);
   const unmappedRoles = edt && draft?.aiPoc
@@ -228,8 +229,8 @@ export function QuotationPhaseWorkspace({
           const assignmentCount = tasks.length;
           const taskTotal = tasks.reduce((sum, task) => sum + task.hours, 0);
           const editStage = (patch: {name?:string;startWeek?:number;durationWeeks?:number}) => {
-            if (edt && stageCode && onEditStage) onEditStage(stageCode, patch);
-            else onEditPhase(index, {
+            if (edt && stageCode && onEditStage) return onEditStage(stageCode, patch);
+            return onEditPhase(index, {
               ...patch, ...(patch.name ? { name: prefix + patch.name } : {}),
             });
           };
@@ -238,7 +239,11 @@ export function QuotationPhaseWorkspace({
               <div className={styles.phaseHeader}>
                 <span className={styles.phaseBadge}>Fase {index + 1}</span>
                 <span className={styles.phaseDescription}>
-                  {hh(total)} HH · semanas {phase.startWeek} a {phase.startWeek + phase.durationWeeks - 1}
+                  {hh(total)} HH · {phase.durationWeeks % 1 !== 0 || phase.startWeek % 1 !== 0
+                    ? 'desde semana ' + hh(phase.startWeek) +
+                      ' · duración ' + hh(phase.durationWeeks) + ' semanas'
+                    : 'semanas ' + phase.startWeek + ' a ' +
+                      (phase.startWeek + phase.durationWeeks - 1)}
                 </span>
                 {editable && (!edt || stageCode) && (
                   <Button variant="tertiary" size="sm" className={styles.remove}
@@ -261,14 +266,14 @@ export function QuotationPhaseWorkspace({
                     onChange={(e) => editStage({ name: e.target.value })}/>
                 </label>
                 <label>Semana de inicio
-                  <input type="number" min={1} max={520} value={phase.startWeek}
-                    disabled={!editable}
-                    onChange={(e) => editStage({ startWeek: Math.max(1, Number(e.target.value) || 1) })}/>
+                  <QuotationWeekInput label={'Semana de inicio de fase ' + (index + 1)}
+                    min={1} value={phase.startWeek} disabled={!editable}
+                    onCommit={(startWeek) => editStage({ startWeek })}/>
                 </label>
                 <label>Duración (semanas)
-                  <input type="number" min={1} max={520} value={phase.durationWeeks}
-                    disabled={!editable}
-                    onChange={(e) => editStage({ durationWeeks: Math.max(1, Number(e.target.value) || 1) })}/>
+                  <QuotationWeekInput label={'Duración de fase ' + (index + 1)}
+                    min={0.5} value={phase.durationWeeks} disabled={!editable}
+                    onCommit={(durationWeeks) => editStage({ durationWeeks })}/>
                 </label>
               </div>
               <div className={styles.phaseTeams}>

@@ -50,6 +50,8 @@ export type ApprovedQuotationTeam = {
 export function planCommercialPreparationTransfer(input: {
   previousSoldHours: number;
   approvedQuotationHours: number;
+  /** Cobro histórico Fase 0: fuera de la planificación nueva de equipos. */
+  phaseZeroBillableHours?: number;
   existingTeams: readonly ExistingProspectTeam[];
   quotationTeams: readonly ApprovedQuotationTeam[];
 }): {
@@ -93,7 +95,7 @@ export function planCommercialPreparationTransfer(input: {
   }
   return {
     projectSoldHours: (cents(input.previousSoldHours) +
-      cents(input.approvedQuotationHours)) / 100,
+      cents(input.approvedQuotationHours) + cents(input.phaseZeroBillableHours ?? 0)) / 100,
     phase1AssignedHours: [...existing.values()].reduce((sum, value) =>
       sum + value, 0) / 100,
     teamAllocations,

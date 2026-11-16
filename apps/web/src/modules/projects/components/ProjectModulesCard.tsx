@@ -21,7 +21,7 @@ import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { PhaseRoadmap, HistoricalPhaseZero, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
+import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleSegment, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
@@ -38,6 +38,7 @@ import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
 import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
 import { ProjectPhaseTasksTable } from './ProjectPhaseTasksTable';
+import { HistoricalPhaseZeroDetail } from './HistoricalPhaseZeroDetail';
 import { phaseHeaderMeta } from '../lib/phase-header-meta';
 import {
   ProjectRoadmapTaskDetail, DetailPanel, Facts, Fact, Description,
@@ -679,7 +680,7 @@ export function ProjectModulesCard({
       )}
       {project.modules.length === 0 ? (
         <section className={styles.emptyRoadmap} aria-label="Roadmap sin fases planificadas">
-          <HistoricalPhaseZero hours={project.phaseZeroHours} />
+          <HistoricalPhaseZeroDetail project={project} />
           <header className={styles.emptyRoadmapTop}>
             <div className={styles.emptyRoadmapCounters} aria-label="Resumen del plan">
               <span>0 fases planificadas</span>
@@ -734,6 +735,7 @@ export function ProjectModulesCard({
       <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
         operationalPresaleHours={project.phaseZeroHours}
+        operationalPhaseZero={<HistoricalPhaseZeroDetail project={project} />}
         operationalRows={getOperationalRows}
         operationalMetrics={getOperationalMetrics}
         operationalNotice={canManage && pendingReview.length > 0 ? (

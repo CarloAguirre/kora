@@ -76,6 +76,8 @@ export interface ProjectDetailSource {
   readonly prospectPhaseHours: number;
   /** HH capturadas antes del primer traspaso, aunque el proyecto ya estuviera activo. */
   readonly phaseZeroHours: number;
+  readonly phaseZeroEntries: ProjectDetail['phaseZeroEntries'];
+  readonly phaseZeroEntriesTruncated: boolean;
   readonly actorUserId: string;
   /** Líder de este proyecto, PMO o admin: puede editar cualquier entrada de bitácora y resolver pendientes. */
   readonly canManagePendings: boolean;
@@ -327,6 +329,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     leaderLastActivityAt: source.leaderLastActivityAt?.toISOString() ?? null,
     prospectPhaseHours: source.prospectPhaseHours,
     phaseZeroHours: source.phaseZeroHours,
+    phaseZeroEntries: source.phaseZeroEntries,
+    phaseZeroEntriesTruncated: source.phaseZeroEntriesTruncated,
     contractAmount: snapshot.contractAmount,
     contractCurrency: snapshot.contractCurrency,
     pendingManagementApproval: source.project.pendingManagementApproval,

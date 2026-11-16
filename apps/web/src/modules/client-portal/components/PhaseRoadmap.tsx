@@ -185,7 +185,7 @@ export function PhaseRoadmap({
   toolbarActions, operationalNotice, renderPhaseHeaderName, renderPhaseHeaderActions, borderlessSummary = false,
   alwaysExpanded = false,
   operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows, onPlanOperationalRow,
-  operationalMetrics, operationalFooter, operationalPresaleHours,
+  operationalMetrics, operationalFooter, operationalPresaleHours, operationalPhaseZero,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -343,7 +343,7 @@ export function PhaseRoadmap({
         </>}
       </div>
       {operationalView && operationalPresaleHours != null && (
-        <HistoricalPhaseZero hours={operationalPresaleHours} />
+        operationalPhaseZero ?? <HistoricalPhaseZero hours={operationalPresaleHours} />
       )}
 
       <div className={styles.phaseList}>
@@ -605,6 +605,8 @@ export interface PhaseRoadmapProps {
   operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
   /** HH históricas previas al traspaso, aunque el proyecto haya iniciado. */
   operationalPresaleHours?: number | null;
+  /** Sustitución solo interna de Fase 0: detalle de registros agrupados por equipo. */
+  operationalPhaseZero?: ReactNode;
   /** Acción al final de las fases, exclusiva de la ficha interna. */
   operationalFooter?: ReactNode;
   renderPhaseHeaderName?: (phase: PhaseRoadmapPhase) => ReactNode;

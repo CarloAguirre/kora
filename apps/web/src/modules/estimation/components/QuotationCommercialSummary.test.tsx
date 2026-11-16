@@ -99,6 +99,39 @@ describe('QuotationCommercialSummary · fidelidad comercial sin alterar el cálc
     expect(onSave).not.toHaveBeenCalled();
   });
 
+  it('cobra Fase 0 sin distribuirla en los equipos ni alterar sus fases futuras', () => {
+    const draft: QuotationDraftData = {
+      ...version.draft, mode: 'phases', phaseZeroBillableHours: 548.5,
+      teams: [{ teamId, collaborators: 6, unit: 'week', duration: 10,
+        hoursPerWeek: 40, dedicationPercent: 100 }],
+      phases: [{ name: 'Desarrollo', startWeek: 1, durationWeeks: 10,
+        teamHours: [{ teamId, hours: 1108 }] }],
+    };
+    render(<QuotationCommercialSummary {...baseProps} draft={draft}
+      hourlyRate={0.6} />);
+    expect(screen.getByText('1.656,5')).toBeInTheDocument();
+    expect(screen.getByText('548,5 HH')).toBeInTheDocument();
+    expect(screen.getByText('1.108 HH')).toBeInTheDocument();
+    expect(screen.getByText('993,9 UF')).toBeInTheDocument();
+    expect(screen.getByText('1.182,741 UF')).toBeInTheDocument();
+    expect(screen.getByText('1.108 hh')).toBeInTheDocument();
+    expect(screen.getByText('548,5 hh')).toBeInTheDocument();
+  });
+
+  it('con fase cero vacía conserva el cálculo comercial original', () => {
+    const draft: QuotationDraftData = {
+      ...version.draft, mode: 'phases', phaseZeroBillableHours: 0,
+      teams: [{ teamId, collaborators: 1, unit: 'week', duration: 2,
+        hoursPerWeek: 40, dedicationPercent: 100 }],
+      phases: [{ name: 'Implementación', startWeek: 1, durationWeeks: 2,
+        teamHours: [{ teamId, hours: 80 }] }],
+    };
+    render(<QuotationCommercialSummary {...baseProps} draft={draft} hourlyRate={0.6} />);
+    expect(screen.getByText('80')).toBeInTheDocument();
+    expect(screen.getByText('48 UF')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Desglose de HH cobrables')).not.toBeInTheDocument();
+  });
+
   it('en modo fases solo contabiliza HH de equipos incluidos sin duplicarlas', () => {
     const draft: QuotationDraftData = {
       ...version.draft, mode: 'phases',
