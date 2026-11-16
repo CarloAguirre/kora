@@ -803,11 +803,9 @@ export function QuotationWorkspacePage() {
                   {/* El desglose de fases permanece visible bajo ambos tabs del
                       resumen. La fuente es la EDT o las fases de la cotización,
                       no la opción de presentación «Por equipo». */}
-                  {(form.draft.mode === 'phases' ||
-                    Boolean(form.draft.aiPoc?.edt) ||
-                    form.draft.phases.length > 0) && (
-                    <QuotationPhaseWorkspace
+                  <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
+                      historicalHours={project?.prospectPhaseHours ?? 0}
                       draft={form.draft}
                       phases={phaseRows}
                       teams={teamRows}
@@ -839,7 +837,6 @@ export function QuotationWorkspacePage() {
                         phases: phaseRows.filter((_, position) => position !== index),
                       })}
                     />
-                  )}
 
                   <QuotationCommercialSections
                     version={selected}
