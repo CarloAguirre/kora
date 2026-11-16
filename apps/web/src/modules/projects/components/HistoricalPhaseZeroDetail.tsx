@@ -3,7 +3,9 @@ import type { ProjectDetail } from '@kora/contracts';
 import styles from './HistoricalPhaseZeroDetail.module.css';
 
 type Entry = ProjectDetail['phaseZeroEntries'][number];
-const hh = (hours: number) => hours.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+const hh = (hours: number | null | undefined) =>
+  (typeof hours === 'number' && Number.isFinite(hours) ? hours : 0)
+    .toLocaleString('es-CL', { maximumFractionDigits: 2 });
 const date = (iso: string) => iso.split('-').reverse().join('-');
 const STATUS = { approved: 'Aprobada', pending: 'Pendiente', rejected: 'Rechazada' } as const;
 
