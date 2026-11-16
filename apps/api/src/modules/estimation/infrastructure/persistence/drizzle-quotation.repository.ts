@@ -4,6 +4,7 @@ import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../
 import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
+  assertQuotationPhaseCapacity,
   quotationAiPocSnapshotSchema,
   appliedQuotationPlanningSchema,
   projectPocRolesToQuotationDraft,
@@ -1294,6 +1295,25 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           throw new BadRequestException(error.message);
         }
         throw error;
+      }
+      // Defensa de API: no aceptar compresiones inviables aunque se omita UI.
+      // No bloquear borradores legacy por ediciones ajenas al calendario.
+      const windows = (value: QuotationDraftData) => JSON.stringify({
+        phases: value.phases.map((phase) => [phase.startWeek, phase.durationWeeks]),
+        stages: (value.edtStageSettings ?? []).map((stage) =>
+          [stage.stageCode, stage.startWeek, stage.durationWeeks]),
+        commercial: (value.edtCommercialStages ?? []).map((stage) =>
+          [stage.code, stage.startWeek, stage.durationWeeks]),
+      });
+      if (windows(savedDraft) !== windows(draft)) {
+        try {
+          const projected = draft.aiPoc?.edt ? projectPocRolesToQuotationDraft(draft,
+            draft.aiPoc.roleTeamIds) : draft;
+          assertQuotationPhaseCapacity(projected);
+        } catch (cause) {
+          throw new BadRequestException(cause instanceof Error ? cause.message :
+            'La duración de las fases supera la capacidad disponible.');
+        }
       }
       const scopeChangedAfterAiAcceptance = Boolean(savedDraft.aiPoc &&
         currentRow.aiReviewStatus === 'accepted' &&
