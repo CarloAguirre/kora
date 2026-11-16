@@ -679,7 +679,7 @@ export function ProjectModulesCard({
       )}
       {project.modules.length === 0 ? (
         <section className={styles.emptyRoadmap} aria-label="Roadmap sin fases planificadas">
-          <HistoricalPhaseZero hours={project.prospectPhaseHours} />
+          <HistoricalPhaseZero hours={project.phaseZeroHours} />
           <header className={styles.emptyRoadmapTop}>
             <div className={styles.emptyRoadmapCounters} aria-label="Resumen del plan">
               <span>0 fases planificadas</span>
@@ -733,7 +733,7 @@ export function ProjectModulesCard({
       ) : (
       <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
-        operationalPresaleHours={project.prospectPhaseHours}
+        operationalPresaleHours={project.phaseZeroHours}
         operationalRows={getOperationalRows}
         operationalMetrics={getOperationalMetrics}
         operationalNotice={canManage && pendingReview.length > 0 ? (
