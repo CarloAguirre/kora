@@ -4,8 +4,8 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "build": "nest build",
-    "dev": "nest start --watch",
+    "build": "pnpm --filter @kora/contracts build && nest build",
+    "dev": "pnpm --filter @kora/contracts build && nest start --watch",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",

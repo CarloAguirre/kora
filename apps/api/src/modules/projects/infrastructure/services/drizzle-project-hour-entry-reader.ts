@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gte, hourEntries, inArray, lt, lte, projectModules, sql, users, type Database } from '@kora/db';
+import { and, asc, desc, eq, gte, hourEntries, inArray, lt, lte, projectModules, projectQuotations, quotationEvents, quotationVersions, sql, users, type Database } from '@kora/db';
 import type { ProjectHourEntryReader } from '../../application/ports/project-hour-entry-reader.port';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 
@@ -47,6 +47,30 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
         moduleName: row.moduleName, activity: row.activity, description: row.description,
         hours: Number(row.hours), hasBlocker: row.hasBlocker, blockerDescription: row.blockerDescription,
       })),
+    };
+  }
+
+  async phaseZeroSnapshotForProject(projectId: string): Promise<{
+    transferred: boolean; hours: number | null;
+  }> {
+    const [event] = await this.database.select({ metadata: quotationEvents.metadata })
+      .from(quotationEvents)
+      .innerJoin(quotationVersions, eq(quotationVersions.id, quotationEvents.versionId))
+      .innerJoin(projectQuotations, eq(projectQuotations.id, quotationVersions.quotationId))
+      .where(and(eq(projectQuotations.projectId, projectId),
+        eq(quotationEvents.action, 'quotation_transferred')))
+      .orderBy(asc(quotationEvents.occurredAt))
+      .limit(1);
+    if (!event) return { transferred: false, hours: null };
+
+    // 053af371 ya guarda el usedHours previo en este evento append-only.
+    const prior = event.metadata.priorCommercialState;
+    const hours = prior && typeof prior === 'object' && 'usedHours' in prior
+      ? prior.usedHours : null;
+    return {
+      transferred: true,
+      hours: typeof hours === 'number' && Number.isFinite(hours) && hours >= 0
+        ? hours : null,
     };
   }
 

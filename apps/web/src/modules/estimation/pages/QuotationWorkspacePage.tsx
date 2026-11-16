@@ -695,6 +695,13 @@ export function QuotationWorkspacePage() {
                       </Badge>
                     </div>
                   </div>
+                  {form.draft.aiPoc?.source === 'copied_template' && (
+                    <p className={styles.helper} role="status">
+                      Plantilla de otra cotización: conserva tareas, perfiles y HH para adaptar,
+                      pero no incluye las referencias ni las respuestas documentales del proyecto origen.
+                      Revisa el alcance y las horas antes de aprobar o traspasar.
+                    </p>
+                  )}
                   {/* Tras editar desaparece el bloque inicial, pero la aceptación IA
                       sigue disponible para la versión guardada. Guardar los ajustes no
                       equivale a aceptar la IA ni a registrar aprobación del cliente. */}
@@ -796,11 +803,9 @@ export function QuotationWorkspacePage() {
                   {/* El desglose de fases permanece visible bajo ambos tabs del
                       resumen. La fuente es la EDT o las fases de la cotización,
                       no la opción de presentación «Por equipo». */}
-                  {(form.draft.mode === 'phases' ||
-                    Boolean(form.draft.aiPoc?.edt) ||
-                    form.draft.phases.length > 0) && (
-                    <QuotationPhaseWorkspace
+                  <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
+                      historicalHours={project?.phaseZeroHours ?? 0}
                       draft={form.draft}
                       phases={phaseRows}
                       teams={teamRows}
@@ -832,7 +837,6 @@ export function QuotationWorkspacePage() {
                         phases: phaseRows.filter((_, position) => position !== index),
                       })}
                     />
-                  )}
 
                   <QuotationCommercialSections
                     version={selected}

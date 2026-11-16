@@ -112,6 +112,10 @@ pnpm build
 pnpm dev                            # API en :3000 y front en :5173
 ```
 
+Los comandos `pnpm --filter @kora/api dev` y `pnpm --filter @kora/api build`
+recompilan `@kora/contracts` antes de ejecutar Nest, para no usar contratos
+desactualizados. Si esa compilación falla, la API no inicia ni se compila.
+
 El front llama a `/api` en su mismo origen y Vite lo reenvía a la API, así que
 en desarrollo no hay que configurar CORS.
 

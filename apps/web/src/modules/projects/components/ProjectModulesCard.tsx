@@ -21,7 +21,7 @@ import { Badge, type BadgeTone } from '@/shared/components/ui/Badge';
 import { TrashIcon } from '@/shared/components/icons/Icons';
 import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { PhaseRoadmap, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
+import { PhaseRoadmap, HistoricalPhaseZero, type PhaseRoadmapSelection, type OperationalRoadmapRow } from '@/modules/client-portal/components/PhaseRoadmap';
 import { roleFromTeamName, toPhaseRoadmap } from '@/modules/client-portal/adapters/project-detail.adapter';
 import { useCreateProjectModule, useCreateProjectModuleSegment, useDeleteProjectModule, useDeleteProjectModuleSegment, useDeleteProjectModuleTask, useUpdateProjectModule, useUpdateProjectModuleSegment, useUpdateProjectModuleTask } from '../api/projects.queries';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
@@ -678,10 +678,11 @@ export function ProjectModulesCard({
         </Card>
       )}
       {project.modules.length === 0 ? (
-        <section className={styles.emptyRoadmap} aria-label="Roadmap sin fases">
+        <section className={styles.emptyRoadmap} aria-label="Roadmap sin fases planificadas">
+          <HistoricalPhaseZero hours={project.phaseZeroHours} />
           <header className={styles.emptyRoadmapTop}>
             <div className={styles.emptyRoadmapCounters} aria-label="Resumen del plan">
-              <span>0 fases</span>
+              <span>0 fases planificadas</span>
               <span>0 bloques de trabajo</span>
               <span>0 tareas</span>
             </div>
@@ -732,7 +733,7 @@ export function ProjectModulesCard({
       ) : (
       <PhaseRoadmap alwaysExpanded operationalView borderlessSummary phaseRoadmap={phaseRoadmap}
         operationalTaskCount={operationalCounts.tasks} operationalBlockCount={operationalCounts.blocks}
-        operationalPresaleHours={project.prospectPhaseHours}
+        operationalPresaleHours={project.phaseZeroHours}
         operationalRows={getOperationalRows}
         operationalMetrics={getOperationalMetrics}
         operationalNotice={canManage && pendingReview.length > 0 ? (

@@ -39,6 +39,8 @@ vi.mock('@/modules/client-portal/adapters/project-detail.adapter', async (import
   }),
 }));
 vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
+  HistoricalPhaseZero: ({ hours }: { hours: number }) =>
+    <section aria-label="Fase 0 · Prospecto y levantamiento">{hours ?? 0} HH consumidas · Solo lectura</section>,
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
     renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
     renderSelectionDetail, operationalPresaleHours, operationalNotice }: {
@@ -168,8 +170,9 @@ describe('Roadmap vacío · creación guiada y equipos asignados', () => {
 
   it('muestra los tres pasos y el resumen vacío sin depender de Editar proyecto', () => {
     show(emptyProject(), { teamOptions: [] });
-    const empty = screen.getByRole('region', { name: 'Roadmap sin fases' });
-    expect(within(empty).getByText('0 fases')).toBeInTheDocument();
+    const empty = screen.getByRole('region', { name: 'Roadmap sin fases planificadas' });
+    expect(within(empty).getByText('0 fases planificadas')).toBeInTheDocument();
+    expect(within(empty).getByRole('region', { name: 'Fase 0 · Prospecto y levantamiento' })).toHaveTextContent('0 HH consumidas');
     expect(within(empty).getByText('0 bloques de trabajo')).toBeInTheDocument();
     expect(within(empty).getByText('0 tareas')).toBeInTheDocument();
     expect(within(empty).getByRole('heading', { name: 'Arma el plan del proyecto' }))
@@ -322,7 +325,7 @@ describe('Cabecera de las fases · HTML v5', () => {
   });
 
   it('la cabecera de fase muestra periodo, HH reales y preventa del contrato', () => {
-    show({ ...project, prospectPhaseHours: 18,
+    show({ ...project, prospectPhaseHours: 18, phaseZeroHours: 18,
       modules: [{ ...module, estimatedHours: null, segments: [{
         id: 'segment-1', teamId: 'team-1', teamName: 'Desarrollo', name: 'Diseño UX',
         startDate: '2026-09-07', endDate: '2026-10-16', estimatedHours: 464,

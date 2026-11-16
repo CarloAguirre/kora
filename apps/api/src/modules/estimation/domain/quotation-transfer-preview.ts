@@ -55,7 +55,7 @@ export function buildQuotationTransferPreview(
 
   const findings: QuotationTransferPreview['findings'] = [
     { code: 'TRANSFER_PREVIEW_NOT_AUTHORIZATION', severity: 'review',
-      message: 'Esta comparación no autoriza el traspaso. Kora admite la aplicación inicial a proyectos sin ejecución; las recotizaciones con historial requieren conciliación explícita.' },
+      message: 'La vista previa es informativa y no autoriza cambios por sí sola. El traspaso aprobado agrega fases y HH sin modificar los registros históricos.' },
   ];
   if (version.status !== 'approved') findings.push({
     code: 'VERSION_NOT_APPROVED', severity: 'blocker',

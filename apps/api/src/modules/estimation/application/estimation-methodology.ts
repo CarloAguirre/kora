@@ -103,11 +103,9 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
   if (!edt.stages.length || !edt.activities.length) {
     throw new EstimationMethodologyValidationError('La EDT no contiene tramos y actividades verificables.');
   }
-  if (edt.stages.length >= 20 || edt.activities.length >= 120 ||
-      edt.roleHours.length >= 240) {
-    throw new EstimationMethodologyValidationError('La EDT no dejó espacio reservado para la supervisión técnica semanal.');
-  }
-  const overlapping = edt.activities.find((activity) =>
+  // Descartar SOLO las HH de supervisión semanal del TL emitidas por el modelo.
+  // Otras HH en el mismo WBS (QA/Desarrollo) permanecen intactas.
+  const weeklyWbs = new Set(edt.activities.filter((activity) =>
     edt.roleHours.some((hours) =>
       hours.wbs === activity.wbs && hours.role === leadRole &&
       isOrdinaryWeeklyTechLeadSupervision([
@@ -116,15 +114,27 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
           ? [hours.taskName] : []),
         ...('taskDescription' in hours && typeof hours.taskDescription === 'string'
           ? [hours.taskDescription] : []),
-      ].join('. '))));
-  if (overlapping) {
-    throw new EstimationMethodologyValidationError('Supervisión técnica duplicada en WBS ' + overlapping.wbs +
-      ': la supervisión semanal la incorpora el servidor, no Gemini.');
+      ].join('. ')))).map((activity) => activity.wbs));
+  const roleHours = edt.roleHours.filter((hours) =>
+    hours.role !== leadRole || !weeklyWbs.has(hours.wbs));
+  const retainedWbs = new Set(roleHours.map((hours) => hours.wbs));
+  // No ocultar actividades inválidas SIN HH que no sean supervisión:
+  // la validación referencial posterior debe detectarlas y rechazarlas.
+  const activities = edt.activities.filter((activity) =>
+    !weeklyWbs.has(activity.wbs) || retainedWbs.has(activity.wbs));
+  if (!activities.length) {
+    throw new EstimationMethodologyValidationError(
+      'La EDT no contiene trabajo verificable fuera de la supervisión semanal.');
   }
-  // Un tramo sin actividades no debe aumentar la duración contractual ni
-  // generar HH ficticias de supervisión. Las FK y HH se validan después.
-  const referencedStages = new Set(edt.activities.map((activity) => activity.stageCode));
-  const activeStages = edt.stages.filter((stage) => referencedStages.has(stage.code));
+  const referencedStages = new Set(activities.map((activity) => activity.stageCode));
+  const stages = edt.stages.filter((stage) =>
+    stage.code !== 'TL-GOV' || referencedStages.has(stage.code));
+  if (stages.length >= 20 || activities.length >= 120 || roleHours.length >= 240) {
+    throw new EstimationMethodologyValidationError(
+      'La EDT no dejó espacio reservado para la supervisión técnica semanal.');
+  }
+  // Solo tramos con actividades reales cuentan para el horizonte.
+  const activeStages = stages.filter((stage) => referencedStages.has(stage.code));
   if (activeStages.length === 0) {
     throw new EstimationMethodologyValidationError('Ninguna actividad de la EDT referencia un tramo cronológico declarado.');
   }
@@ -135,19 +145,19 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
   }
   const stageCode = 'TL-GOV';
   const wbs = 'TL-GOV.01';
-  if (edt.stages.some((stage) => stage.code === stageCode) ||
-      edt.activities.some((activity) => activity.wbs === wbs)) {
+  if (stages.some((stage) => stage.code === stageCode) ||
+      activities.some((activity) => activity.wbs === wbs)) {
     throw new EstimationMethodologyValidationError('La EDT reserva TL-GOV para supervisión obligatoria; código duplicado.');
   }
   return {
     ...edt,
-    stages: [...edt.stages, {
+    stages: [...stages, {
       code: stageCode,
       name: 'Supervisión y control técnico transversal',
       startWeek: 1,
       durationWeeks: horizonWeeks,
     }],
-    activities: [...edt.activities, {
+    activities: [...activities, {
       wbs,
       stageCode,
       module: 'Gobierno técnico',
@@ -159,7 +169,7 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
       references: '',
       classification: 'derivado_tecnico',
     }],
-    roleHours: [...edt.roleHours, {
+    roleHours: [...roleHours, {
       wbs, role: leadRole, hours: TECH_LEAD_HOURS_PER_WEEK * horizonWeeks,
       taskName: 'Supervisar calidad, riesgos y decisiones técnicas de forma semanal',
       taskDescription: 'Revisar avances y riesgos técnicos, coordinar decisiones ' +

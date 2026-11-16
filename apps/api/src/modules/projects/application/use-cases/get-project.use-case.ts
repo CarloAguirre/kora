@@ -90,6 +90,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       projectPaymentMilestones,
       usedHoursUpdatedAt,
       leaderLastActivityAt,
+      phaseZeroSnapshot,
     ] = await Promise.all([
       snapshot.clientId ? this.clients.findById(snapshot.clientId) : Promise.resolve(null),
       snapshot.primaryContactId ? this.contacts.findById(snapshot.primaryContactId) : Promise.resolve(null),
@@ -107,6 +108,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       snapshot.leaderUserId
         ? this.activity.lastActivityAtByUser(project.id, snapshot.leaderUserId)
         : Promise.resolve(null),
+      this.hourEntries.phaseZeroSnapshotForProject(project.id),
     ]);
 
     /**
@@ -135,6 +137,13 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
           new Date(hoursCutoff.toISOString().slice(0, 10)),
         )
       : snapshot.usedHours;
+
+    // Fase 0 NO es lo mismo que "horas antes de Hito 0".
+    // Al traspasar se congela la foto de HH ya consumidas incluso si el
+    // proyecto había comenzado semanas antes. La cotización aún pendiente
+    // muestra el consumo actual. Historial antiguo sin foto usa el corte legado.
+    const phaseZeroHours = phaseZeroSnapshot.hours ??
+      (phaseZeroSnapshot.transferred ? prospectPhaseHours : snapshot.usedHours);
 
     if (!command.actorPermissions.includes('projects:read')) {
       const isParticipant =
@@ -216,6 +225,7 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
         usedHoursUpdatedAt,
         leaderLastActivityAt,
         prospectPhaseHours,
+        phaseZeroHours,
         actorUserId: command.actorUserId,
         canManagePendings,
         ledTeamIds,

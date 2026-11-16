@@ -76,12 +76,16 @@ describe('política de estimación profesional', () => {
     );
   });
 
-  it('rechaza que Gemini duplique la supervisión del Tech Lead', () => {
+  it('normaliza la supervisión semanal duplicada sin tocar HH de otros roles', () => {
     const data = base(4);
     data.activities[0]!.name = 'Supervisión técnica semanal';
-    data.roleHours.push({ wbs: 'T01.01', role: 'Tech Lead', hours: 20 });
-    expect(() => addMandatoryTechLeadSupervision(data, 'Tech Lead'))
-      .toThrow(/Supervisión técnica duplicada/);
+    data.roleHours.push({ wbs: 'T01.01', role: 'Tech Lead', hours: 38 });
+    const original = structuredClone(data);
+    const result = addMandatoryTechLeadSupervision(data, 'Tech Lead');
+    expect(data).toEqual(original);
+    expect(result.roleHours.filter((r) => r.role === 'Tech Lead'))
+      .toEqual([expect.objectContaining({ wbs: 'TL-GOV.01', hours: 20 })]);
+    expect(result.roleHours.find((r) => r.role === 'Desarrollo Fullstack')?.hours).toBe(80);
   });
 
   it('no confunde una supervisión técnica puntual con gobierno semanal duplicado', () => {
@@ -107,12 +111,33 @@ describe('política de estimación profesional', () => {
       .roleHours.find((row) => row.wbs === 'TL-GOV.01')?.hours).toBe(20);
   });
 
-  it('rechaza seguimiento semanal de riesgos duplicado, no lo suma dos veces', () => {
+  it('sustituye el WBS T02.006 semanal de OpenAI por una sola supervisión canónica', () => {
     const data = base(4);
-    data.activities[0]!.name = 'Seguimiento semanal de riesgos y avances';
-    data.roleHours.push({ wbs: 'T01.01', role: 'Líder Técnico', hours: 20 });
-    expect(() => addMandatoryTechLeadSupervision(data, 'Líder Técnico'))
-      .toThrow(/Supervisión técnica duplicada en WBS T01.01/);
+    data.stages.push({ code: 'T02', name: 'QA', startWeek: 2, durationWeeks: 3 });
+    data.activities.push({
+      ...data.activities[0]!, wbs: 'T02.006', stageCode: 'T02',
+      name: 'Seguimiento semanal de riesgos y avances',
+    });
+    data.roleHours.push({ wbs: 'T02.006', role: 'Líder Técnico', hours: 40 });
+    const result = addMandatoryTechLeadSupervision(data, 'Líder Técnico');
+    expect(result.roleHours.some((row) => row.wbs === 'T02.006')).toBe(false);
+    expect(result.activities.some((row) => row.wbs === 'T02.006')).toBe(false);
+    expect(result.roleHours.find((row) => row.wbs === 'TL-GOV.01')?.hours).toBe(20);
+    expect(result.roleHours.find((row) => row.wbs === 'T01.01')?.hours).toBe(80);
+  });
+
+  it('retira un TL-GOV del modelo si no contiene más actividades', () => {
+    const data = base(4);
+    data.stages.push({ code: 'TL-GOV', name: 'Tramo del modelo', startWeek: 1, durationWeeks: 4 });
+    data.activities.push({
+      ...data.activities[0]!, wbs: 'TL-GOV.01', stageCode: 'TL-GOV',
+      name: 'Supervisión técnica semanal',
+    });
+    data.roleHours.push({ wbs: 'TL-GOV.01', role: 'Líder Técnico', hours: 17 });
+    const result = addMandatoryTechLeadSupervision(data, 'Líder Técnico');
+    expect(result.stages.filter((row) => row.code === 'TL-GOV')).toHaveLength(1);
+    expect(result.roleHours.filter((row) => row.wbs === 'TL-GOV.01'))
+      .toEqual([expect.objectContaining({ hours: 20 })]);
   });
 
   it('permite trabajo de arquitectura hands-on adicional pero conserva la base aparte', () => {

@@ -316,7 +316,7 @@ export type EstimationPocRole = z.infer<typeof estimationPocRoleSchema>;
 export const estimationPocProposalSchema = z.object({
   projectId: uuidSchema,
   provider: z.string().trim().min(1).max(120),
-  sourceMode: z.enum(['poc_simulated', 'drive']),
+  sourceMode: z.enum(['poc_simulated', 'drive', 'copied_template']),
   documentsAnalyzed: z.number().int().min(0),
   summary: nonEmptyTrimmed(3000, 'El resumen'),
   roles: z.array(estimationPocRoleSchema).min(1),

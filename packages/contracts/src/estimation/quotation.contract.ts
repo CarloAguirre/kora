@@ -72,7 +72,7 @@ export const quotationPaymentItemSchema = z.object({
 /** Evidencia de una propuesta Gemini obtenida desde el documento de demostración KDM.
  * Distinta del artefacto EDT: no simula requerimientos ni entregables inexistentes. */
 export const quotationAiPocSnapshotSchema = z.object({
-  source: z.enum(['kdm_demo', 'drive']),
+  source: z.enum(['kdm_demo', 'drive', 'copied_template']),
   proposal: estimationPocProposalSchema,
   answers: z.array(submitEstimationAnswerSchema),
   dynamicQuestions: z.array(estimationQuestionSchema).max(5).default([]),

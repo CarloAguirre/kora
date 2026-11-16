@@ -127,6 +127,7 @@ describe('GetProjectUseCase — lectura del líder de un equipo aprobado', () =>
       {
         maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
         sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(0),
+        phaseZeroSnapshotForProject: vi.fn().mockResolvedValue({ transferred: false, hours: null }),
       } as unknown as ProjectHourEntryReader,
       { lastActivityAtByUser: vi.fn().mockResolvedValue(null) } as unknown as ProjectActivityReader,
       new FixedClock(),
@@ -192,6 +193,7 @@ describe('GetProjectUseCase — calendario traspasado al iniciar', () => {
       { findById: vi.fn().mockResolvedValue(null) } as unknown as ProjectContactReader,
       { maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
         sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(0),
+        phaseZeroSnapshotForProject: vi.fn().mockResolvedValue({ transferred: false, hours: null }),
       } as unknown as ProjectHourEntryReader,
       { lastActivityAtByUser: vi.fn().mockResolvedValue(null) } as unknown as ProjectActivityReader,
       new FixedClock(),
@@ -226,11 +228,13 @@ describe('GetProjectUseCase — corte provisional de HH', () => {
     startDate = new Date('2026-03-30T00:00:00.000Z'),
     hito0At = null,
     hoursBeforeCutoff = 0,
+    phaseZeroSnapshot = { transferred: false, hours: null } as { transferred: boolean; hours: number | null },
   }: {
     status?: 'active' | 'draft';
     startDate?: Date | null;
     hito0At?: Date | null;
     hoursBeforeCutoff?: number;
+    phaseZeroSnapshot?: { transferred: boolean; hours: number | null };
   } = {}) {
     const snapshot = {
       id: projectId, name: 'App Walvy', slug: 'app-walvy',
@@ -252,6 +256,7 @@ describe('GetProjectUseCase — corte provisional de HH', () => {
     const hourEntries = {
       maxApprovedEntryDateForProject: vi.fn().mockResolvedValue(null),
       sumApprovedHoursBeforeDateForProject: vi.fn().mockResolvedValue(hoursBeforeCutoff),
+        phaseZeroSnapshotForProject: vi.fn().mockResolvedValue(phaseZeroSnapshot),
     };
     const ensure = vi.fn().mockResolvedValue(false);
     const useCase = new GetProjectUseCase(
@@ -276,6 +281,37 @@ describe('GetProjectUseCase — corte provisional de HH', () => {
 
   const read = (useCase: GetProjectUseCase) =>
     useCase.execute({ projectId, actorUserId: 'pmo-1', actorPermissions: ['projects:read'] });
+
+  it('Fase 0 antes del traspaso incluye las HH consumidas aunque el proyecto ya inició', async () => {
+    const { useCase } = buildCutoffScenario({ hoursBeforeCutoff: 75 });
+    const result = await read(useCase);
+    if (!result.isOk()) throw new Error('No se pudo leer el proyecto');
+    expect(result.value.prospectPhaseHours).toBe(75);
+    expect(result.value.phaseZeroHours).toBe(5143.75);
+    expect(result.value.usedHours).toBe(5143.75);
+  });
+
+  it('Fase 0 conserva la foto del traspaso sin sumar consumo posterior', async () => {
+    const { useCase } = buildCutoffScenario({
+      hoursBeforeCutoff: 75,
+      phaseZeroSnapshot: { transferred: true, hours: 180 },
+    });
+    const result = await read(useCase);
+    if (!result.isOk()) throw new Error('No se pudo leer el proyecto');
+    expect(result.value.phaseZeroHours).toBe(180);
+    expect(result.value.prospectPhaseHours).toBe(75);
+    expect(result.value.usedHours).toBe(5143.75);
+  });
+
+  it('un traspaso antiguo sin foto recurre al corte legado sin duplicar horas', async () => {
+    const { useCase } = buildCutoffScenario({
+      hoursBeforeCutoff: 75,
+      phaseZeroSnapshot: { transferred: true, hours: null },
+    });
+    const result = await read(useCase);
+    if (!result.isOk()) throw new Error('No se pudo leer el proyecto');
+    expect(result.value.phaseZeroHours).toBe(75);
+  });
 
   it('usa startDate para un proyecto activo sin Hito 0, conservando las HH históricas', async () => {
     const { useCase, hourEntries } = buildCutoffScenario();

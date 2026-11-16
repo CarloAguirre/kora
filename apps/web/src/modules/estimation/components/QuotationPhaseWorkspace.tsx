@@ -129,7 +129,7 @@ export function referencePhasesFromEdt(
 }
 
 export function QuotationPhaseWorkspace({
-  phases, teams, teamNames, edt, roleTeamIds, editable,
+  phases, teams, teamNames, edt, roleTeamIds, editable, historicalHours = 0,
   commercialMode = 'phases', draft, activeTeams = [],
   onEditPhase, onAddPhase, onRemovePhase,
   onEditTaskHours, onEditTaskFixed, onEditTaskTeam, onEditGroupHours,
@@ -145,6 +145,8 @@ export function QuotationPhaseWorkspace({
   activeTeams?: readonly { id: string; name: string }[];
   roleTeamIds?: Readonly<Record<string, string>>;
   editable: boolean;
+  /** HH consumidas previas al traspaso; solo lectura, fuera de la EDT cotizada. */
+  historicalHours?: number;
   commercialMode?: QuotationDraftData['mode'];
   onEditTaskHours?: (wbs: string, role: string, hours: number) => void;
   onEditTaskFixed?: (wbs: string, role: string, fixed: boolean) => void;
@@ -194,6 +196,22 @@ export function QuotationPhaseWorkspace({
         </div>
       )}
       <div className={styles.phases}>
+        <section className={[styles.phase, styles.historicalPhase].join(' ')}
+          aria-label="Fase 0 · Prospecto y levantamiento">
+          <div className={styles.phaseHeader}>
+            <span className={styles.phaseBadge}>Fase 0</span>
+            <strong>Prospecto y levantamiento</strong>
+            <span className={styles.phaseReadOnly}>Solo lectura</span>
+          </div>
+          <output className={styles.historicalHours} aria-label="HH consumidas en Fase 0">
+            {hh(historicalHours)} HH consumidas
+          </output>
+          <p className={styles.historicalExplanation}>
+            Horas reales aprobadas antes de aplicar la planificación: reuniones, levantamiento y documentación.
+            Ya están contabilizadas en el consumo del proyecto; no se suman a las HH
+            estimadas ni se pueden editar desde la calculadora.
+          </p>
+        </section>
         {displayPhases.map((phase, index) => {
           const stage = edt?.stages?.find((item) => phase.name.startsWith(item.code + ' · ')) ??
             draft?.edtCommercialStages?.find((item) => phase.name.startsWith(item.code + ' · '));
@@ -218,7 +236,7 @@ export function QuotationPhaseWorkspace({
           return (
             <section className={styles.phase} key={stageCode ?? index}>
               <div className={styles.phaseHeader}>
-                <span className={styles.phaseBadge}>Fase {index + 2}</span>
+                <span className={styles.phaseBadge}>Fase {index + 1}</span>
                 <span className={styles.phaseDescription}>
                   {hh(total)} HH · semanas {phase.startWeek} a {phase.startWeek + phase.durationWeeks - 1}
                 </span>
@@ -268,7 +286,7 @@ export function QuotationPhaseWorkspace({
                         {row.teamId.startsWith('profile:') ? 'Sin equipo · ' + row.teamId.slice(8) : label} · HH</span>
                       <QuotationGroupHoursInput value={row.hours}
                         disabled={!editable || row.teamId.startsWith('profile:')}
-                        label={'HH de ' + label + ' para fase ' + (index + 2)}
+                        label={'HH de ' + label + ' para fase ' + (index + 1)}
                         onCommit={(amount) => {
                           if (edt && onEditGroupHours)
                             onEditGroupHours(row.teamId, amount, stage?.code,
@@ -374,7 +392,7 @@ export function QuotationPhaseWorkspace({
                       <label className={styles.add + ' ' + styles.importAction}>
                         Importar Excel
                         <input type="file" accept=".xlsx,.xls,.csv" hidden
-                          aria-label={'Importar Excel en fase ' + (index + 2)}
+                          aria-label={'Importar Excel en fase ' + (index + 1)}
                           onChange={(event) => {
                             const file = event.target.files?.[0];
                             event.target.value = '';
@@ -394,9 +412,9 @@ export function QuotationPhaseWorkspace({
           );
         })}
         {displayPhases.length === 0 &&
-          <p className={styles.empty}>Todavía no hay fases definidas.</p>}
+          <p className={styles.empty}>Todavía no hay fases cotizadas. La Fase 0 no forma parte del presupuesto.</p>}
       </div>
-      {editable && (
+      {editable && (commercialMode === 'phases' || Boolean(edt) || phases.length > 0) && (
         <Button variant="outline" size="sm" onClick={onAddPhase}>
           + Agregar fase / módulo
         </Button>
@@ -415,7 +433,7 @@ export function QuotationPhaseWorkspace({
               const label = stage ? phase.name.slice(stage.code.length + 3) : phase.name;
               return (
                 <div className={styles.timelineRow} key={index}>
-                  <span title={label}>Fase {index + 2} · {label}</span>
+                  <span title={label}>Fase {index + 1} · {label}</span>
                   <div className={styles.timelineTrack}
                     aria-label={phase.name + ', semanas ' + phase.startWeek + ' a ' +
                       (phase.startWeek + phase.durationWeeks - 1)}>
