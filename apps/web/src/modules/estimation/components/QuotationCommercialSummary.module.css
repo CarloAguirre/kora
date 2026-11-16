@@ -21,3 +21,10 @@
 .unsaved{font-size:10px;color:var(--kora-warning-text)}
 .recurring{color:var(--kora-text-muted);font-size:11.5px;margin:0}
 .summary{gap:10px}
+
+/* Desglose comercial de HH históricas cobrables vs EDT por ejecutar. */
+.billableBreakdown{display:grid;gap:5px;border-top:1px solid var(--kora-border-soft);padding:9px 0 1px}
+.billableBreakdown>div{display:flex;justify-content:space-between;align-items:baseline;gap:9px;font-size:11px}
+.billableBreakdown span{color:var(--kora-text-muted)}
+.billableBreakdown strong{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--kora-navy)}
+.billableBreakdown small{font-size:10px;line-height:1.4;color:var(--kora-text-muted)}
