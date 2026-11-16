@@ -243,6 +243,8 @@ export const quotationTransferResultSchema = z.object({
   teamCount: z.number().int().nonnegative(),
   moduleCount: z.number().int().nonnegative(),
   paymentMilestoneCount: z.number().int().nonnegative(),
+  /** El traspaso se confirmó, pero la materialización requiere revisión. */
+  calendarWarning: z.string().optional(),
 });
 export type QuotationTransferResult = z.infer<typeof quotationTransferResultSchema>;
 
