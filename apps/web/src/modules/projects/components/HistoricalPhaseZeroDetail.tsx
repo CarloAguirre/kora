@@ -90,7 +90,7 @@ export function HistoricalPhaseZeroDetail({ project }: { project: ProjectDetail 
                     <tr key={item.id}>
                       <td>{date(item.date)}</td>
                       <td>
-                        <strong>{item.taskName ?? item.activity || 'Actividad sin nombre'}</strong>
+                        <strong>{(item.taskName ?? item.activity) || 'Actividad sin nombre'}</strong>
                         {item.taskName && item.activity !== item.taskName &&
                           <small>{item.activity}</small>}
                         {item.description && <small>{item.description}</small>}
