@@ -173,7 +173,7 @@ export function HistoricalPhaseZero({ hours }: { hours: number }) {
     </div>
     <div className={styles.historicalPhaseZeroBody}>
       <strong>{new Intl.NumberFormat('es-CL', { maximumFractionDigits: 2 }).format(hours)} HH consumidas</strong>
-      <p>Reuniones, levantamiento y documentación antes del inicio.
+      <p>Trabajo previo a la planificación aprobada, como reuniones, levantamiento y documentación.
         Estas HH aprobadas ya forman parte del consumo histórico del proyecto.
         No se agregan al presupuesto de las fases planificadas.</p>
     </div>
@@ -603,7 +603,7 @@ export interface PhaseRoadmapProps {
   operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
   /** HH y avance comprobables de cada bloque operativo; no se inventan porcentajes. */
   operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
-  /** HH reales de preventa previas al Hito 0, fuera del plan operativo. */
+  /** HH históricas previas al traspaso, aunque el proyecto haya iniciado. */
   operationalPresaleHours?: number | null;
   /** Acción al final de las fases, exclusiva de la ficha interna. */
   operationalFooter?: ReactNode;
