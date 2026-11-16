@@ -53,7 +53,9 @@ export function projectPocRolesToQuotationDraft(
     aiPoc.proposal.sourceMode === 'poc_simulated';
   const isRealDrive = aiPoc.source === 'drive' &&
     aiPoc.proposal.sourceMode === 'drive';
-  if ((!isKdmDemo && !isRealDrive) ||
+  const isCommercialTemplate = aiPoc.source === 'copied_template' &&
+    aiPoc.proposal.sourceMode === 'copied_template';
+  if ((!isKdmDemo && !isRealDrive && !isCommercialTemplate) ||
       (aiPoc.edt && aiPoc.edt.source !== aiPoc.source)) {
     throw new Error('El borrador no contiene una propuesta IA con procedencia documental coherente.');
   }

@@ -141,18 +141,37 @@ describe('Copia de cotización IA con EDT y traspaso de tareas', () => {
       .toThrow(/evidencia original de IA/);
   });
 
-  it('no traslada tareas ni documentos entre proyectos distintos', () => {
+  it('copia las tareas entre proyectos como plantilla, sin heredar evidencia IA', () => {
     const original = aiVersionDraft();
+    const originalEdt = structuredClone(original.aiPoc!.edt);
     const copied = copyQuotationDraft(original, projectId, otherProjectId);
     expect(copied.mode).toBe('phases');
     expect(copied.teams).toEqual(original.teams);
     expect(copied.phases).toEqual(original.phases);
-    expect(copied.aiPoc).toBeNull();
+    expect(copied.aiPoc?.source).toBe('copied_template');
+    expect(copied.aiPoc?.proposal.sourceMode).toBe('copied_template');
+    expect(copied.aiPoc?.proposal.projectId).toBe(otherProjectId);
+    expect(copied.aiPoc?.proposal.documentsAnalyzed).toBe(0);
+    expect(copied.aiPoc?.edt?.source).toBe('copied_template');
     expect(copied.sourceRefs).toEqual([]);
     expect(copied.answers).toEqual({});
-    expect(copied.edtTaskNames).toBeUndefined();
-    expect(copied.edtTaskSettings).toBeUndefined();
-    expect(quotationEdtAssignments(copied)).toEqual([]);
+    expect(copied.aiPoc?.answers).toEqual([]);
+    expect(copied.analysis).toBeNull();
+    expect(copied.edtTaskNames).toEqual(original.edtTaskNames);
+    expect(copied.edtTaskSettings).toEqual(original.edtTaskSettings);
+    expect(quotationEdtAssignments(copied).map((row) => [row.wbs, row.hours]))
+      .toEqual([['STG-01.01', 40], ['TL-GOV.01', 20]]);
+    const targets = [
+      { moduleId: stageOneModuleId, name: copied.phases[0]!.name, totalHours: 40 },
+      { moduleId: stageTwoModuleId, name: copied.phases[1]!.name, totalHours: 20 },
+    ];
+    const refs = buildQuotationTransferReferences(copied, targets);
+    expect(refs.modules.map((module) => module.tasks.map((task) => task.wbs)))
+      .toEqual([['STG-01.01'], ['TL-GOV.01']]);
+    expect(() => validatePocDraftIntegrity(copied, copied)).not.toThrow();
+    expect(original.aiPoc?.edt).toEqual(originalEdt);
+    const next = copyQuotationDraft(copied, otherProjectId, otherProjectId);
+    expect(quotationEdtAssignments(next)).toHaveLength(2);
   });
 
   it('no convierte el fixture KDM en evidencia real al copiarlo', () => {
