@@ -77,17 +77,41 @@ const callbacks = {
   onImportTaskExcel: vi.fn().mockResolvedValue(undefined),
   onRemoveCommercialPhase: vi.fn(),
 };
-function renderEditor(custom = draft) {
+function renderEditor(custom = draft, historicalHours = 0) {
   return render(<QuotationPhaseWorkspace
     phases={custom.phases} teams={custom.teams} edt={edt}
     draft={custom} teamNames={teams} roleTeamIds={custom.aiPoc?.roleTeamIds}
     activeTeams={[{ id: dev, name: 'Desarrollo' }, { id: qa, name: 'QA' }]}
-    editable commercialMode={custom.mode}
+    editable commercialMode={custom.mode} historicalHours={historicalHours}
     {...callbacks}/>);
 }
 afterEach(() => vi.clearAllMocks());
 
 describe('Cotización HTML v5 · fases y tareas', () => {
+  it('muestra Fase 0 con HH históricas sin permitir editar ni sumar a la EDT', () => {
+    renderEditor(mappedDraft, 18.5);
+    const phase0 = screen.getByRole('region', { name: 'Fase 0 · Prospecto y levantamiento' });
+    expect(phase0).toHaveTextContent('18,5 HH consumidas');
+    expect(phase0).toHaveTextContent('Solo lectura');
+    expect(phase0.querySelectorAll('input, button, select, textarea')).toHaveLength(0);
+    expect(screen.getByText('15 HH · semanas 1 a 2')).toBeInTheDocument();
+    expect(callbacks.onEditPhase).not.toHaveBeenCalled();
+  });
+
+  it('la Fase 0 permanece visible con cero HH aunque todavía no haya fases estimadas', () => {
+    const manual = quotationDraftDataSchema.parse({ mode: 'team', teams: [], phases: [] });
+    render(<QuotationPhaseWorkspace
+      phases={manual.phases} teams={manual.teams} teamNames={teams}
+      commercialMode="team" historicalHours={0} editable
+      onEditPhase={callbacks.onEditPhase} onAddPhase={callbacks.onAddPhase}
+      onRemovePhase={callbacks.onRemovePhase} />);
+    const phase0 = screen.getByRole('region', { name: 'Fase 0 · Prospecto y levantamiento' });
+    expect(phase0).toHaveTextContent('0 HH consumidas');
+    expect(phase0.querySelectorAll('input, button, select, textarea')).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /Agregar fase/ })).not.toBeInTheDocument();
+  });
+
+
   it('agrega una fase después del fin ACTUAL de la EDT replanificada, no del snapshot IA', () => {
     // La IA terminó originalmente en semana 3, pero la cotización cambió
     // una fase a semanas 11–13 y otra quedó en 1–2.
@@ -133,8 +157,9 @@ describe('Cotización HTML v5 · fases y tareas', () => {
   it('muestra módulos y roadmap aun sin fases comerciales ni equipos mapeados', () => {
     renderEditor();
     expect(screen.getByText('Fases · Módulos')).toBeInTheDocument();
+    expect(screen.getByText('Fase 0')).toBeInTheDocument();
+    expect(screen.getByText('Fase 1')).toBeInTheDocument();
     expect(screen.getByText('Fase 2')).toBeInTheDocument();
-    expect(screen.getByText('Fase 3')).toBeInTheDocument();
     expect(screen.getByText('Roadmap preliminar')).toBeInTheDocument();
     expect(screen.getByText('15 HH · semanas 1 a 2')).toBeInTheDocument();
     expect(screen.queryByText(/Planificación propuesta por Gemini/)).not.toBeInTheDocument();
@@ -187,7 +212,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
 
   it('permite modificar HH por equipo Kora y fase; recalcular se delega a contratos', () => {
     renderEditor(mappedDraft);
-    const groupHours = screen.getByLabelText('HH de Desarrollo para fase 2');
+    const groupHours = screen.getByLabelText('HH de Desarrollo para fase 1');
     fireEvent.change(groupHours, { target: { value: '10' } });
     expect(callbacks.onEditGroupHours).not.toHaveBeenCalled();
     fireEvent.blur(groupHours);
