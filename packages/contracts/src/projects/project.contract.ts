@@ -898,6 +898,16 @@ export const projectDetailSchema = projectSummarySchema.omit({ supportPlanType: 
    * Ya están en usedHours y nunca se suman otra vez a soldHours.
    */
   phaseZeroHours: z.number().nonnegative().default(0),
+  /** Registros reales creados antes del primer traspaso (sin duplicar consumo). */
+  phaseZeroEntries: z.array(z.object({
+    id: uuidSchema, date: z.iso.date(), recordedAt: isoDateTimeSchema,
+    userName: z.string(), activity: z.string(), description: z.string(),
+    taskName: z.string().nullable(), hours: z.number().nonnegative(),
+    status: z.enum(['pending', 'approved', 'rejected']),
+    teamId: uuidSchema.nullable(), teamName: z.string().nullable(),
+    teamAttribution: z.enum(['explicit', 'current_membership', 'unassigned']),
+  })).default([]),
+  phaseZeroEntriesTruncated: z.boolean().default(false),
   /** Monto total del contrato — base del % de cada tramo. */
   contractAmount: z.number().nullable(),
   /** Moneda de todos los tramos de pago del proyecto. */
