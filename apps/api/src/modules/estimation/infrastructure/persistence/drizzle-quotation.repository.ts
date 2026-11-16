@@ -376,6 +376,11 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         .from(quotationVersions).where(eq(quotationVersions.quotationId, quotation.id))
         .orderBy(desc(quotationVersions.versionNumber)).limit(1);
 
+      // Foto del consumo previo de esta versión: las HH ya ejecutadas se cobran,
+      // pero NO se convierten en trabajo nuevo ni tareas EDT.
+      const [pricingProject] = await tx.select({ usedHours: projects.usedHours })
+        .from(projects).where(and(eq(projects.id, projectId), isNull(projects.deletedAt))).limit(1);
+      if (!pricingProject) throw new NotFoundException('Proyecto no encontrado para cotizar.');
       let draft: QuotationDraftData = quotationDraftDataSchema.parse({});
       let hourlyRate: number | null = null;
       let currency: 'UF' | 'CLP' | 'USD' = 'UF';
@@ -462,6 +467,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         tax = source.tax as typeof tax;
         origin = 'copy';
       }
+      // Para nuevas versiones del mismo proyecto conservar una foto ya fijada.
+      // Al copiar desde otro proyecto se reemplaza por su consumo propio.
+      draft = {
+        ...draft,
+        phaseZeroBillableHours: input.sourceVersionId &&
+          (input.sourceProjectId ?? projectId) === projectId &&
+          draft.phaseZeroBillableHours !== undefined
+          ? draft.phaseZeroBillableHours : Number(pricingProject.usedHours),
+      };
       const totals = calculateQuotation(draft, hourlyRate, tax);
       const next = (last?.versionNumber ?? 0) + 1;
       const [created] = await tx.insert(quotationVersions).values({
@@ -1078,6 +1092,16 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new ConflictException(error instanceof Error ? error.message :
           'No se pudo conciliar la Fase 1 con la cotización aprobada.');
       }
+      // Fase 0 histórica: incrementar HH VENDIDAS, no asignaciones de equipos.
+      // Version.totalHours permanece igual a las fases futuras y la EDT.
+      const billablePhaseZero = draft.phaseZeroBillableHours ?? 0;
+      if (billablePhaseZero > Number(project.usedHours) + 0.01) {
+        throw new ConflictException('Las HH cobrables de Fase 0 superan el consumo real. Revisa la cotización.');
+      }
+      const commercialSoldHours = Math.round((transferPlan.projectSoldHours + billablePhaseZero) * 100) / 100;
+      if (!Number.isFinite(commercialSoldHours) || commercialSoldHours > 99999999.99) {
+        throw new ConflictException('El total comercial de HH supera el rango permitido.');
+      }
       const allocations = new Map(transferPlan.teamAllocations.map((row) =>
         [row.teamId, row]));
       for (const team of draft.teams) {
@@ -1172,7 +1196,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         throw new ConflictException('El monto acumulado excede el rango contractual permitido.');
       }
       await tx.update(projects).set({
-        soldHours: transferPlan.projectSoldHours.toFixed(2),
+        soldHours: commercialSoldHours.toFixed(2),
         // Nunca sobrescribir el consumo ni la fecha del proyecto.
         contractAmount: contractAmount.toFixed(2),
         contractCurrency: version.currency,
@@ -1182,7 +1206,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         versionId, actorUserId: userId, action: 'quotation_transferred',
         metadata: { moduleIds, versionRevision: input.revision,
           totalHours: Number(version.totalHours),
-          totalProjectHours: transferPlan.projectSoldHours,
+          totalProjectHours: commercialSoldHours,
+          phaseZeroBillableHours: billablePhaseZero,
+          futureQuotedHours: Number(version.totalHours),
           uncalendarizedProspectPhase: {
             priorSoldHours: Number(project.soldHours),
             phase1AssignedHours: transferPlan.phase1AssignedHours,
@@ -1214,7 +1240,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       }).returning();
       return {
         projectId, versionId, transferredAt: event!.occurredAt.toISOString(),
-        projectHours: transferPlan.projectSoldHours,
+        projectHours: commercialSoldHours,
         teamCount: new Set([...existingTeams.map((team) => team.teamId), ...ids]).size,
         moduleCount: moduleIds.length,
         paymentMilestoneCount: draft.paymentPlan.length,
@@ -1249,10 +1275,19 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         'La versión ya generó planificación. Crea una nueva cotización para cambiarla.',
       );
       const savedDraft = quotationDraftDataSchema.parse(currentRow.draft);
+      // El cliente no puede editar el precio histórico. Las versiones anteriores
+      // a Fase 0 fijan su foto por primera vez al guardarse; de ahí en adelante
+      // permanecerá congelada en el JSON de la cotización.
+      const [pricingProject] = await tx.select({ usedHours: projects.usedHours })
+        .from(projects).where(and(eq(projects.id, projectId), isNull(projects.deletedAt))).limit(1);
+      if (!pricingProject) throw new NotFoundException('Proyecto no disponible.');
       let draft: QuotationDraftData;
       try {
         validatePocDraftIntegrity(savedDraft, input.draft);
         draft = reconcileQuotationAnalysis(savedDraft, input.draft);
+        draft = { ...draft,
+          phaseZeroBillableHours: savedDraft.phaseZeroBillableHours ?? Number(pricingProject.usedHours),
+        };
       } catch (error) {
         if (error instanceof QuotationAnalysisIntegrityError || error instanceof Error) {
           throw new BadRequestException(error.message);
