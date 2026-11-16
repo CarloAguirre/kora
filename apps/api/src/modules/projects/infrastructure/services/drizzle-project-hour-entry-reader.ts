@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gte, hourEntries, inArray, lt, lte, projectModules, projectQuotations, quotationEvents, quotationVersions, sql, users, type Database } from '@kora/db';
+import { and, asc, desc, eq, gte, hourEntries, inArray, lt, lte, projectModuleSegments, projectModuleTasks, projectModules, projectQuotations, quotationEvents, quotationVersions, sql, users, type Database } from '@kora/db';
 import type { ProjectHourEntryReader } from '../../application/ports/project-hour-entry-reader.port';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 
@@ -61,7 +61,7 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
         eq(quotationEvents.action, 'quotation_transferred')))
       .orderBy(asc(quotationEvents.occurredAt))
       .limit(1);
-    if (!event) return { transferred: false, hours: null };
+    if (!event) return { transferred: false, hours: null, cutoffAt: null };
 
     // 053af371 ya guarda el usedHours previo en este evento append-only.
     const prior = event.metadata.priorCommercialState;
@@ -69,8 +69,45 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
       ? prior.usedHours : null;
     return {
       transferred: true,
+      cutoffAt: event.transferredAt,
       hours: typeof hours === 'number' && Number.isFinite(hours) && hours >= 0
         ? hours : null,
+    };
+  }
+
+  /** Los registros de Fase 0 se delimitan por fecha de creación, no por
+   * date (una hora histórica puede registrarse retroactivamente).
+   * Las imputaciones posteriores al traspaso no pertenecen a Fase 0.
+   * teamId se toma SOLO de un bloque o tarea vinculados explícitamente.
+   */
+  async phaseZeroEntriesForProject(projectId: string, cutoffAt: Date | null, limit: number) {
+    const rows = await this.database.select({
+      id: hourEntries.id, userId: hourEntries.userId,
+      date: hourEntries.date, createdAt: hourEntries.createdAt,
+      status: hourEntries.status, hours: hourEntries.hours,
+      activity: hourEntries.category, description: hourEntries.description,
+      firstName: users.firstName, lastName: users.lastName,
+      taskName: projectModuleTasks.name,
+      segmentTeamId: projectModuleSegments.teamId,
+      taskTeamId: projectModuleTasks.teamId,
+    }).from(hourEntries)
+      .leftJoin(users, eq(users.id, hourEntries.userId))
+      .leftJoin(projectModuleSegments, eq(projectModuleSegments.id, hourEntries.segmentId))
+      .leftJoin(projectModuleTasks, eq(projectModuleTasks.id, hourEntries.taskId))
+      .where(and(eq(hourEntries.projectId, projectId),
+        cutoffAt ? lte(hourEntries.createdAt, cutoffAt) : undefined))
+      .orderBy(desc(hourEntries.date), desc(hourEntries.createdAt))
+      .limit(limit + 1);
+    return {
+      truncated: rows.length > limit,
+      entries: rows.slice(0, limit).map((row) => ({
+        id: row.id, userId: row.userId,
+        userName: [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Colaborador',
+        date: row.date, createdAt: row.createdAt, status: row.status,
+        hours: Number(row.hours), activity: row.activity, description: row.description,
+        taskName: row.taskName,
+        teamId: row.segmentTeamId ?? row.taskTeamId ?? null,
+      })),
     };
   }
 
