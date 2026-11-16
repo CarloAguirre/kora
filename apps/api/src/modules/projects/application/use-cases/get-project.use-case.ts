@@ -156,6 +156,33 @@ export class GetProjectUseCase implements UseCase<GetProjectCommand, ProjectDeta
       if (!isParticipant) return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
     }
 
+    // Registros anteriores al evento comercial, con estatus REAL. La foto de
+    // Fase 0 no cambia si se registran horas operativas después del traspaso.
+    const historical = this.hourEntries.phaseZeroEntriesForProject
+      ? await this.hourEntries.phaseZeroEntriesForProject(
+          project.id, phaseZeroSnapshot.cutoffAt ?? null, 1000,
+        )
+      : { entries: [], truncated: false };
+    const teamNameById = new Map(projectTeams.map((team) => [team.teamId, team.teamName]));
+    const phaseZeroEntries = historical.entries.map((entry) => {
+      const currentTeams = [...new Set(members.filter((member) =>
+        member.userId === entry.userId && !member.blockedAt).map((member) => member.teamId))];
+      // Equipo exacto de un bloque/tarea tiene prioridad. Una única membresía
+      // ACTUAL es solo indicativa y así se etiqueta. Con ambigüedad no inventar.
+      const inferredTeam = entry.teamId ? null : currentTeams.length === 1 ? currentTeams[0]! : null;
+      const teamId = entry.teamId ?? inferredTeam;
+      return {
+        id: entry.id, date: entry.date.toISOString().slice(0, 10),
+        recordedAt: entry.createdAt.toISOString(),
+        userName: entry.userName, activity: entry.activity, description: entry.description,
+        taskName: entry.taskName, status: entry.status, hours: entry.hours,
+        teamId, teamName: teamId ? teamNameById.get(teamId) ?? null : null,
+        teamAttribution: (entry.teamId ? 'explicit' :
+          inferredTeam ? 'current_membership' : 'unassigned') as
+          'explicit' | 'current_membership' | 'unassigned',
+      };
+    });
+
     // El traspaso ya fue aprobado. En la primera lectura autorizada de un
     // proyecto iniciado se materializan las semanas comerciales como bloques
     // operativos reales. Esta operación es transaccional, idempotente y
