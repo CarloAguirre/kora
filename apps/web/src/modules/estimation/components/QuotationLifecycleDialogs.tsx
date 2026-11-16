@@ -197,8 +197,10 @@ export function QuotationTransferDialog({
       <p className={styles.transferIntro}>
         Se agregarán las fases y HH de la cotización aprobada a <strong>{project.name}</strong>.
         {' '}Las HH consumidas, módulos, equipos y asignaciones anteriores permanecen intactos.
-        El Roadmap de las fases nuevas toma la fecha de inicio registrada del proyecto,
-        incluso si fue anterior a este traspaso. Los pagos ya emitidos también se conservan.
+        {historicalConsumed > 0
+          ? ' Como existe trabajo histórico de Fase 0, las fases nuevas comienzan el día del traspaso, sin superponer horas pasadas.'
+          : ' Las fases nuevas toman la fecha de inicio que ya tenga registrada el proyecto.'}
+        {' '}Los pagos emitidos también se conservan.
       </p>
       <div className={styles.mapping} aria-label="Resumen del traspaso">
         <span className={styles.columnHead}>COTIZACIÓN V{version.versionNumber}</span>
