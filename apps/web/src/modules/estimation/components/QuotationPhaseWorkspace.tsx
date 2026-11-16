@@ -205,7 +205,7 @@ export function QuotationPhaseWorkspace({
             {hh(historicalHours)} HH consumidas
           </output>
           <p className={styles.historicalExplanation}>
-            Horas reales aprobadas antes del inicio: reuniones, levantamiento y documentación.
+            Horas reales aprobadas antes de aplicar la planificación: reuniones, levantamiento y documentación.
             Ya están contabilizadas en el consumo del proyecto; no se suman a las HH
             estimadas ni se pueden editar desde la calculadora.
           </p>
