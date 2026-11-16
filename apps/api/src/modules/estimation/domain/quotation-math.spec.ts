@@ -4,12 +4,27 @@ import { calculateQuotation } from './quotation-math';
 const teamId = '0777e456-fd76-445e-83f1-afc25061c101';
 
 describe('calculateQuotation', () => {
+  it('incluye Fase 0 en monto y HH cobrables, nunca en HH planificadas', () => {
+    const draft = quotationDraftDataSchema.parse({
+      mode: 'phases', phaseZeroBillableHours: 548.5,
+      teams: [{ teamId, collaborators: 6, unit: 'week', duration: 10,
+        hoursPerWeek: 40, dedicationPercent: 100 }],
+      phases: [{ name: 'Desarrollo', startWeek: 1, durationWeeks: 10,
+        teamHours: [{ teamId, hours: 1108 }] }],
+    });
+    expect(calculateQuotation(draft, 0.6, 'iva19')).toEqual({
+      totalHours: 1108, billableHours: 1656.5,
+      netAmount: 993.9, totalAmount: 1182.741,
+    });
+  });
+
+
   it('convierte días en semanas de 5 días y aplica cupos/dedicación', () => {
     const draft = quotationDraftDataSchema.parse({
       teams: [{ teamId, collaborators: 2, unit: 'day', duration: 10, hoursPerWeek: 20, dedicationPercent: 50 }],
       costs: [{ description: 'Licencia', amount: 2, recurrence: 'once' }, { description: 'SaaS', amount: 4, recurrence: 'monthly' }],
     });
-    expect(calculateQuotation(draft, 0.5, 'iva19')).toEqual({ totalHours: 80, netAmount: 42, totalAmount: 49.98 });
+    expect(calculateQuotation(draft, 0.5, 'iva19')).toEqual({ totalHours: 80, billableHours: 80, netAmount: 42, totalAmount: 49.98 });
   });
 
   it('no duplica dedicación: 40 HH con 50% histórico son una sola jornada de 40 HH', () => {
@@ -27,7 +42,7 @@ describe('calculateQuotation', () => {
       mode: 'phases', teams: [{ teamId, collaborators: 1, unit: 'week', duration: 5, hoursPerWeek: 40, dedicationPercent: 100 }],
       phases: [{ name: 'Módulo', startWeek: 1, durationWeeks: 2, teamHours: [{ teamId, hours: 24 }] }],
     });
-    expect(calculateQuotation(draft, null, 'exempt')).toEqual({ totalHours: 24, netAmount: null, totalAmount: null });
+    expect(calculateQuotation(draft, null, 'exempt')).toEqual({ totalHours: 24, billableHours: 24, netAmount: null, totalAmount: null });
   });
 
   it('rechaza HH de fase asociadas a un equipo inexistente', () => {
