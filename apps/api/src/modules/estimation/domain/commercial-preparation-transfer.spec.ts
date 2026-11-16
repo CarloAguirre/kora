@@ -51,6 +51,22 @@ describe('Fase 1 no calendarizada: presupuestos preexistentes al traspasar', () 
     expect(plan.teamAllocations.find((item) => item.teamId === 'ux')).toBeUndefined();
   });
 
+  it('permite un proyecto ya iniciado con muchas HH consumidas fuera del nuevo presupuesto', () => {
+    // Las 180 HH aprobadas previamente NO son parte de este cálculo.
+    const usedHours = 180;
+    const startDate = '2026-11-09';
+    const plan = planCommercialPreparationTransfer({
+      previousSoldHours: 120, approvedQuotationHours: 80,
+      existingTeams: [{ teamId: 'dev', assignedHours: 120 }],
+      quotationTeams: [{ teamId: 'dev', quotedHours: 80 }],
+    });
+    expect(plan.projectSoldHours).toBe(200);
+    expect(plan.teamAllocations[0]?.quotationHours).toBe(80);
+    expect(plan.teamAllocations[0]?.combinedHours).toBe(200);
+    expect(usedHours).toBe(180);
+    expect(startDate).toBe('2026-11-09');
+  });
+
   it('NULL sin horas declaradas no genera presupuestos ficticios', () => {
     const plan = planCommercialPreparationTransfer({
       previousSoldHours: 0, approvedQuotationHours: 40,

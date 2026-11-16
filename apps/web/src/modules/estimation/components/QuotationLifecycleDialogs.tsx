@@ -70,10 +70,9 @@ export function QuotationApprovalDialog({
       </fieldset>
       {project.status === 'active' && (
         <p className={styles.warning}>
-          El proyecto está Activo. El traspaso inmediato solo será posible si todavía no existen
-          fases ni ejecución operativa que reemplazar. Kora verificará los registros y conservará
-          las HH históricas. Si encuentra conflictos, la aprobación quedará registrada y el
-          traspaso permanecerá pendiente de conciliación.
+          El proyecto está Activo. Puedes traspasar la cotización aunque tenga fecha de inicio,
+          fases o registros de horas. Kora agregará la nueva planificación sin reiniciar las HH
+          consumidas ni reemplazar las fases y pagos históricos.
         </p>
       )}
       {!canTransferNow && (
@@ -116,9 +115,9 @@ export function QuotationTransferDialog({
   const previousTeamHours = project.teams.reduce((sum, row) =>
     sum + (row.assignedHours ?? 0), 0);
   const previousSoldHours = project.soldHours ?? 0;
-  const prospectConsumed = project.prospectPhaseHours ?? project.usedHours ?? 0;
+  const historicalConsumed = project.usedHours ?? 0;
   const hasHistoricalPhase = project.teams.length > 0 ||
-    previousSoldHours > 0 || prospectConsumed > 0;
+    previousSoldHours > 0 || historicalConsumed > 0;
   const quotedTeamIds = new Set(teams.map((row) => row.id));
   const weeks = version.draft.phases.length
     ? Math.max(...version.draft.phases.map((phase) => phase.startWeek + phase.durationWeeks - 1))
@@ -126,13 +125,13 @@ export function QuotationTransferDialog({
   const entries: { key: string; source: string; target: string }[] = [
     { key: 'approval', source: 'Aprobación', target: 'Tipo de proyecto: Proyecto aprobado' },
     ...(hasHistoricalPhase ? [
-      { key: 'phase1', source: 'Fase 1 · Prospecto/Cotización',
-        target: formatted(previousTeamHours) + ' HH previamente asignadas, sin calendario. ' +
-          formatted(prospectConsumed) + ' HH consumidas históricas conservadas.' },
+      { key: 'phase1', source: 'Presupuesto previo del proyecto',
+        target: formatted(previousTeamHours) + ' HH previamente asignadas que se mantienen. ' +
+          formatted(historicalConsumed) + ' HH consumidas históricas conservadas (sin sumarlas otra vez).' },
       { key: 'previous-sold', source: 'HH vendidas anteriores',
         target: formatted(previousSoldHours) + ' HH; no se reemplazan.' },
     ] : []),
-    { key: 'hours', source: 'Fase 2 en adelante · Cotización',
+    { key: 'hours', source: 'Nuevas fases · Cotización',
       target: formatted(version.totalHours) + ' HH nuevas' +
         (weeks ? ' · ' + weeks + ' semanas estimadas' : '') },
     { key: 'total-project-hours', source: 'Total HH vendidas tras traspaso',
@@ -160,16 +159,16 @@ export function QuotationTransferDialog({
     ...(version.draft.phases.length > 0
       ? version.draft.phases.map((phase, index) => ({
           key: 'phase-' + index,
-          source: 'Fase ' + (index + 2) + ' · ' + phase.name,
+          source: 'Fase nueva ' + (index + 1) + ' · ' + phase.name,
           target: 'Roadmap: fase con equipos y horas de referencia, semanas ' +
             phase.startWeek + ' a ' + (phase.startWeek + phase.durationWeeks - 1) +
             ' · ' + formatted(phase.teamHours.reduce((sum, row) => sum + row.hours, 0)) +
             ' HH',
         }))
       : [{ key: 'phases', source: 'Fases', target: 'La planificación se organizará en el Roadmap según la cotización aprobada.' }]),
-    { key: 'net', source: 'Neto', target: version.netAmount == null
-      ? 'Monto del contrato: sin valor calculado'
-      : 'Monto del contrato: ' + formatted(version.netAmount) + ' ' + version.currency },
+    { key: 'net', source: 'Neto de esta cotización', target: version.netAmount == null
+      ? 'Esta cotización no tiene un valor neto calculado'
+      : 'Valor neto nuevo: ' + formatted(version.netAmount) + ' ' + version.currency },
     { key: 'plan', source: 'Plan de pago',
       target: 'Tramos: ' + version.draft.paymentPlan.map((item) =>
         item.name + ' ' + formatted(item.percent) + '%').join(' · ') },
@@ -188,11 +187,10 @@ export function QuotationTransferDialog({
         <Button loading={pending} onClick={onTransfer}>Traspasar</Button>
       </div>}>
       <p className={styles.transferIntro}>
-        Se completarán los campos comerciales y de planificación de <strong>{project.name}</strong>.
-        {' '}Las HH y equipos históricos de prospección corresponden a la Fase 1,
-        sin calendario. La nueva cotización aporta las fases de ejecución. Los líderes,
-        integrantes y registros operativos se conservan; si hay ejecución distinta a
-        la preparación comercial, el traspaso exigirá conciliación.
+        Se agregarán las fases y HH de la cotización aprobada a <strong>{project.name}</strong>.
+        {' '}Las HH consumidas, módulos, equipos y asignaciones anteriores permanecen intactos.
+        El Roadmap de las fases nuevas toma la fecha de inicio registrada del proyecto,
+        incluso si fue anterior a este traspaso. Los pagos ya emitidos también se conservan.
       </p>
       <div className={styles.mapping} aria-label="Resumen del traspaso">
         <span className={styles.columnHead}>COTIZACIÓN V{version.versionNumber}</span>

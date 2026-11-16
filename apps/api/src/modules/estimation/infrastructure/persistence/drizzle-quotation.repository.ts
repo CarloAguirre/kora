@@ -36,7 +36,6 @@ import {
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
 import { hasOnlyUntouchedDefaultPaymentMilestones } from '../../domain/default-payment-plan-eligibility';
-import { initialQuotationTransferBlockers } from '../../domain/initial-quotation-transfer-blockers';
 import { hasOnlyCommercialPreparationHours, planCommercialPreparationTransfer } from '../../domain/commercial-preparation-transfer';
 import { buildQuotationTransferReferences, matchingCopiedQuotationReferenceSource } from '../../domain/quotation-transfer-references';
 import { copyQuotationDraft } from '../../domain/copy-quotation-draft';
@@ -960,9 +959,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
     });
   }
 
-  /** Traspaso inicial de una versión aprobada, sin reemplazar ejecución.
-   * Admite un proyecto Activo SOLO cuando aún contiene exclusivamente preparación
-   * comercial. La ejecución operativa exige conciliación separada. */
+  /** Traspaso aditivo: nuevas HH vendidas y fases sin alterar ejecución previa.
+   * Las HH consumidas, fechas, módulos y pagos históricos son inmutables. */
   async transferApproved(projectId: string, versionId: string, userId: string,
     input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
     return this.db.transaction(async (tx) => {
@@ -972,7 +970,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       )).limit(1);
       if (!project || project.type !== 'development') throw new NotFoundException('Proyecto no encontrado.');
       if (!['draft', 'active'].includes(project.status) || project.salesStage !== 'approved') {
-        throw new ConflictException('El traspaso requiere aprobación comercial y un proyecto No iniciado o Activo sin ejecución operativa.');
+        throw new ConflictException('El traspaso requiere aprobación comercial y un proyecto No iniciado o Activo.');
       }
       const [quotation] = await tx.select({ id: projectQuotations.id })
         .from(projectQuotations).where(eq(projectQuotations.projectId, projectId)).limit(1);
@@ -1016,47 +1014,22 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           tx.select().from(projectPaymentMilestones)
             .where(eq(projectPaymentMilestones.projectId, projectId)),
         ]);
-      const transferBlockers = initialQuotationTransferBlockers({
-        soldHours: Number(project.soldHours),
-        usedHours: Number(project.usedHours),
-        hasStartDate: project.startDate !== null,
-        hasContractAmount: project.contractAmount !== null,
-        projectTeamCount: existingTeams.length,
-        moduleCount: existingModules.length,
-        hourEntryCount: existingHours.length,
-        hasChangedPaymentPlan: !hasOnlyUntouchedDefaultPaymentMilestones(existingPayments),
-      });
-      // Caso A: historia comercial de Prospecto, sin fases operativas ni facturas.
-      // Se conservan horas, fechas, miembros y líderes; la nueva cotización
-      // actualiza el presupuesto comercial y registra el valor anterior en auditoría.
+      // Traspasar no reinicia ni reclasifica registros de HH: aprobadas,
+      // pendientes o rechazadas siguen perteneciendo a su historial original.
+      // El presupuesto nuevo es adicional a toda planificación ya persistida.
       const commercialPreparationOnly = existingModules.length === 0 &&
         project.contractAmount === null &&
         hasOnlyUntouchedDefaultPaymentMilestones(existingPayments) &&
         ((existingHours.length === 0 && Number(project.usedHours) === 0) ||
           hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours)));
-      // Un prospecto Activo puede registrar preventa sin ejecución. El estado
-      // Activo por sí solo no basta: se requiere ausencia de fases, horas
-      // operativas y pagos alterados para utilizar el traspaso inicial.
-      if (project.status === 'active' && !commercialPreparationOnly) {
+      const replaceDefaultPayments = hasOnlyUntouchedDefaultPaymentMilestones(existingPayments);
+      // Los hitos antiguos nunca se destruyen salvo los dos placeholders
+      // totalmente vacíos. Un contrato anterior en otra moneda no se puede sumar.
+      if (project.contractAmount !== null &&
+          project.contractCurrency !== version.currency) {
         throw new ConflictException(
-          'Proyecto Activo con ejecución o compromisos previos: requiere conciliación. ' +
-          'No se modificaron HH, equipos, Roadmap ni pagos.',
-        );
-      }
-      const unresolvedBlockers = commercialPreparationOnly
-        ? transferBlockers.filter((reason) => !(
-            reason === 'HH vendidas existentes' ||
-            reason === 'HH consumidas existentes' ||
-            reason === 'fecha de inicio definida' ||
-            reason.endsWith(' equipos asignados') ||
-            reason.endsWith(' registros de horas')
-          ))
-        : transferBlockers;
-      if (unresolvedBlockers.length > 0) {
-        throw new ConflictException(
-          'Traspaso inicial bloqueado: ' + unresolvedBlockers.join('; ') +
-          '. Este proyecto requiere conciliación antes de incorporar otra cotización. ' +
-          'No se modificaron HH, equipos, Roadmap ni pagos existentes.',
+          'El contrato previo está en otra moneda. Hay que conciliar los montos ' +
+          'sin convertir ni sobrescribir facturas históricas.',
         );
       }
       const draft = quotationDraftDataSchema.parse(version.draft);
@@ -1088,9 +1061,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (Math.abs(sum - Number(version.totalHours)) > 0.011) {
         throw new BadRequestException('Las HH por equipo difieren del total aprobado.');
       }
-      // Fase 1 (prospecto/cotización) NO tiene calendario ni módulos.
-      // Sus HH de equipo se preservan; las HH nuevas se suman y se
-      // mantienen las filas de equipos históricos ajenos a esta cotización.
+      // Presupuestos de equipo previos (con o sin fases) se conservan.
+      // Cada nueva cotización aporta únicamente sus propias HH y fases;
+      // las HH consumidas siguen en projects.used_hours sin modificaciones.
       let transferPlan: ReturnType<typeof planCommercialPreparationTransfer>;
       try {
         transferPlan = planCommercialPreparationTransfer({
@@ -1152,8 +1125,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         if (moduleIdByPhase.has(module.name)) ambiguousPhaseNames.add(module.name);
         moduleIdByPhase.set(module.name, saved.id);
       }
-      // El plan predeterminado solo se reemplaza si no se facturó ni alteró.
-      await tx.delete(projectPaymentMilestones).where(eq(projectPaymentMilestones.projectId, projectId));
+      // Los hitos facturados o editados permanecen íntegros. Solo se
+      // sustituyen los dos placeholders vacíos creados con el proyecto.
+      if (replaceDefaultPayments && existingPayments.length > 0) {
+        await tx.delete(projectPaymentMilestones).where(eq(projectPaymentMilestones.projectId, projectId));
+      }
+      const paymentSortOffset = replaceDefaultPayments ? 0 :
+        Math.max(0, ...existingPayments.map((row) => row.sortOrder + 1));
       const total = Number(version.totalAmount);
       if (!Number.isFinite(total) || total < 0) throw new BadRequestException('Monto aprobado inválido.');
       const targetTotal = Math.round((total + Number.EPSILON) * 100) / 100;
@@ -1177,7 +1155,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         }
         await tx.insert(projectPaymentMilestones).values({
           projectId, name: item.name, percent: item.percent.toFixed(2),
-          amount: amount.toFixed(2), sortOrder: index, status: 'pending',
+          amount: amount.toFixed(2), sortOrder: paymentSortOffset + index, status: 'pending',
           triggerType: item.trigger,
           triggerPhase: null,
           triggerModuleId: item.trigger === 'phase' ? moduleId : null,
@@ -1189,9 +1167,14 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (version.currency !== 'UF' && version.currency !== 'CLP' && version.currency !== 'USD') {
         throw new BadRequestException('Moneda de la cotización incompatible con el contrato del proyecto.');
       }
+      const contractAmount = Number(project.contractAmount ?? 0) + targetTotal;
+      if (!Number.isFinite(contractAmount) || contractAmount > 999999999999.99) {
+        throw new ConflictException('El monto acumulado excede el rango contractual permitido.');
+      }
       await tx.update(projects).set({
         soldHours: transferPlan.projectSoldHours.toFixed(2),
-        contractAmount: targetTotal.toFixed(2),
+        // Nunca sobrescribir el consumo ni la fecha del proyecto.
+        contractAmount: contractAmount.toFixed(2),
         contractCurrency: version.currency,
         updatedAt: new Date(),
       }).where(eq(projects.id, projectId));
@@ -1211,7 +1194,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           },
           phase2QuotationAllocations: transferPlan.teamAllocations,
           paymentCount: draft.paymentPlan.length,
+          preservedPreviousPayments: !replaceDefaultPayments,
           preservedStartDate: true,
+          preservedHistoricalHours: true,
           commercialPreparationOnly,
           priorCommercialState: {
             soldHours: Number(project.soldHours),
@@ -1219,6 +1204,10 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             startDate: project.startDate?.toISOString?.().slice(0, 10) ?? null,
             preexistingTeamIds: existingTeams.map((team) => team.teamId),
             commercialHourEntries: existingHours.length,
+            priorModuleCount: existingModules.length,
+            priorPaymentCount: existingPayments.length,
+            priorContractAmount: project.contractAmount === null ? null :
+              Number(project.contractAmount),
           },
           source: version.origin === 'copy' ? 'copy' : (draft.aiPoc?.source ?? 'manual'),
         },

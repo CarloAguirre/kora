@@ -36,18 +36,18 @@ const version = {
   },
 } as unknown as QuotationVersion;
 
-describe('Resumen de traspaso: preservar Prospecto/Cotización como Fase 1', () => {
+describe('Resumen de traspaso aditivo con HH previas conservadas', () => {
   it('muestra HH anteriores, cotización, totales y equipos históricos', () => {
     render(<QuotationTransferDialog project={project} version={version}
       open afterApproval={false} pending={false} onClose={vi.fn()}
       onTransfer={vi.fn()}/>);
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('Fase 1 · Prospecto/Cotización')).toBeInTheDocument();
-    expect(within(dialog).getByText(/60 HH previamente asignadas, sin calendario/))
+    expect(within(dialog).getByText('Presupuesto previo del proyecto')).toBeInTheDocument();
+    expect(within(dialog).getByText(/60 HH previamente asignadas que se mantienen/))
       .toBeInTheDocument();
     expect(within(dialog).getByText(/15 HH consumidas históricas conservadas/))
       .toBeInTheDocument();
-    expect(within(dialog).getByText('Fase 2 en adelante · Cotización')).toBeInTheDocument();
+    expect(within(dialog).getByText('Nuevas fases · Cotización')).toBeInTheDocument();
     expect(within(dialog).getByText(/160 HH \(anteriores \+ cotización\)/)).toBeInTheDocument();
     expect(within(dialog).getByText(/40 HH previas \+ 80 HH nuevas = 120 HH asignadas/))
       .toBeInTheDocument();

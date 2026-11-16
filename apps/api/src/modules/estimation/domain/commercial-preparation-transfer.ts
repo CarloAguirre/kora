@@ -42,12 +42,10 @@ export type ApprovedQuotationTeam = {
   quotedHours: number;
 };
 
-/** Preserva la Fase 1 de prospección sin crear módulos ni semanas:
- * solo suma las HH nuevas de la cotización aprobada al presupuesto de
- * los equipos que ya estaban asignados. Los equipos históricos ausentes
- * en la nueva cotización quedan intocados en project_teams.
- *
- * SoldHours y UsedHours son distintos: este cálculo jamás modifica consumo.
+/** Traspaso aditivo de presupuesto de equipos: los equipos existentes
+ * conservan sus HH y los equipos ausentes de la cotización quedan intactos.
+ * No calendariza horas previas ni afecta los módulos existentes.
+ * SoldHours y UsedHours son distintos: nunca recalcula consumo histórico.
  */
 export function planCommercialPreparationTransfer(input: {
   previousSoldHours: number;
