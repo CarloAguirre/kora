@@ -170,7 +170,7 @@ export function QuotationPhaseWorkspace({
   const displayPhases = edt
     ? referencePhasesFromEdt(edt, mapping, teamNames, draft)
     : phases;
-  const maxWeek = Math.max(1, ...displayPhases.map((phase) =>
+  const maxWeek = Math.max(0.5, ...displayPhases.map((phase) =>
     phase.startWeek + phase.durationWeeks - 1));
   const projectAllowsEdit = editable && Boolean(edt);
   const unmappedRoles = edt && draft?.aiPoc
