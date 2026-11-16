@@ -453,7 +453,7 @@ describe('Cabecera del Roadmap operativo · fidelidad HTML v5.02', () => {
       operationalView operationalBlockCount={6} operationalTaskCount={19}
       operationalPresaleHours={18} toolbarActions={<button type="button">Planificar</button>} />);
     const counters = container.querySelector('[class*="summaryChips"]');
-    expect(counters).toHaveTextContent('2 fases');
+    expect(counters).toHaveTextContent('2 fases planificadas');
     expect(counters).toHaveTextContent('6 bloques de trabajo');
     expect(counters).toHaveTextContent('19 tareas');
     expect(screen.getByRole('button', { name: 'Planificar' })).toBeInTheDocument();
@@ -465,9 +465,10 @@ describe('Cabecera del Roadmap operativo · fidelidad HTML v5.02', () => {
     expect(screen.getByText('Entregada')).toBeInTheDocument();
     expect(screen.getByText('Entrega vencida')).toBeInTheDocument();
     expect(screen.getByText('Hoy')).toBeInTheDocument();
-    expect(screen.getByText(/Preventa: 18 HH de prospecto y cotización/)).toHaveTextContent(
-      'Cuentan como HH consumidas, pero no forman parte del plan.',
-    );
+    const phase0 = screen.getByRole('region', { name: 'Fase 0 · Prospecto y levantamiento' });
+    expect(phase0).toHaveTextContent('18 HH consumidas');
+    expect(phase0).toHaveTextContent('Solo lectura');
+    expect(phase0.querySelectorAll('input, button, select, textarea')).toHaveLength(0);
     expect(screen.queryByText('Entrega comprometida')).not.toBeInTheDocument();
     expect(screen.queryByText('Entrega realizada')).not.toBeInTheDocument();
   });
@@ -475,12 +476,14 @@ describe('Cabecera del Roadmap operativo · fidelidad HTML v5.02', () => {
   it('no muestra guía ni preventa en el portal cliente y conserva su leyenda original', () => {
     render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} operationalPresaleHours={18} />);
     expect(screen.queryByText('Bloque de trabajo:')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Preventa:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Fase 0 · Prospecto y levantamiento' })).not.toBeInTheDocument();
     expect(screen.getByText('Entrega comprometida')).toBeInTheDocument();
   });
 
-  it('no inventa mensaje de preventa cuando el backend no informa HH anteriores al inicio', () => {
+  it('muestra Fase 0 con cero HH sin generar bloques ni tareas operativas', () => {
     render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} operationalView operationalPresaleHours={0} />);
-    expect(screen.queryByText(/Preventa:/)).not.toBeInTheDocument();
+    const phase0 = screen.getByRole('region', { name: 'Fase 0 · Prospecto y levantamiento' });
+    expect(phase0).toHaveTextContent('0 HH consumidas');
+    expect(phase0.querySelectorAll('input, button, select, textarea')).toHaveLength(0);
   });
 });
