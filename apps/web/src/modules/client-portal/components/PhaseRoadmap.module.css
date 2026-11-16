@@ -1088,3 +1088,12 @@ button.ganttBar {
   .operationalPhaseHeader:has(.phaseHeadingIdentityPlanning) .phaseHeaderSpacer { flex: 0 1 2px; }
   .operationalPhaseHeader:has(.phaseHeadingIdentityPlanning) .phaseHeaderActions { margin-left: auto; }
 }
+
+/* Fase 0 virtual, separada del Gantt y sin controles de edición. */
+.historicalPhaseZero{border:1px dashed #c9d3df;border-radius:12px;background:#f7f9fc;overflow:hidden}
+.historicalPhaseZeroHeader{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #e3e9f0}
+.historicalPhaseZeroHeader strong{font-size:14px;color:#0f2a44}
+.historicalPhaseZeroLock{margin-left:auto;border:1px solid #d2dbe6;border-radius:999px;padding:4px 9px;color:#5b6b7a;font-size:11px}
+.historicalPhaseZeroBody{padding:12px 16px}
+.historicalPhaseZeroBody strong{font-size:17px;font-variant-numeric:tabular-nums;color:#0f2a44}
+.historicalPhaseZeroBody p{font-size:12px;line-height:1.5;color:#5b6b7a;margin:6px 0 0}
