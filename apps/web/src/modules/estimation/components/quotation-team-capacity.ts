@@ -55,8 +55,15 @@ export function quotationTeamCapacity(
   const highest = loads.reduce<{ week: number; perPerson: number } | null>(
     (max, item) => !max || item.perPerson > max.perPerson ? item : max, null);
   const overloadedWeeks = hasEdt
-    ? loads.filter((entry) => entry.perPerson > capacityPerPerson + 0.005)
-      .map((entry) => entry.week)
+    ? [...new Set([
+      ...loads.filter((entry) => entry.perPerson > capacityPerPerson + 0.005)
+        .map((entry) => entry.week),
+      ...(scheduled?.halfWeekHours
+        ? [...scheduled.halfWeekHours].filter(([, hh]) =>
+          hh / collaborators > capacityPerPerson / 2 + 0.005)
+          .map(([halfWeek]) => halfWeek)
+        : []),
+    ])].sort((a, b) => a - b)
     : [];
   const durationConflict = Boolean(hasEdt && totalHours > 0 && scheduled &&
     (weeks <= 0 || scheduled.activeWeeks > weeks + 0.000001));
