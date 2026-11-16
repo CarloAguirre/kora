@@ -58,8 +58,8 @@ describe('Proyección semanal por equipos de la EDT', () => {
     expect(plan.rows[0]?.activeWeeks).toBe(1.5);
     expect(plan.rows[0]?.lastWeek).toBe(1.5);
     expect([...plan.rows[0]!.weeklyHours.values()]).toEqual([16.67, 8.33]);
-    expect([...plan.rows[0]!.halfWeekHours.keys()]).toEqual([1, 1.5, 2]);
-    expect([...plan.rows[0]!.halfWeekHours.values()].reduce((sum, n) => sum + n, 0))
+    expect([...plan.rows[0]!.halfWeekHours!.keys()]).toEqual([1, 1.5, 2]);
+    expect([...plan.rows[0]!.halfWeekHours!.values()].reduce((sum, n) => sum + n, 0))
       .toBe(25);
   });
 
