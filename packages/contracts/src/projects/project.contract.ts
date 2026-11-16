@@ -1221,6 +1221,8 @@ export const projectPeriodSchema = z
 export type ProjectPeriod = z.infer<typeof projectPeriodSchema>;
 
 export const listProjectsQuerySchema = paginationQuerySchema.extend({
+  /** Selector de HH Prospecto: lista todos los prospectos, nunca proyectos aprobados. */
+  hourEntryProspects: z.literal('true').optional(),
   search: z.string().trim().max(120).optional(),
   type: projectTypeSchema.optional(),
   status: arrayQueryParam(projectStatusSchema),
