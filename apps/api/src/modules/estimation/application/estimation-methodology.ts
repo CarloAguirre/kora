@@ -118,7 +118,10 @@ export function addMandatoryTechLeadSupervision<T extends FlatEdtRows>(
   const roleHours = edt.roleHours.filter((hours) =>
     hours.role !== leadRole || !weeklyWbs.has(hours.wbs));
   const retainedWbs = new Set(roleHours.map((hours) => hours.wbs));
-  const activities = edt.activities.filter((activity) => retainedWbs.has(activity.wbs));
+  // No ocultar actividades inválidas SIN HH que no sean supervisión:
+  // la validación referencial posterior debe detectarlas y rechazarlas.
+  const activities = edt.activities.filter((activity) =>
+    !weeklyWbs.has(activity.wbs) || retainedWbs.has(activity.wbs));
   if (!activities.length) {
     throw new EstimationMethodologyValidationError(
       'La EDT no contiene trabajo verificable fuera de la supervisión semanal.');

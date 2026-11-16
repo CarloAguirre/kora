@@ -36,6 +36,7 @@ function aiVersionDraft() {
         {
           wbs: 'STG-01.01', name: 'API de integración', description: 'API desde Drive',
           role: 'Desarrollo', hours: 40, stageCode: 'STG-01',
+          referenceIds: ['drive:file-origen:seccion-1'],
           roleEffort: [{ role: 'Desarrollo', hours: 40 }],
         },
         {
@@ -153,6 +154,9 @@ describe('Copia de cotización IA con EDT y traspaso de tareas', () => {
     expect(copied.aiPoc?.proposal.projectId).toBe(otherProjectId);
     expect(copied.aiPoc?.proposal.documentsAnalyzed).toBe(0);
     expect(copied.aiPoc?.edt?.source).toBe('copied_template');
+    expect(copied.aiPoc?.edt?.modules[0]?.tasks[0]?.referenceIds).toBeUndefined();
+    expect(original.aiPoc?.edt?.modules[0]?.tasks[0]?.referenceIds)
+      .toEqual(['drive:file-origen:seccion-1']);
     expect(copied.sourceRefs).toEqual([]);
     expect(copied.answers).toEqual({});
     expect(copied.aiPoc?.answers).toEqual([]);

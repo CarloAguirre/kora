@@ -20,7 +20,7 @@ const delivery = (status: 'planned' | 'delivered' | 'approved', canManage = true
   id: '0777e456-fd76-445e-83f1-afc25061c104',
   teamId, status, canManage, assigneeUserId: null, assigneeName: null,
   segmentId, segmentName: 'Bloque núcleo', completedOn: null,
-  name: 'Entregable de Desarrollo', rejectionReason: null, estimatedDate: '2026-11-15',
+  name: 'Entregable de Desarrollo', rejectionReason: null, estimatedDate: '2099-11-15',
 });
 const project = (status: 'planned' | 'delivered' | 'approved' = 'planned',
   canManage = true): ProjectDetail => ({
@@ -31,7 +31,7 @@ const project = (status: 'planned' | 'delivered' | 'approved' = 'planned',
     tasks: [],
     segments: [{
       id: segmentId, name: 'Bloque núcleo',
-      teamId, startDate: '2026-11-01', endDate: '2026-11-15',
+      teamId, startDate: '2099-11-01', endDate: '2099-11-15',
     }],
     deliveries: [
       delivery(status, canManage),
