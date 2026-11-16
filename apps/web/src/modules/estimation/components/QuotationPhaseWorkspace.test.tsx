@@ -311,7 +311,7 @@ describe('Cotización HTML v5 · fases y tareas', () => {
     expect(phases[2]?.teamHours).toEqual([{ teamId: qa, hours: 12 }]);
     renderEditor(composed);
     screen.getAllByText('Tareas').forEach((title) => title.closest('details')?.setAttribute('open', ''));
-    expect(screen.getByText('Fase 4')).toBeInTheDocument();
+    expect(screen.getByText('Fase 3')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Control de entregas')).toBeInTheDocument();
     const deleteButton = screen.getByRole('button', { name: 'Quitar tarea ' + extraTask.wbs });
     expect(deleteButton).toHaveClass(nativeButtonClass('button'), nativeButtonClass('ghost'));
