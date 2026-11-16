@@ -950,7 +950,9 @@ export function QuotationWorkspacePage() {
                 tax={form?.tax ?? 'iva19'}
                 currency={form?.currency ?? 'UF'}
                 teamNames={teamById}
-                historicalHours={form?.draft.phaseZeroBillableHours ?? project?.phaseZeroHours ?? 0}
+                historicalHours={selected?.status === 'draft'
+                  ? (form?.draft.phaseZeroBillableHours ?? project?.phaseZeroHours ?? 0)
+                  : (form?.draft.phaseZeroBillableHours ?? 0)}
                 editable={editable}
                 dirty={dirty}
                 saving={saveDraft.isPending}
