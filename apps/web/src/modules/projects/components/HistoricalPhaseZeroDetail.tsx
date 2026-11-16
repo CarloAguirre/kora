@@ -11,9 +11,10 @@ const STATUS = { approved: 'Aprobada', pending: 'Pendiente', rejected: 'Rechazad
  * Equipos inferidos por membresía actual se etiquetan como referenciales.
  */
 export function HistoricalPhaseZeroDetail({ project }: { project: ProjectDetail }) {
+  const entries = project.phaseZeroEntries ?? [];
   const grouped = useMemo(() => {
     const groups = new Map<string, { id: string; name: string; inferred: boolean; entries: Entry[] }>();
-    for (const entry of project.phaseZeroEntries) {
+    for (const entry of entries) {
       const id = entry.teamId ?? 'unassigned';
       const item = groups.get(id) ?? {
         id, name: entry.teamName ?? (entry.teamId ? 'Equipo sin catálogo' : 'Sin equipo identificable'),
@@ -24,13 +25,13 @@ export function HistoricalPhaseZeroDetail({ project }: { project: ProjectDetail 
       groups.set(id, item);
     }
     return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'es-CL'));
-  }, [project.phaseZeroEntries]);
+  }, [entries]);
   const totals = useMemo(() => ({
-    approved: project.phaseZeroEntries.filter((entry) => entry.status === 'approved')
+    approved: entries.filter((entry) => entry.status === 'approved')
       .reduce((sum, entry) => sum + entry.hours, 0),
-    pending: project.phaseZeroEntries.filter((entry) => entry.status === 'pending')
+    pending: entries.filter((entry) => entry.status === 'pending')
       .reduce((sum, entry) => sum + entry.hours, 0),
-    rejected: project.phaseZeroEntries.filter((entry) => entry.status === 'rejected')
+    rejected: entries.filter((entry) => entry.status === 'rejected')
       .reduce((sum, entry) => sum + entry.hours, 0),
   }), [project.phaseZeroEntries]);
   return (
@@ -50,7 +51,7 @@ export function HistoricalPhaseZeroDetail({ project }: { project: ProjectDetail 
         No son bloques operativos nuevos ni se suman nuevamente a las fases futuras.
       </p>
       <div className={styles.stats}>
-        <span>{project.phaseZeroEntries.length} registros históricos</span>
+        <span>{entries.length} registros históricos</span>
         <span>Aprobadas: {hh(totals.approved)} HH</span>
         <span>Pendientes: {hh(totals.pending)} HH</span>
         {totals.rejected > 0 && <span>Rechazadas: {hh(totals.rejected)} HH</span>}
