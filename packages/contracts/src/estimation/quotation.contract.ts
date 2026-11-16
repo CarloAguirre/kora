@@ -89,6 +89,12 @@ export const quotationDraftDataSchema = z.object({
   teams: z.array(quotationTeamDraftSchema).max(100).default([]),
   phases: z.array(quotationPhaseDraftSchema).max(100).default([]),
   /**
+   * Foto histórica cobrable de Fase 0 al crear la versión (o primer guardado
+   * de una versión legacy). Ya consumida; no se planifica como HH de la EDT.
+   * La API la obtiene del proyecto, no de una edición del cliente.
+   */
+  phaseZeroBillableHours: z.number().nonnegative().max(100000000).optional(),
+  /**
    * HH manuales por WBS y perfil. La EDT original en aiPoc.edt es inmutable;
    * esta lista representa solo diferencias revisables del borrador.
    */
