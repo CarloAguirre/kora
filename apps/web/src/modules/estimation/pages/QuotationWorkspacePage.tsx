@@ -695,6 +695,13 @@ export function QuotationWorkspacePage() {
                       </Badge>
                     </div>
                   </div>
+                  {form.draft.aiPoc?.source === 'copied_template' && (
+                    <p className={styles.helper} role="status">
+                      Plantilla de otra cotización: conserva tareas, perfiles y HH para adaptar,
+                      pero no incluye las referencias ni las respuestas documentales del proyecto origen.
+                      Revisa el alcance y las horas antes de aprobar o traspasar.
+                    </p>
+                  )}
                   {/* Tras editar desaparece el bloque inicial, pero la aceptación IA
                       sigue disponible para la versión guardada. Guardar los ajustes no
                       equivale a aceptar la IA ni a registrar aprobación del cliente. */}

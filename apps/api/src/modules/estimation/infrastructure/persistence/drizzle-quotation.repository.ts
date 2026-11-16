@@ -455,7 +455,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         // Copiar una versión IA del MISMO proyecto conserva su EDT WBS,
         // asignaciones por perfil y ediciones comerciales, sin crear una
         // nueva generación IA ni perder las tareas al traspasar la v2.
-        // Copias entre proyectos y fuentes demo siguen sin heredar evidencia.
+        // Entre proyectos la EDT se conserva como plantilla de tareas sin evidencia documental.
         const previous = quotationDraftDataSchema.parse(source.draft);
         draft = copyQuotationDraft(previous, sourceProjectId, projectId);
         hourlyRate = source.hourlyRate === null ? null : Number(source.hourlyRate);
@@ -591,7 +591,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       revision: metadata.revision ?? metadata.versionRevision ?? version.revision,
       appliedAt: event.occurredAt.toISOString(),
       appliedByUserId: event.actorUserId,
-      source: draft.aiPoc?.source ?? (version.origin === 'copy' ? 'copy' : 'manual'),
+      source: version.origin === 'copy' ? 'copy' : (draft.aiPoc?.source ?? 'manual'),
       status: event.action === 'quotation_transferred'
         ? 'transferred' : 'accepted_for_planning_only',
       commercialApproval: event.action === 'quotation_transferred',
@@ -1220,7 +1220,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             preexistingTeamIds: existingTeams.map((team) => team.teamId),
             commercialHourEntries: existingHours.length,
           },
-          source: draft.aiPoc?.source ?? 'manual',
+          source: version.origin === 'copy' ? 'copy' : (draft.aiPoc?.source ?? 'manual'),
         },
       }).returning();
       return {
