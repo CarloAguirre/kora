@@ -325,7 +325,7 @@ describe('Cabecera de las fases · HTML v5', () => {
   });
 
   it('la cabecera de fase muestra periodo, HH reales y preventa del contrato', () => {
-    show({ ...project, prospectPhaseHours: 18,
+    show({ ...project, prospectPhaseHours: 18, phaseZeroHours: 18,
       modules: [{ ...module, estimatedHours: null, segments: [{
         id: 'segment-1', teamId: 'team-1', teamName: 'Desarrollo', name: 'Diseño UX',
         startDate: '2026-09-07', endDate: '2026-10-16', estimatedHours: 464,
