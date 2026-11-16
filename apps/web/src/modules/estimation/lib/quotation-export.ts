@@ -92,8 +92,10 @@ export function buildQuotationWorkbook(context: QuotationExportContext): XLSX.Wo
     ['Estado', model.status],
     ['Origen', version.origin],
     ['Última modificación', version.updatedAt.slice(0, 10)],
-    ['HH vendidas', version.totalHours],
-    ['Reserva IA referencial (fuera de HH vendidas)', reserved],
+    ['HH futuras planificadas (EDT)', version.totalHours],
+    ['HH Fase 0 · levantamiento ya consumido', draft.phaseZeroBillableHours ?? 0],
+    ['HH totales cobrables', version.totalHours + (draft.phaseZeroBillableHours ?? 0)],
+    ['Reserva IA referencial (fuera de HH cobrables)', reserved],
     ['Moneda', version.currency],
     ['Valor por HH', version.hourlyRate ?? 'No definido'],
     ['Neto', version.netAmount ?? 'No definido'],
@@ -403,12 +405,12 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       };
     }
     case 11: return {
-      1: 'Actividades principales · HH totales de la cotización. Detalle completo en Excel.',
+      1: 'Actividades principales · HH futuras por ejecutar. Fase 0 histórica separada en Excel.',
       5: compact(chunk(0)?.team ?? '—', 28),
       6: compact(chunk(0)?.name ?? 'Sin EDT desglosada', 98),
       // La columna TOTAL H/H está combinada verticalmente en el PPTX original.
-      // Este valor es el TOTAL de la versión, no las HH de una tarea.
-      7: fmt(version.totalHours) + ' H/H',
+      // Fase 0 es comercial, no actividad nueva. La presentación muestra ambas HH.
+      7: fmt(version.totalHours + (draft.phaseZeroBillableHours ?? 0)) + ' H/H',
       8: compact(chunk(1)?.team ?? '—', 28),
       9: compact(chunk(1)?.name ?? '—', 98),
       10: compact(chunk(2)?.team ?? '—', 28),
@@ -445,7 +447,9 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       17: 'Cronograma referencial en semanas. Detalle completo en Excel.' };
     case 16: return { 1: 'Esfuerzo y valor de la versión seleccionada.',
       3: String(m.weeks || '—') + ' semanas relativas',
-      7: compact(m.projectName, 85), 8: fmt(version.totalHours) + ' horas',
+      7: compact(m.projectName, 85),
+      8: fmt(version.totalHours + (draft.phaseZeroBillableHours ?? 0)) +
+        ' horas (' + fmt(draft.phaseZeroBillableHours ?? 0) + ' HH históricas)',
       9: amt, 10: compact(draft.costs[0]?.description ?? 'Costos externos', 65),
       11: draft.costs[0] ? fmt(draft.costs[0]!.amount) + ' ' + version.currency : '—',
       12: money(version.totalAmount, version.currency),
