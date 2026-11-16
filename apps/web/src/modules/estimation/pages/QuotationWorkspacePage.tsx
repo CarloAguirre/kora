@@ -127,6 +127,21 @@ export function QuotationWorkspacePage() {
   const editable = Boolean(mayWrite && selected?.status === 'draft' && form &&
     appliedPlan.data?.versionId !== selected?.id && !appliedPlan.isLoading);
 
+  // Versiones existentes previas a la valorización de Fase 0: preparar un
+  // guardado explícito para fijar el monto histórico sin tocar Gemini ni EDT.
+  useEffect(() => {
+    if (!editable || !project || !selected ||
+        selected.draft.phaseZeroBillableHours !== undefined ||
+        (project.phaseZeroHours ?? 0) <= 0) return;
+    setForm((current) => {
+      if (!current || current.draft.phaseZeroBillableHours !== undefined) return current;
+      return { ...current, draft: { ...current.draft,
+        phaseZeroBillableHours: project.phaseZeroHours } };
+    });
+    setDirty(true);
+  }, [editable, project?.phaseZeroHours, selected?.id, selected?.revision]);
+
+
   // Compatibilidad con cotizaciones anteriores a la generación con catálogo.
   // Reutiliza la EDT ya guardada: nunca gasta una nueva llamada Gemini.
   // Solo vincula si CADA perfil tiene una correspondencia única y no ambigua.
@@ -805,7 +820,7 @@ export function QuotationWorkspacePage() {
                       no la opción de presentación «Por equipo». */}
                   <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
-                      historicalHours={project?.phaseZeroHours ?? 0}
+                      historicalHours={form.draft.phaseZeroBillableHours ?? project?.phaseZeroHours ?? 0}
                       draft={form.draft}
                       phases={phaseRows}
                       teams={teamRows}
@@ -935,6 +950,7 @@ export function QuotationWorkspacePage() {
                 tax={form?.tax ?? 'iva19'}
                 currency={form?.currency ?? 'UF'}
                 teamNames={teamById}
+                historicalHours={form?.draft.phaseZeroBillableHours ?? project?.phaseZeroHours ?? 0}
                 editable={editable}
                 dirty={dirty}
                 saving={saveDraft.isPending}
