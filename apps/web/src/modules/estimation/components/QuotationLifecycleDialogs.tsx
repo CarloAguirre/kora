@@ -116,6 +116,7 @@ export function QuotationTransferDialog({
     sum + (row.assignedHours ?? 0), 0);
   const previousSoldHours = project.soldHours ?? 0;
   const historicalConsumed = project.usedHours ?? 0;
+  const historicalBillable = version.draft.phaseZeroBillableHours ?? 0;
   const hasHistoricalPhase = project.teams.length > 0 ||
     previousSoldHours > 0 || historicalConsumed > 0;
   const quotedTeamIds = new Set(teams.map((row) => row.id));
@@ -134,9 +135,16 @@ export function QuotationTransferDialog({
     { key: 'hours', source: 'Nuevas fases · Cotización',
       target: formatted(version.totalHours) + ' HH nuevas' +
         (weeks ? ' · ' + weeks + ' semanas estimadas' : '') },
+    ...(historicalBillable > 0 ? [{
+      key: 'phase-zero-charge', source: 'Fase 0 · Levantamiento cobrable',
+      target: formatted(historicalBillable) +
+        ' HH ya consumidas, incorporadas al precio sin crear nuevas tareas.',
+    }] : []),
     { key: 'total-project-hours', source: 'Total HH vendidas tras traspaso',
-      target: formatted(previousSoldHours + version.totalHours) +
-        ' HH (anteriores + cotización)' },
+      target: formatted(previousSoldHours + version.totalHours + historicalBillable) +
+        (historicalBillable > 0
+          ? ' HH (anteriores + fases futuras + Fase 0)'
+          : ' HH (anteriores + cotización)') },
     ...teams.map((team) => {
       const existing = project.teams.find((item) => item.teamId === team.id);
       const prior = existing?.assignedHours ?? 0;
