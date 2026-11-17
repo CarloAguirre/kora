@@ -25,6 +25,7 @@ function fixture() {
     }),
     removeSegment: vi.fn(),
     removeTask: vi.fn(),
+    excludeQuotationReference: vi.fn(),
   } as unknown as ProjectModuleRepository;
   const forecast = { syncModuleTasks: vi.fn().mockResolvedValue(undefined) }
     as unknown as ForecastSourceSyncService;
@@ -63,6 +64,7 @@ describe('Eliminar bloque operativo con tareas y entregas vinculadas', () => {
     expect(project.soldHours).toBe(1656.5);
     expect(project.usedHours).toBe(548.5);
     expect(modules.removeTask).not.toHaveBeenCalled();
+    expect(modules.excludeQuotationReference).not.toHaveBeenCalled();
   });
 
   it('permite eliminar un bloque sin tareas ni entrega', async () => {
