@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   PROJECT_MODULE_DELIVERY_STATUS_LABELS,
+  ROADMAP_REMOVED_TEAM_BLOCK_WBS,
   type CreateProjectModuleSegmentInput,
   type UpdateProjectModuleSegmentInput,
   type HourEntrySummary,
@@ -342,29 +343,35 @@ export function ProjectModulesCard({
     });
   };
 
-  /** Nunca borrar fases con ejecución, entregas ni referencias EDT.
-   * El endpoint de Kora verifica la autorización y restricciones definitivas. */
+  /** La fase se elimina completa (bloques, tareas y entregas), no la
+   * cotización aprobada ni el historial de HH que ya consumió el proyecto. */
   const onDeletePhase = async (module: ProjectModule) => {
-    if (module.segments.length || module.tasks.length || module.deliveries.length ||
-        module.blockerCount > 0 || hourEntries.some((entry) => entry.module?.id === module.id)) {
-      toast.error('No se puede eliminar esta fase: tiene bloques, tareas, entregas o historial de horas/incidencias.');
-      return;
-    }
     const reference = appliedPlanning.data?.modules.find((item) => item.moduleId === module.id);
-    if (reference && (reference.tasks.length || reference.relativeTeamBlocks?.length)) {
-      toast.error('Esta fase tiene referencias EDT de la cotización. No se eliminará sin conciliarlas.');
-      return;
-    }
+    const references = reference?.tasks.filter((task) => referenceIsPending(module, task)) ?? [];
     if (!await confirm({
-      title: 'Eliminar fase',
+      title: 'Eliminar fase y toda su planificación',
+      description: 'Se eliminará «' + module.name + '», junto con ' +
+        plural(module.segments.length, 'bloque') + ', ' +
+        plural(module.tasks.length, 'tarea operativa') + ', ' +
+        plural(module.deliveries.length, 'entrega') + ' y ' +
+        plural(references.length, 'referencia EDT pendiente') +
+        ' que solo se muestra en el Roadmap.',
+      warning: 'Se conservarán las HH vendidas y todas las HH históricas aprobadas o pendientes. ' +
+        'La cotización seguirá intacta, pero esta fase dejará de estar planificada.',
+      confirmLabel: 'Continuar', cancelLabel: 'Cancelar', destructive: true,
+    })) return;
+    if (!await confirm({
+      title: 'Confirmación final · Eliminar fase',
       description: '¿Eliminar definitivamente «' + module.name +
-        '»? Esta acción no se puede deshacer. Solo se permite sin bloques, tareas ni entregas.',
-      confirmLabel: 'Eliminar fase',
-      destructive: true,
+        '» y todos sus bloques, tareas y entregas? Las HH estimadas quedarán sin ' +
+        'asignación operativa y podrás volver a planificarlas.',
+      warning: 'Esta operación no se puede deshacer. No elimina registros históricos de horas.',
+      confirmLabel: 'Sí, eliminar fase y tareas',
+      cancelLabel: 'Volver', destructive: true,
     })) return;
     try {
       await deleteModule.mutateAsync({ projectId: project.id, moduleId: module.id });
-      toast.success('Fase eliminada.');
+      toast.success('Fase y planificación operativa eliminadas. Las HH vendidas permanecen disponibles.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar la fase.');
     }
@@ -408,11 +415,6 @@ export function ProjectModulesCard({
     const actual = module.progress.actual;
     const expected = module.progress.expected;
     const percent = (value: number | null) => value === null ? '—' : value + '%';
-    const hasDependencies = module.segments.length > 0 || module.tasks.length > 0 ||
-      module.deliveries.length > 0 || module.blockerCount > 0 ||
-      hourEntries.some((entry) => entry.module?.id === module.id) ||
-      Boolean(appliedPlanning.data?.modules.some((item) =>
-        item.moduleId === module.id && (item.tasks.length || item.relativeTeamBlocks?.length)));
     return (
       <div className={styles.phaseHeadingActions}>
         <span className={styles.phaseHeadingProgress}
@@ -430,10 +432,8 @@ export function ProjectModulesCard({
             <Button variant="outline" size="sm" className={styles.phaseAddBlock}
               onClick={() => onAddPhaseBlock(module)}>+ Bloque de trabajo</Button>
             <Button variant="ghost" size="sm" className={styles.phaseDeleteButton}
-              disabled={deleteModule.isPending || hasDependencies}
-              title={hasDependencies
-                ? 'La fase tiene bloques, tareas, entregas, horas, incidencias o referencias EDT que deben conservarse.'
-                : 'Eliminar fase'}
+              disabled={deleteModule.isPending}
+              title="Eliminar fase completa con bloques y tareas (doble confirmación)"
               aria-label={'Eliminar fase ' + module.name}
               onClick={() => void onDeletePhase(module)}><TrashIcon size={15} /></Button>
           </>
@@ -444,6 +444,12 @@ export function ProjectModulesCard({
 
   /** En v5.02 los bloques/HH de la cotización siguen siendo referencias hasta
    * crear el segmento real. No asignamos fechas, responsables ni estados falsos. */
+  const referenceTeamIsRemoved = (moduleId: string, teamId?: string | null) =>
+    Boolean(teamId && roadmapExclusions.data?.some((row) =>
+      row.moduleId === moduleId &&
+      row.versionId === appliedPlanning.data?.versionId &&
+      row.wbs === ROADMAP_REMOVED_TEAM_BLOCK_WBS && row.role === teamId));
+
   const referenceIsConverted = (
     module: ProjectModule,
     reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
@@ -463,7 +469,9 @@ export function ProjectModulesCard({
   const referenceIsPending = (
     module: ProjectModule,
     reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
-  ) => !referenceIsConverted(module, reference) && !referenceIsExcluded(module, reference);
+  ) => !referenceIsConverted(module, reference) &&
+    !referenceIsExcluded(module, reference) &&
+    !referenceTeamIsRemoved(module.id, reference.teamId);
 
   const onDiscardReference = async (
     module: ProjectModule,
@@ -492,7 +500,8 @@ export function ProjectModulesCard({
     const reference = appliedPlanning.data?.modules.find((entry) => entry.moduleId === phase.id);
     if (!module || !reference?.relativeTeamBlocks) return [];
     return reference.relativeTeamBlocks
-      .filter((block) => !module.segments.some((segment) => segment.teamId === block.teamId))
+      .filter((block) => !module.segments.some((segment) => segment.teamId === block.teamId) &&
+        !referenceTeamIsRemoved(module.id, block.teamId))
       .map((block) => {
         const teamName = project.teams.find((team) => team.teamId === block.teamId)?.teamName ??
           teamOptions.find((team) => team.value === block.teamId)?.label ?? 'Equipo por vincular';
