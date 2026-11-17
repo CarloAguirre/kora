@@ -20,6 +20,7 @@ import type { ActorContext, UseCase } from '../../../../shared/application/use-c
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { linkedSegmentTaskIds } from '../../domain/services/linked-segment-task-ids';
+import { ROADMAP_REFERENCE_EXCLUSION_STORE, type RoadmapReferenceExclusionStore } from '../ports/roadmap-reference-exclusion-store.port';
 
 export interface DeleteProjectModuleSegmentCommand {
   readonly projectId: string;
@@ -41,6 +42,7 @@ export class DeleteProjectModuleSegmentUseCase
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     private readonly progress: ProjectProgressRecalculator,
+    @Inject(ROADMAP_REFERENCE_EXCLUSION_STORE) private readonly exclusions: RoadmapReferenceExclusionStore,
   ) {}
 
   async execute(command: DeleteProjectModuleSegmentCommand): Promise<Result<void, ApplicationError>> {
@@ -78,6 +80,14 @@ export class DeleteProjectModuleSegmentUseCase
     const removed = await this.unitOfWork.run(async (tx) => {
       const result = await this.modules.removeSegmentWithDependencies(command.segmentId, linkedTaskIds, tx);
       if (!result.removed) throw new ProjectModuleSegmentNotFoundError(command.segmentId);
+      // Si hay otro bloque del mismo equipo, sus referencias siguen vigentes.
+      // Si retiramos el último, impedir que vuelva como "pendiente de materializar".
+      if (!module.segments.some((row) => row.id !== command.segmentId &&
+          row.teamId === removedSegment.teamId)) {
+        await this.exclusions.suppressTeamBlock(
+          project.id, module.id, removedSegment.teamId, command.actor.userId, tx,
+        );
+      }
       await this.forecastSync.syncModuleTasks(project, command.moduleId, this.clock.now(), tx);
       await this.progress.recalculate(project.id, tx);
       return result;
@@ -94,6 +104,8 @@ export class DeleteProjectModuleSegmentUseCase
         taskCount: removed.taskCount, deliveryCount: removed.deliveryCount,
         segmentName: removedSegment.name, plannedHoursReleased: removedSegment.estimatedHours,
         tasksSnapshot: removedTasks, deliveriesSnapshot: removedDeliveries,
+        quotationTeamReferencesSuppressed: !module.segments.some((row) =>
+          row.id !== command.segmentId && row.teamId === removedSegment.teamId),
         soldHoursPreserved: true, hourEntriesPreserved: true,
       },
     });
