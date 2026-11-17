@@ -590,6 +590,24 @@ export function ProjectModulesCard({
     </div>;
   };
 
+  /** Papelera del BLOQUE operativo, independiente de la papelera de FASE.
+   * Disponible en Ver y Planificar a usuarios con permisos de gestión. */
+  const renderOperationalBlockActions = (
+    phase: { id: string }, block: { id?: string; label: string },
+  ) => {
+    if (!canManage || !block.id) return null;
+    const module = modulesById.get(phase.id);
+    const segment = module?.segments.find((entry) => entry.id === block.id);
+    if (!module || !segment) return null;
+    return <Button variant="ghost" size="sm" className={styles.blockDeleteButton}
+      title={'Eliminar bloque ' + segment.name + ' y sus tareas'}
+      aria-label={'Eliminar bloque ' + segment.name}
+      disabled={deleteSegment.isPending}
+      onClick={() => void onDeleteSegment(module.id, segment, () => {})}>
+      <TrashIcon size={14} />
+    </Button>;
+  };
+
   const renderSelectionDetail = (phase: { id: string }, selection: PhaseRoadmapSelection, close: () => void) => {
     const module = modulesById.get(phase.id);
     if (!module) return null;
@@ -784,6 +802,7 @@ export function ProjectModulesCard({
         renderSelectionDetail={renderSelectionDetail}
         renderPhaseHeaderName={renderPhaseHeaderName}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
+        renderOperationalBlockActions={renderOperationalBlockActions}
         toolbarActions={canManage ? (
           <PillSwitcher aria-label="Modo del Roadmap"
             options={ROADMAP_MODE_OPTIONS}
