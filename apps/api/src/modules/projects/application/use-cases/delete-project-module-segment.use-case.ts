@@ -19,6 +19,7 @@ import {
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
+import { linkedSegmentTaskIds } from '../../domain/services/linked-segment-task-ids';
 
 export interface DeleteProjectModuleSegmentCommand {
   readonly projectId: string;
@@ -61,20 +62,21 @@ export class DeleteProjectModuleSegmentUseCase
 
     // Guardar en auditoría la identidad de la planificación retirada: las FK
     // de hour_entries pasan a NULL, pero los registros y estados no se borran.
-    const removedTasks = module.tasks.filter((task) => task.segmentId === command.segmentId)
+    const removedSegment = module.segments.find((segment) =>
+      segment.id === command.segmentId)!;
+    const linkedTaskIds = linkedSegmentTaskIds(module, removedSegment);
+    const linkedTaskSet = new Set(linkedTaskIds);
+    const removedTasks = module.tasks.filter((task) => linkedTaskSet.has(task.id))
       .map((task) => ({ id: task.id, name: task.name,
         estimatedHours: task.estimatedHours, status: task.status }));
     const removedDeliveries = module.deliveries.filter((delivery) =>
       delivery.segmentId === command.segmentId)
       .map((delivery) => ({ id: delivery.id, name: delivery.name, status: delivery.status }));
-    const removedSegment = module.segments.find((segment) =>
-      segment.id === command.segmentId)!;
-
     // Eliminar el conjunto OPERATIVO; no tocar projects.sold_hours,
     // cotizaciones, EDT ni HH de hour_entries. Sin borrar las tareas vinculadas
     // se convertirían silenciosamente en tareas huérfanas por ON DELETE SET NULL.
     const removed = await this.unitOfWork.run(async (tx) => {
-      const result = await this.modules.removeSegmentWithDependencies(command.segmentId, tx);
+      const result = await this.modules.removeSegmentWithDependencies(command.segmentId, linkedTaskIds, tx);
       if (!result.removed) throw new ProjectModuleSegmentNotFoundError(command.segmentId);
       await this.forecastSync.syncModuleTasks(project, command.moduleId, this.clock.now(), tx);
       await this.progress.recalculate(project.id, tx);
