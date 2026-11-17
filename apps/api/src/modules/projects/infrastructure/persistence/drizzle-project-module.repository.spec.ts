@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Database } from '@kora/db';
+import { projectModuleTasks, projectModuleDeliveries, projectModuleSegments, type Database } from '@kora/db';
 import { DrizzleProjectModuleRepository } from './drizzle-project-module.repository';
 
 const date = new Date('2026-11-04T19:32:09.000Z');
@@ -38,5 +38,33 @@ describe('DrizzleProjectModuleRepository.refreshSegmentClosure', () => {
     expect(context.update).not.toHaveBeenCalled();
     // Si había un closedAt histórico, queda intacto. Si no, sigue abierto
     // hasta ejecutar closureAction='close' mediante el caso de uso.
+  });
+});
+
+describe('DrizzleProjectModuleRepository.removeSegmentWithDependencies', () => {
+  it('elimina primero tareas y entregas y finalmente bloque, sin tocar las HH del proyecto', async () => {
+    const deleted: unknown[] = [];
+    const responses = [[{ id: 'task-1' }, { id: 'task-2' }],
+      [{ id: 'delivery-1' }], [{ id: 'segment-1' }]];
+    const remove = vi.fn((table: unknown) => {
+      deleted.push(table);
+      return { where: () => ({ returning: vi.fn().mockResolvedValue(
+        responses[deleted.length - 1],
+      ) }) };
+    });
+    const repo = new DrizzleProjectModuleRepository({ delete: remove } as unknown as Database);
+    const result = await repo.removeSegmentWithDependencies('segment-1');
+    expect(result).toEqual({ removed: true, taskCount: 2, deliveryCount: 1 });
+    expect(deleted).toEqual([projectModuleTasks, projectModuleDeliveries, projectModuleSegments]);
+    // La base configura hour_entries.task_id/segment_id ON DELETE SET NULL;
+    // nunca se ejecuta un DELETE sobre hour_entries.
+    expect(remove).toHaveBeenCalledTimes(3);
+  });
+  it('si falla cualquier eliminación, se propaga el error al UnitOfWork para hacer rollback', async () => {
+    const remove = vi.fn().mockReturnValue({
+      where: () => ({ returning: () => Promise.reject(new Error('FK conflict')) }),
+    });
+    const repo = new DrizzleProjectModuleRepository({ delete: remove } as unknown as Database);
+    await expect(repo.removeSegmentWithDependencies('segment-1')).rejects.toThrow('FK conflict');
   });
 });
