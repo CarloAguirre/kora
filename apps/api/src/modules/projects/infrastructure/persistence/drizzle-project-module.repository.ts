@@ -9,6 +9,7 @@ import {
   hourEntries,
   inArray,
   isNull,
+  or,
   projectModuleDeliveries,
   projectModuleSegmentMembers,
   projectModuleSegments,
@@ -549,14 +550,17 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     await db.delete(projectModuleSegments).where(eq(projectModuleSegments.id, id));
   }
 
-  async removeSegmentWithDependencies(id: string, context?: TransactionContext): Promise<{
+  async removeSegmentWithDependencies(id: string, legacyTaskIds: readonly string[], context?: TransactionContext): Promise<{
     removed: boolean; taskCount: number; deliveryCount: number;
   }> {
     const db = resolveDb(this.database, context);
     // Las FK de hour_entries son SET NULL; el consumo real no se borra.
     // Las filas de Forecast de cada bloque/tarea son CASCADE.
     const tasks = await db.delete(projectModuleTasks)
-      .where(eq(projectModuleTasks.segmentId, id))
+      .where(legacyTaskIds.length
+        ? or(eq(projectModuleTasks.segmentId, id),
+          inArray(projectModuleTasks.id, [...legacyTaskIds]))
+        : eq(projectModuleTasks.segmentId, id))
       .returning({ id: projectModuleTasks.id });
     const deliveries = await db.delete(projectModuleDeliveries)
       .where(eq(projectModuleDeliveries.segmentId, id))
