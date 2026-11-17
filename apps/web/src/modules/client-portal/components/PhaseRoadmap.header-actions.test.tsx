@@ -112,6 +112,49 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
     expect(screen.getByText('Tareas 18, 0 aprobadas')).toBeInTheDocument();
   });
 
+  it('la papelera de bloque es una acción separada, exclusiva del roadmap interno', () => {
+    const remove = vi.fn();
+    const withBlock: ProjectPhaseRoadmap = {
+      ...phaseRoadmap, phases: [{ ...phaseRoadmap.phases[0]!,
+        tasks: [{ id: 'segment-1', role: 'dev', scope: 'desarrollo',
+          label: 'Generar vistas', startDate: '2026-11-16', endDate: '2026-11-19' }],
+      }],
+    };
+    const { unmount } = render(<PhaseRoadmap phaseRoadmap={withBlock}
+      operationalView renderOperationalBlockActions={(_phase, block) =>
+        <button type="button" onClick={() => remove(block.id)}>
+          Eliminar bloque {block.label}
+        </button>} />);
+    const action = screen.getByRole('button', { name: 'Eliminar bloque Generar vistas' });
+    expect(action).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir bloque Generar vistas' }))
+      .toBeInTheDocument();
+    fireEvent.click(action);
+    expect(remove).toHaveBeenCalledWith('segment-1');
+    unmount();
+    render(<PhaseRoadmap phaseRoadmap={withBlock} />);
+    expect(screen.queryByRole('button', { name: 'Eliminar bloque Generar vistas' }))
+      .not.toBeInTheDocument();
+  });
+
+  it('una referencia pendiente puede quitarse del Roadmap interno, pero no del portal cliente', () => {
+    const remove = vi.fn();
+    const rows = () => [{ id: 'team-ux', role: 'ux' as const,
+      label: 'S2 · Diseño UX', hours: 28 }];
+    const ui = render(<PhaseRoadmap phaseRoadmap={phaseRoadmap}
+      operationalView operationalRows={rows}
+      renderOperationalReferenceActions={(_phase, row) =>
+        <button type="button" onClick={() => remove(row.id)}>
+          Quitar bloque pendiente {row.label}
+        </button>} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar bloque pendiente S2 · Diseño UX' }));
+    expect(remove).toHaveBeenCalledWith('team-ux');
+    ui.unmount();
+    render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} />);
+    expect(screen.queryByRole('button', { name: /Quitar bloque pendiente/ }))
+      .not.toBeInTheDocument();
+  });
+
   it('dibuja barras definitivas cuando el segmento ya está persistido', () => {
     const withBlock = {
       ...phaseRoadmap, phases: [{

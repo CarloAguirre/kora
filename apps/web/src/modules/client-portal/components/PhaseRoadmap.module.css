@@ -715,6 +715,24 @@ button.ganttBar {
   min-height: 46px;
   border-top: 1px solid #eef0f4;
 }
+.operationalBlockNameCell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: #fff;
+  box-shadow: 1px 0 0 #e4e9ee;
+}
+.operationalBlockNameCell > .operationalBlockLabel {
+  position: static;
+  left: auto;
+  z-index: auto;
+  box-shadow: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .operationalBlockLabel {
   display: flex;
   text-align: left;

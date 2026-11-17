@@ -186,6 +186,7 @@ export function PhaseRoadmap({
   alwaysExpanded = false,
   operationalView = false, operationalTaskCount, operationalBlockCount, operationalRows, onPlanOperationalRow,
   operationalMetrics, operationalFooter, operationalPresaleHours, operationalPhaseZero,
+  renderOperationalBlockActions, renderOperationalReferenceActions,
 }: PhaseRoadmapProps) {
   /** Fases abiertas — cada una se abre/cierra por separado (varias a la vez); arranca abierta la primera. */
   const [expandedPhaseIds, setExpandedPhaseIds] = useState<ReadonlySet<string>>(
@@ -354,6 +355,8 @@ export function PhaseRoadmap({
             getMetrics={operationalMetrics}
             renderHeaderName={renderPhaseHeaderName}
             renderHeaderActions={renderPhaseHeaderActions}
+            renderBlockActions={renderOperationalBlockActions}
+            renderReferenceActions={renderOperationalReferenceActions}
             renderReferences={renderPhaseReferences}
             renderSelectionDetail={renderSelectionDetail} />
         ) : (
@@ -601,6 +604,10 @@ export interface PhaseRoadmapProps {
   onPlanOperationalRow?: (phase: PhaseRoadmapPhase, row: OperationalRoadmapRow) => void;
   /** Referencias pendientes: solo los segmentos persistidos dibujan barras del Gantt. */
   operationalRows?: (phase: PhaseRoadmapPhase) => readonly OperationalRoadmapRow[];
+  /** Acciones sobre cada bloque real, solo en la vista interna (no portal cliente). */
+  renderOperationalBlockActions?: (phase: PhaseRoadmapPhase, block: PhaseRoadmapTask) => ReactNode;
+  /** Acciones sobre una referencia sin bloque real, solo en la vista interna. */
+  renderOperationalReferenceActions?: (phase: PhaseRoadmapPhase, row: OperationalRoadmapRow) => ReactNode;
   /** HH y avance comprobables de cada bloque operativo; no se inventan porcentajes. */
   operationalMetrics?: (phase: PhaseRoadmapPhase, task: PhaseRoadmapTask) => { hours: number | null; progress: number | null };
   /** HH históricas previas al traspaso, aunque el proyecto haya iniciado. */
@@ -905,7 +912,7 @@ function PhaseCard({
  */
 function OperationalPhaseCard({
   phase, axis, placeholderRows, onPlanRow, getMetrics, renderHeaderName, renderHeaderActions,
-  renderReferences, renderSelectionDetail,
+  renderReferences, renderSelectionDetail, renderBlockActions, renderReferenceActions,
 }: {
   phase: PhaseRoadmapPhase;
   axis: TimelineAxis;
@@ -914,6 +921,8 @@ function OperationalPhaseCard({
   getMetrics?: PhaseRoadmapProps['operationalMetrics'];
   renderHeaderName?: PhaseRoadmapProps['renderPhaseHeaderName'];
   renderHeaderActions?: PhaseRoadmapProps['renderPhaseHeaderActions'];
+  renderBlockActions?: PhaseRoadmapProps['renderOperationalBlockActions'];
+  renderReferenceActions?: PhaseRoadmapProps['renderOperationalReferenceActions'];
   renderReferences?: PhaseRoadmapProps['renderPhaseReferences'];
   renderSelectionDetail?: PhaseRoadmapProps['renderSelectionDetail'];
 }) {
@@ -1005,6 +1014,7 @@ function OperationalPhaseCard({
               };
               const isSelected = sameSelection(selected, selection);
               return <div key={task.id ?? index} className={styles.operationalLine}>
+                <div className={styles.operationalBlockNameCell}>
                 <button type="button" className={styles.operationalBlockLabel}
                   title={task.label} aria-label={'Ver detalle del bloque ' + task.label}
                   onClick={() => choose(selection)}>
@@ -1016,6 +1026,8 @@ function OperationalPhaseCard({
                     {metrics && <small>{metrics.hours == null ? 'HH sin definir' : metrics.hours + ' HH'} · {metrics.progress == null ? 'avance sin definir' : metrics.progress + '% de avance'}</small>}
                   </span>
                 </button>
+                {renderBlockActions?.(phase, task)}
+                </div>
                 <div className={styles.operationalTrack}>
                   {axis.weekLines.map((percent, idx) =>
                     <span key={idx} className={styles.operationalGridLine}
@@ -1135,6 +1147,7 @@ function OperationalPhaseCard({
                 styles.operationalLine, styles.operationalReferenceRow,
                 isSelected ? styles.operationalReferenceSelected : '',
               ].filter(Boolean).join(' ')}>
+                <div className={styles.operationalBlockNameCell}>
                 <button type="button" className={styles.operationalBlockLabel}
                   title={row.label} aria-label={'Abrir bloque ' + row.label}
                   onClick={() => choose(selection)}>
@@ -1146,6 +1159,8 @@ function OperationalPhaseCard({
                     {row.label}<small>{row.hours} HH de referencia · sin bloque operativo</small>
                   </span>
                 </button>
+                {renderReferenceActions?.(phase, row)}
+                </div>
                 <div className={styles.operationalNoDates}>
                   <button type="button" className={styles.operationalOpenReference}
                     onClick={() => choose(selection)}>

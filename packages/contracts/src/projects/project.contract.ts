@@ -323,6 +323,12 @@ const estimatedHoursSchema = z.coerce
 
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
 /** Quitar una referencia EDT solo de la planificación operacional; la cotización permanece intacta. */
+/** Tombstone operativo persistente: indica que el equipo fue retirado de una fase
+ * transferida. La cotización original y sus HH siguen intactas.
+ * Se guarda en project_roadmap_reference_exclusions usando role=teamId.
+ */
+export const ROADMAP_REMOVED_TEAM_BLOCK_WBS = '__KORA_REMOVED_TEAM_BLOCK__';
+
 export const excludeRoadmapReferenceSchema = z.object({
   versionId: uuidSchema,
   wbs: z.string().trim().min(1).max(160),

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   projects, projectModules, projectModuleSegments, projectModuleDeliveries,
-  projectTeams, quotationEvents,
+  projectTeams, quotationEvents, projectRoadmapReferenceExclusions,
   type Database,
 } from '@kora/db';
 import { DrizzleApprovedProjectCalendar } from './drizzle-approved-project-calendar';
@@ -18,6 +18,7 @@ function fixture(options: {
   existingDates?: boolean;
   hitoOnly?: boolean;
   historical?: boolean;
+  removedTeam?: boolean;
 } = {}) {
   const project = {
     id: projectId, type: 'development', status: options.active === false ? 'draft' : 'active',
@@ -64,6 +65,7 @@ function fixture(options: {
     if (table === projectModules) return modules;
     if (table === projectTeams) return [{ id: teamId, name: 'UX' }];
     if (table === projectModuleSegments) return segments;
+    if (table === projectRoadmapReferenceExclusions) return options.removedTeam ? [{ moduleId, teamId }] : [];
     return [];
   };
   const tx = {
@@ -144,6 +146,15 @@ describe('Materializar cronograma de cotización aprobada (sin segunda aprobaci�
     expect(fx.segments).toHaveLength(0);
     expect(fx.inserts.filter((item) => item.table === projectModuleSegments)).toHaveLength(1);
     expect(fx.inserts.filter((item) => item.table === projectModuleDeliveries)).toHaveLength(1);
+  });
+
+  it('un bloque retirado por el PM no vuelve a materializarse aunque no exista aún evento de calendario', async () => {
+    const fx = fixture({ removedTeam: true });
+    expect(await fx.calendar.ensure(projectId)).toBe(false);
+    expect(fx.inserts.filter((item) => item.table === projectModuleSegments)).toHaveLength(0);
+    expect(fx.inserts.filter((item) => item.table === projectModuleDeliveries)).toHaveLength(0);
+    expect(fx.persistedEvents[0]?.action).toBe('roadmap_calendar_materialized');
+    expect(await fx.calendar.ensure(projectId)).toBe(false);
   });
 
   it('si el PM no definió start_date toma Hito 0, sin escribir una fecha artificial al proyecto', async () => {

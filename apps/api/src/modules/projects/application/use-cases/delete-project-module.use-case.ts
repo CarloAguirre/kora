@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { err, ok, type ApplicationError, type Result } from '@kora/core';
+import { UNIT_OF_WORK, err, ok, type ApplicationError, type Result, type UnitOfWork } from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import { CannotManageProjectError, ProjectModuleNotFoundError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
@@ -27,6 +27,7 @@ export class DeleteProjectModuleUseCase implements UseCase<DeleteProjectModuleCo
     @Inject(PROJECT_REPOSITORY) private readonly projects: ProjectRepository,
     @Inject(PROJECT_MODULE_REPOSITORY) private readonly modules: ProjectModuleRepository,
     private readonly progress: ProjectProgressRecalculator,
+    @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
@@ -43,15 +44,28 @@ export class DeleteProjectModuleUseCase implements UseCase<DeleteProjectModuleCo
       return err(new CannotManageProjectError());
     }
 
-    await this.modules.remove(command.moduleId);
-    await this.progress.recalculate(project.id);
+    // La BD elimina en cascada bloques, tareas, entregas, membresías y
+    // exclusiones de referencias de esta fase. Las HH reales se conservan:
+    // hour_entries.module_id / segment_id / task_id usan ON DELETE SET NULL.
+    // El presupuesto vendido se conserva como valor del proyecto.
+    await this.unitOfWork.run(async (tx) => {
+      await this.modules.remove(command.moduleId, tx);
+      await this.progress.recalculate(project.id, tx);
+    });
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },
       action: 'update',
       entityType: 'project',
       entityId: project.id,
-      metadata: { event: 'module_deleted', moduleId: command.moduleId },
+      metadata: {
+        event: 'module_deleted', moduleId: command.moduleId,
+        phaseName: module.name, estimatedHoursReleased: module.estimatedHours,
+        removedSegmentIds: module.segments.map((item) => item.id),
+        removedTaskIds: module.tasks.map((item) => item.id),
+        removedDeliveryIds: module.deliveries.map((item) => item.id),
+        soldHoursPreserved: true, hourEntriesPreserved: true,
+      },
     });
 
     return ok(undefined);

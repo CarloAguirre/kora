@@ -24,6 +24,20 @@ const project = {
 } as unknown as ProjectDetail;
 
 describe('Formulario completo de edición del bloque', () => {
+  it('al desaparecer el bloque, sus HH vuelven a estar disponibles para replanificar', () => {
+    const projectAfterDelete = { ...project, modules: [{ ...module,
+      segments: [], tasks: [], deliveries: [],
+    }], soldHours: 1656.5 };
+    render(<NewWorkBlockModal mode="create"
+      project={projectAfterDelete as unknown as ProjectDetail}
+      module={projectAfterDelete.modules[0] as ProjectModule}
+      teamOptions={[{ value: 'team-qa', label: 'QA' }]}
+      submitting={false} onCancel={vi.fn()} onConfirm={vi.fn()} />);
+    expect(screen.getByText(/110 HH asignadas, 0 HH ya en otros bloques, 110 disponibles/))
+      .toBeInTheDocument();
+    expect(projectAfterDelete.soldHours).toBe(1656.5);
+  });
+
   it('precarga fechas, HH y entrega de cierre, conservando el vínculo al guardar', () => {
     const onConfirm = vi.fn();
     render(<NewWorkBlockModal mode="edit"
