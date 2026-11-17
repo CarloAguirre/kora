@@ -36,7 +36,7 @@ import { SegmentDrawer } from './SegmentDrawer';
 import { ReviewActionModal, type ReviewAction } from './ReviewActionModal';
 import { ReferenceBlockDrawer } from './ReferenceBlockDrawer';
 import { useAppliedQuotationPlanning } from '@/modules/estimation/api/quotation.queries';
-import { indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
+import { getLinkedBlockTasks, indexTeamBlockProgress, roadmapBlockMetrics } from '../lib/team-progress';
 import { ProjectPhaseTasksTable } from './ProjectPhaseTasksTable';
 import { HistoricalPhaseZeroDetail } from './HistoricalPhaseZeroDetail';
 import { phaseHeaderMeta } from '../lib/phase-header-meta';
@@ -233,7 +233,7 @@ export function ProjectModulesCard({
     moduleId: string, segment: ProjectModuleSegment, close: () => void,
   ) => {
     const module = project.modules.find((item) => item.id === moduleId);
-    const tasks = module?.tasks.filter((task) => task.segmentId === segment.id) ?? [];
+    const tasks = module ? getLinkedBlockTasks(module, segment) : [];
     const deliveries = module?.deliveries.filter((delivery) => delivery.segmentId === segment.id) ?? [];
     const hours = segment.estimatedHours ?? 0;
     // Primera confirmación: explicar todas las dependencias antes de eliminar.
