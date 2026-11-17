@@ -53,7 +53,7 @@ describe('DrizzleProjectModuleRepository.removeSegmentWithDependencies', () => {
       ) }) };
     });
     const repo = new DrizzleProjectModuleRepository({ delete: remove } as unknown as Database);
-    const result = await repo.removeSegmentWithDependencies('segment-1');
+    const result = await repo.removeSegmentWithDependencies('segment-1', ['legacy-task-1']);
     expect(result).toEqual({ removed: true, taskCount: 2, deliveryCount: 1 });
     expect(deleted).toEqual([projectModuleTasks, projectModuleDeliveries, projectModuleSegments]);
     // La base configura hour_entries.task_id/segment_id ON DELETE SET NULL;
@@ -65,6 +65,6 @@ describe('DrizzleProjectModuleRepository.removeSegmentWithDependencies', () => {
       where: () => ({ returning: () => Promise.reject(new Error('FK conflict')) }),
     });
     const repo = new DrizzleProjectModuleRepository({ delete: remove } as unknown as Database);
-    await expect(repo.removeSegmentWithDependencies('segment-1')).rejects.toThrow('FK conflict');
+    await expect(repo.removeSegmentWithDependencies('segment-1', ['legacy-task-1'])).rejects.toThrow('FK conflict');
   });
 });
