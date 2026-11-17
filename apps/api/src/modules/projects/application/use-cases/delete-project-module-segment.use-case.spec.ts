@@ -27,12 +27,9 @@ function fixture() {
     removeTask: vi.fn(),
     excludeQuotationReference: vi.fn(),
   } as unknown as ProjectModuleRepository;
-  const forecast = { syncModuleTasks: vi.fn().mockResolvedValue(undefined) }
-    as unknown as ForecastSourceSyncService;
-  const progress = { recalculate: vi.fn().mockResolvedValue(undefined) }
-    as unknown as ProjectProgressRecalculator;
-  const audit = { record: vi.fn().mockResolvedValue(undefined) }
-    as unknown as AuditRecorder;
+  const forecast = { syncModuleTasks: vi.fn().mockResolvedValue(undefined) } as unknown as ForecastSourceSyncService;
+  const progress = { recalculate: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectProgressRecalculator;
+  const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
   const uc = new DeleteProjectModuleSegmentUseCase(projects, modules,
     forecast, audit, new FixedClock(), new PassthroughUnitOfWork(), progress);
   return { uc, projects, modules, forecast, progress, audit, project };
