@@ -15,7 +15,7 @@ function fixture() {
   const modules = {
     findById: vi.fn().mockResolvedValue({
       id: 'module-1', projectId: 'project-1', estimatedHours: 1108,
-      segments: [{ id: 'segment-1', estimatedHours: 52 }],
+      segments: [{ id: 'segment-1', teamId: 'team-dev', estimatedHours: 52 }],
       tasks: [{ id: 'task-1', segmentId: 'segment-1', status: 'done' },
         { id: 'task-2', segmentId: 'segment-1', status: 'in_progress' }],
       deliveries: [{ id: 'delivery-1', segmentId: 'segment-1', status: 'approved' }],
@@ -30,9 +30,11 @@ function fixture() {
   const forecast = { syncModuleTasks: vi.fn().mockResolvedValue(undefined) } as unknown as ForecastSourceSyncService;
   const progress = { recalculate: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectProgressRecalculator;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
+  const exclusions = { suppressTeamBlock: vi.fn().mockResolvedValue(true) };
   const uc = new DeleteProjectModuleSegmentUseCase(projects, modules,
-    forecast, audit, new FixedClock(), new PassthroughUnitOfWork(), progress);
-  return { uc, projects, modules, forecast, progress, audit, project };
+    forecast, audit, new FixedClock(), new PassthroughUnitOfWork(), progress,
+    exclusions as never);
+  return { uc, projects, modules, forecast, progress, audit, project, exclusions };
 }
 const command = {
   projectId: 'project-1', moduleId: 'module-1', segmentId: 'segment-1',
@@ -42,11 +44,12 @@ const command = {
 
 describe('Eliminar bloque operativo con tareas y entregas vinculadas', () => {
   it('elimina bloque y dependencias aun si hay tareas aprobadas y entrega aprobada', async () => {
-    const { uc, modules, forecast, progress, audit, project } = fixture();
+    const { uc, modules, forecast, progress, audit, project, exclusions } = fixture();
     const result = await uc.execute(command);
     expect(result.isOk()).toBe(true);
     expect(modules.removeSegmentWithDependencies).toHaveBeenCalledOnce();
     expect(modules.removeSegmentWithDependencies).toHaveBeenCalledWith('segment-1', ['task-1', 'task-2'], expect.anything());
+    expect(exclusions.suppressTeamBlock).toHaveBeenCalledWith('project-1', 'module-1', 'team-dev', 'leader-1', expect.anything());
     const tx = vi.mocked(modules.removeSegmentWithDependencies).mock.calls[0]![2];
     expect(forecast.syncModuleTasks).toHaveBeenCalledWith(
       project, 'module-1', expect.any(Date), tx);
@@ -62,6 +65,18 @@ describe('Eliminar bloque operativo con tareas y entregas vinculadas', () => {
     expect(project.usedHours).toBe(548.5);
     expect(modules.removeTask).not.toHaveBeenCalled();
     expect(modules.excludeQuotationReference).not.toHaveBeenCalled();
+  });
+
+  it('no oculta la referencia del equipo si conserva otro bloque en la misma fase', async () => {
+    const { uc, modules, exclusions } = fixture();
+    vi.mocked(modules.findById).mockResolvedValueOnce({
+      id: 'module-1', projectId: 'project-1',
+      segments: [{ id: 'segment-1', teamId: 'team-dev', estimatedHours: 52 },
+        { id: 'segment-2', teamId: 'team-dev', estimatedHours: 30 }],
+      tasks: [], deliveries: [],
+    } as never);
+    expect((await uc.execute(command)).isOk()).toBe(true);
+    expect(exclusions.suppressTeamBlock).not.toHaveBeenCalled();
   });
 
   it('permite eliminar un bloque sin tareas ni entrega', async () => {
