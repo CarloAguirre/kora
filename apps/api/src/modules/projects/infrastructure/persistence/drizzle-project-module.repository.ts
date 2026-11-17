@@ -549,6 +549,24 @@ export class DrizzleProjectModuleRepository implements ProjectModuleRepository {
     await db.delete(projectModuleSegments).where(eq(projectModuleSegments.id, id));
   }
 
+  async removeSegmentWithDependencies(id: string, context?: TransactionContext): Promise<{
+    removed: boolean; taskCount: number; deliveryCount: number;
+  }> {
+    const db = resolveDb(this.database, context);
+    // Las FK de hour_entries son SET NULL; el consumo real no se borra.
+    // Las filas de Forecast de cada bloque/tarea son CASCADE.
+    const tasks = await db.delete(projectModuleTasks)
+      .where(eq(projectModuleTasks.segmentId, id))
+      .returning({ id: projectModuleTasks.id });
+    const deliveries = await db.delete(projectModuleDeliveries)
+      .where(eq(projectModuleDeliveries.segmentId, id))
+      .returning({ id: projectModuleDeliveries.id });
+    const segments = await db.delete(projectModuleSegments)
+      .where(eq(projectModuleSegments.id, id))
+      .returning({ id: projectModuleSegments.id });
+    return { removed: segments.length === 1, taskCount: tasks.length, deliveryCount: deliveries.length };
+  }
+
   async refreshSegmentClosure(segmentId: string, now: Date, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     // La sentencia UPDATE ... SET con subconsultas correlacionadas contra su
