@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   and, desc, eq, inArray, isNull, sql,
   projects, projectModules, projectModuleSegments, projectModuleDeliveries,
+  projectRoadmapReferenceExclusions,
   projectQuotations, projectTeams, teams, quotationEvents, quotationVersions,
   type Database,
 } from '@kora/db';
@@ -108,6 +109,15 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         moduleId: projectModuleSegments.moduleId, teamId: projectModuleSegments.teamId,
         startDate: projectModuleSegments.startDate, endDate: projectModuleSegments.endDate,
       }).from(projectModuleSegments).where(inArray(projectModuleSegments.moduleId, moduleIds));
+      const removedTeams = await tx.select({
+        moduleId: projectRoadmapReferenceExclusions.moduleId,
+        teamId: projectRoadmapReferenceExclusions.role,
+      }).from(projectRoadmapReferenceExclusions).where(and(
+        inArray(projectRoadmapReferenceExclusions.moduleId, moduleIds),
+        eq(projectRoadmapReferenceExclusions.versionId, source.versionId),
+        eq(projectRoadmapReferenceExclusions.wbs, ROADMAP_REMOVED_TEAM_BLOCK_WBS),
+      ));
+      const suppressed = new Set(removedTeams.map((row) => row.moduleId + ':' + row.teamId));
       const existing = new Set(segments.map((row) => row.moduleId + ':' + row.teamId));
       const bounds = new Map<string, Period[]>();
       for (const segment of segments) {
@@ -139,7 +149,7 @@ export class DrizzleApprovedProjectCalendar implements ApprovedProjectCalendar {
         for (const effort of reference.relativeTeamBlocks ?? []) {
           if (effort.hours <= 0 || !nameByTeam.has(effort.teamId)) continue;
           const key = moduleId + ':' + effort.teamId;
-          if (existing.has(key)) continue; // conserva bloques creados/editados
+          if (existing.has(key) || suppressed.has(key)) continue; // no revivir bloques retirados
           const period = approvedCalendarPeriod(startIso, effort.startWeek, effort.durationWeeks);
           if (!period) throw new Error('La cotización aprobada contiene semanas inválidas.');
           const now = new Date();
