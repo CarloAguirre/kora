@@ -137,6 +137,24 @@ describe('Roadmap operativo · diseño aprobado v5.02', () => {
       .not.toBeInTheDocument();
   });
 
+  it('una referencia pendiente puede quitarse del Roadmap interno, pero no del portal cliente', () => {
+    const remove = vi.fn();
+    const rows = () => [{ id: 'team-ux', role: 'ux' as const,
+      label: 'S2 · Diseño UX', hours: 28 }];
+    const ui = render(<PhaseRoadmap phaseRoadmap={phaseRoadmap}
+      operationalView operationalRows={rows}
+      renderOperationalReferenceActions={(_phase, row) =>
+        <button type="button" onClick={() => remove(row.id)}>
+          Quitar bloque pendiente {row.label}
+        </button>} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Quitar bloque pendiente S2 · Diseño UX' }));
+    expect(remove).toHaveBeenCalledWith('team-ux');
+    ui.unmount();
+    render(<PhaseRoadmap phaseRoadmap={phaseRoadmap} />);
+    expect(screen.queryByRole('button', { name: /Quitar bloque pendiente/ }))
+      .not.toBeInTheDocument();
+  });
+
   it('dibuja barras definitivas cuando el segmento ya está persistido', () => {
     const withBlock = {
       ...phaseRoadmap, phases: [{
