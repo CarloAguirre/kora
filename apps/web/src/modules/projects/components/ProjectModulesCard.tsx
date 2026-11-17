@@ -232,16 +232,37 @@ export function ProjectModulesCard({
   const onDeleteSegment = async (
     moduleId: string, segment: ProjectModuleSegment, close: () => void,
   ) => {
+    const module = project.modules.find((item) => item.id === moduleId);
+    const tasks = module?.tasks.filter((task) => task.segmentId === segment.id) ?? [];
+    const deliveries = module?.deliveries.filter((delivery) => delivery.segmentId === segment.id) ?? [];
+    const hours = segment.estimatedHours ?? 0;
+    // Primera confirmación: explicar todas las dependencias antes de eliminar.
     if (!await confirm({
-      title: 'Eliminar bloque de trabajo',
-      description: '¿Eliminar «' + segment.name +
-        '»? Se eliminará únicamente este bloque operativo. Las tareas EDT de referencia se conservarán.',
-      confirmLabel: 'Eliminar bloque', destructive: true,
+      title: 'Eliminar bloque y tareas relacionadas',
+      description: 'Se eliminará «' + segment.name + '», junto con ' +
+        plural(tasks.length, 'tarea') + ' y ' + plural(deliveries.length, 'entrega') +
+        ' de cierre vinculadas. También desaparecerán sus asignaciones de planificación.',
+      warning: 'Las HH ya registradas y aprobadas se conservarán en el historial. ' +
+        'No se modifican las HH vendidas ni la estimación del proyecto.',
+      confirmLabel: 'Continuar', cancelLabel: 'Cancelar', destructive: true,
+    })) return;
+    // Segunda confirmación separada: no confundir "Continuar" con la ejecución.
+    if (!await confirm({
+      title: 'Confirmación final · Eliminar bloque',
+      description: '¿Confirmas la eliminación definitiva de «' + segment.name +
+        '» y sus ' + tasks.length + ' tareas operativas relacionadas? ' +
+        (segment.estimatedHours == null ? 'Las HH del bloque sin estimar se liberarán.' :
+          hours.toLocaleString('es-CL') + ' HH planificadas quedarán disponibles para crear otro bloque.'),
+      warning: 'Esta acción no se puede deshacer. Se conservan la cotización, ' +
+        'las referencias EDT, las HH vendidas y todas las imputaciones históricas.',
+      confirmLabel: 'Sí, eliminar bloque y tareas',
+      cancelLabel: 'Volver',
+      destructive: true,
     })) return;
     try {
       await deleteSegment.mutateAsync({ projectId: project.id, moduleId, segmentId: segment.id });
       close();
-      toast.success('Bloque eliminado. Las referencias comerciales se conservaron.');
+      toast.success('Bloque y tareas relacionadas eliminados. Las HH estimadas quedan disponibles para replanificar.');
     } catch (error) {
       toast.error(error instanceof ApiRequestError ? error.message : 'No se pudo eliminar el bloque.');
     }
