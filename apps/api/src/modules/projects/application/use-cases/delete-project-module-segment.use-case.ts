@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, UNIT_OF_WORK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
+import { CLOCK, UNIT_OF_WORK, err, ok, type ApplicationError, type Clock, type Result, type UnitOfWork } from '@kora/core';
 import type { Permission } from '@kora/contracts';
 import {
   CannotManageProjectError,
@@ -59,19 +59,15 @@ export class DeleteProjectModuleSegmentUseCase
       return err(new CannotManageProjectError());
     }
 
-    // No convertir una entrega o tarea vigente en huérfana al borrar el bloque.
-    if (module.tasks.some((task) => task.segmentId === command.segmentId) ||
-      module.deliveries.some((delivery) => delivery.segmentId === command.segmentId)) {
-      return err(new ForbiddenError(
-        'Desvincula las tareas y la entrega de cierre antes de eliminar este bloque.',
-        'PROJECT_SEGMENT_HAS_DEPENDENCIES',
-      ));
-    }
-    // Las filas del tramo se van en cascada; las tareas que cubría vuelven a sumar en el Forecast.
-    await this.unitOfWork.run(async (tx) => {
-      await this.modules.removeSegment(command.segmentId, tx);
+    // Eliminar el conjunto OPERATIVO; no tocar projects.sold_hours,
+    // cotizaciones, EDT ni HH de hour_entries. Sin borrar las tareas vinculadas
+    // se convertirían silenciosamente en tareas huérfanas por ON DELETE SET NULL.
+    const removed = await this.unitOfWork.run(async (tx) => {
+      const result = await this.modules.removeSegmentWithDependencies(command.segmentId, tx);
+      if (!result.removed) throw new ProjectModuleSegmentNotFoundError(command.segmentId);
       await this.forecastSync.syncModuleTasks(project, command.moduleId, this.clock.now(), tx);
       await this.progress.recalculate(project.id, tx);
+      return result;
     });
 
     await this.audit.record({
@@ -79,7 +75,12 @@ export class DeleteProjectModuleSegmentUseCase
       action: 'update',
       entityType: 'project',
       entityId: project.id,
-      metadata: { event: 'module_segment_deleted', moduleId: command.moduleId, segmentId: command.segmentId },
+      metadata: {
+        event: 'module_segment_deleted', moduleId: command.moduleId,
+        segmentId: command.segmentId,
+        taskCount: removed.taskCount, deliveryCount: removed.deliveryCount,
+        soldHoursPreserved: true, hourEntriesPreserved: true,
+      },
     });
 
     return ok(undefined);
