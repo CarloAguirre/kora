@@ -20,8 +20,7 @@ function setup() {
     findById: vi.fn().mockResolvedValue(module),
     remove: vi.fn().mockResolvedValue(undefined),
   } as unknown as ProjectModuleRepository;
-  const progress = { recalculate: vi.fn().mockResolvedValue(undefined) }
-    as unknown as ProjectProgressRecalculator;
+  const progress = { recalculate: vi.fn().mockResolvedValue(undefined) } as unknown as ProjectProgressRecalculator;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
   const useCase = new DeleteProjectModuleUseCase(
     projects, modules, progress, new PassthroughUnitOfWork(), audit,
