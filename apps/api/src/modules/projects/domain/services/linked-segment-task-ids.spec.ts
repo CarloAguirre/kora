@@ -8,7 +8,7 @@ const segment = { id, teamId: 'team-dev' };
 const task = (id: string, props: Record<string, unknown>) =>
   ({ id, teamId: 'team-dev', segmentId: null, cancelledAt: null,
     description: null, ...props });
-const moduleOf = (segments: unknown[], tasks: unknown[]) =>
+const moduleOf = (segments: readonly unknown[], tasks: readonly unknown[]) =>
   ({ segments, tasks }) as unknown as Pick<ProjectModuleRecord, 'segments' | 'tasks'>;
 
 describe('Resolución de tareas heredadas al eliminar un bloque', () => {
