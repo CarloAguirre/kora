@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  and, eq, projectQuotations, quotationVersions,
+  and, desc, eq, inArray, projectQuotations, quotationVersions, quotationEvents,
   projectRoadmapReferenceExclusions, type Database,
 } from '@kora/db';
-import type { ExcludeRoadmapReferenceInput, RoadmapReferenceExclusion } from '@kora/contracts';
+import { ROADMAP_REMOVED_TEAM_BLOCK_WBS, type ExcludeRoadmapReferenceInput, type RoadmapReferenceExclusion } from '@kora/contracts';
+import type { TransactionContext } from '@kora/core';
+import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import type { RoadmapReferenceExclusionStore } from '../../application/ports/roadmap-reference-exclusion-store.port';
 
@@ -41,6 +43,32 @@ export class DrizzleRoadmapReferenceExclusionStore implements RoadmapReferenceEx
       versionId: input.versionId, wbs: input.wbs, role: input.role,
       actorUserId,
     }).onConflictDoNothing();
+  }
+
+  async suppressTeamBlock(
+    projectId: string, moduleId: string, teamId: string,
+    actorUserId: string, context?: TransactionContext,
+  ): Promise<boolean> {
+    const db = resolveDb(this.db, context);
+    // Debe corresponder al traspaso vigente y al ID EXACTO de esta fase.
+    // Sin fuente comercial no existe nada que suprimir.
+    const [applied] = await db.select({
+      versionId: quotationEvents.versionId,
+      metadata: quotationEvents.metadata,
+    }).from(quotationEvents)
+      .innerJoin(quotationVersions, eq(quotationVersions.id, quotationEvents.versionId))
+      .innerJoin(projectQuotations, eq(projectQuotations.id, quotationVersions.quotationId))
+      .where(and(eq(projectQuotations.projectId, projectId),
+        inArray(quotationEvents.action, ['quotation_transferred', 'planning_baseline_applied'])))
+      .orderBy(desc(quotationEvents.occurredAt)).limit(1);
+    const modules = (applied?.metadata as { moduleIds?: unknown } | undefined)?.moduleIds;
+    if (!applied || !Array.isArray(modules) || !modules.includes(moduleId)) return false;
+    await db.insert(projectRoadmapReferenceExclusions).values({
+      projectId, moduleId, versionId: applied.versionId,
+      wbs: ROADMAP_REMOVED_TEAM_BLOCK_WBS, role: teamId,
+      actorUserId,
+    }).onConflictDoNothing();
+    return true;
   }
 
   async restore(projectId: string, moduleId: string, input: ExcludeRoadmapReferenceInput): Promise<void> {
