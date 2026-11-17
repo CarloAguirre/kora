@@ -44,13 +44,14 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     <section aria-label="Fase 0 · Prospecto y levantamiento">{hours ?? 0} HH consumidas · Solo lectura</section>,
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
     renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
-    renderSelectionDetail, renderOperationalBlockActions, operationalPresaleHours, operationalNotice }: {
+    renderSelectionDetail, renderOperationalBlockActions, renderOperationalReferenceActions, operationalPresaleHours, operationalNotice }: {
     phaseRoadmap: { phases: { id: string }[]; rangeStartDate: string; rangeEndDate: string };
     toolbarActions?: ReactNode;
     operationalNotice?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
     renderPhaseHeaderActions?: (phase: { id: string }) => ReactNode;
     renderOperationalBlockActions?: (phase: { id: string }, block: { id: string; label: string }) => ReactNode;
+    renderOperationalReferenceActions?: (phase: { id: string }, row: { id: string; label: string }) => ReactNode;
     renderPhaseReferences?: (phase: { id: string }) => ReactNode;
     operationalRows?: (phase: { id: string }) => Array<{
       id: string; label: string; hours: number; proposedStartDate?: string; proposedEndDate?: string;
@@ -75,6 +76,7 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
       {renderPhaseHeaderActions?.(phase)}
       {renderOperationalBlockActions?.(phase, { id: 'segment-real-1', label: 'Bloque operativo' })}
       {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
+        {renderOperationalReferenceActions?.(phase, row)}
         {row.proposedStartDate && row.proposedEndDate && <output data-testid="dates-propuesta">
           {row.proposedStartDate} → {row.proposedEndDate}
         </output>}
@@ -568,6 +570,30 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     expect(screen.getByText('03-11-2026 → 08-12-2026, 120 HH de fase · 1 bloque sin HH')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
     expect(screen.queryByText(/propuesta/i)).not.toBeInTheDocument();
+  });
+
+  it('permite retirar un bloque fantasma heredado y sus tareas EDT con doble confirmación', async () => {
+    seedReference();
+    mocks.appliedPlan.modules[0]!.tasks = [{
+      wbs: 'WBS-UX', role: 'Diseñador UX', teamId: 'team-1',
+      name: 'Diseñar flujos y prototipo por rol', hours: 28, description: '',
+    }];
+    show({ ...project, status: 'active', startDate: '2026-11-09',
+      modules: [{ ...module, segments: [], tasks: [] }],
+    } as unknown as ProjectDetail);
+    const remove = screen.getByRole('button', {
+      name: 'Quitar bloque pendiente Diseño Backend · Desarrollo',
+    });
+    fireEvent.click(remove);
+    await waitFor(() => expect(mocks.excludeReference).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: { versionId: 'version-1',
+        wbs: '__KORA_REMOVED_TEAM_BLOCK__', role: 'team-1' },
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+    expect(mocks.confirm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      title: 'Confirmación final · Quitar bloque referencial',
+    }));
   });
 
   it('después de borrar un bloque no reaparecen ni el bloque pendiente ni sus referencias EDT', () => {
