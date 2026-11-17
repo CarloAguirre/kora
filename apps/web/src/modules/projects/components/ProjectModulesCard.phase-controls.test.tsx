@@ -488,20 +488,51 @@ describe('Cabecera de las fases · HTML v5', () => {
     }));
   });
 
-  it('solicita confirmación y elimina solo una fase vacía', async () => {
+  it('solicita dos confirmaciones y elimina una fase vacía', async () => {
     show();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' }));
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({
       projectId: 'project-1', moduleId: 'module-1',
     }));
-    expect(mocks.confirm).toHaveBeenCalledOnce();
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
   });
 
-  it('bloquea borrado de fases que contienen trabajo operativo', () => {
-    show({ ...project, modules: [{ ...module, tasks: [{ id: 'task-1' }] }] } as unknown as ProjectDetail);
+  it('permite borrar fase con bloques, tareas y entregas; conserva el total comercial', async () => {
+    const populated = { ...project, soldHours: 1656.5, usedHours: 548.5,
+      modules: [{ ...module,
+        segments: [{ id: 'segment-1', teamId: 'team-1', name: 'Bloque 1' }],
+        tasks: [{ id: 'task-1', segmentId: 'segment-1' }],
+        deliveries: [{ id: 'delivery-1', segmentId: 'segment-1' }],
+      }],
+    } as unknown as ProjectDetail;
+    show(populated);
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
-    expect(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' })).toBeDisabled();
+    const button = screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+    expect(mocks.confirm).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      title: 'Eliminar fase y toda su planificación',
+      description: expect.stringContaining('1 bloque'),
+    }));
+    expect(mocks.confirm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      title: 'Confirmación final · Eliminar fase',
+      confirmLabel: 'Sí, eliminar fase y tareas',
+    }));
+    expect(populated.soldHours).toBe(1656.5);
+    expect(populated.usedHours).toBe(548.5);
+  });
+
+  it('cancelar la segunda confirmación de la fase evita borrar', async () => {
+    mocks.confirm.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' }));
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(2));
     expect(mocks.remove).not.toHaveBeenCalled();
   });
 });
@@ -529,6 +560,25 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     expect(screen.getByText('03-11-2026 → 08-12-2026, 120 HH de fase · 1 bloque sin HH')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
     expect(screen.queryByText(/propuesta/i)).not.toBeInTheDocument();
+  });
+
+  it('después de borrar un bloque no reaparecen ni el bloque pendiente ni sus referencias EDT', () => {
+    seedReference();
+    mocks.appliedPlan.modules[0]!.tasks = [{
+      wbs: 'WBS-UX', role: 'Diseñador UX', teamId: 'team-1',
+      name: 'Diseñar flujos y prototipo por rol', hours: 28, description: '',
+    }];
+    mocks.excluded = [{
+      moduleId: 'module-1', versionId: 'version-1',
+      wbs: '__KORA_REMOVED_TEAM_BLOCK__', role: 'team-1',
+    }];
+    show({ ...project, soldHours: 1656.5, modules: [{
+      ...module, segments: [], tasks: [], estimatedHours: 120,
+    }] } as unknown as ProjectDetail);
+    expect(screen.queryByText(/pendiente de materializar/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Diseñar flujos y prototipo por rol')).not.toBeInTheDocument();
+    expect(screen.queryByText(/1 tarea espera asignación/)).not.toBeInTheDocument();
+    expect(mocks.appliedPlan.modules[0]!.totalHours).toBe(160);
   });
 
   it('una fase sin bloques antes de Hito 0 aún no muestra fechas operativas', () => {
