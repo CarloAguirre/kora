@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   createTask: vi.fn(),
   removeTask: vi.fn(),
   createSegment: vi.fn(),
+  deleteSegment: vi.fn(),
   excludeReference: vi.fn(),
   excluded: [] as Array<{ moduleId: string; versionId: string; wbs: string; role: string }>,
   confirm: vi.fn(),
@@ -95,7 +96,7 @@ vi.mock('../api/projects.queries', () => ({
   useDeleteProjectModule: () => ({ mutateAsync: mocks.remove, isPending: false }),
   useUpdateProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateProjectModuleSegment: () => ({ mutateAsync: mocks.createSegment, isPending: false }),
-  useDeleteProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteProjectModuleSegment: () => ({ mutateAsync: mocks.deleteSegment, isPending: false }),
   useUpdateProjectModuleDelivery: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateProjectModuleTask: () => ({ mutateAsync: mocks.updateTask, isPending: false }),
   useCreateProjectModuleTask: () => ({ mutateAsync: mocks.createTask, isPending: false }),
@@ -155,6 +156,7 @@ beforeEach(() => {
   mocks.removeTask.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
   mocks.createSegment.mockReset().mockResolvedValue(undefined);
+  mocks.deleteSegment.mockReset().mockResolvedValue(undefined);
   mocks.excludeReference.mockReset().mockResolvedValue(undefined);
   mocks.excluded = [];
   mocks.confirm.mockReset().mockResolvedValue(true);
@@ -311,6 +313,68 @@ describe('Edición superpuesta sobre el detalle lateral del bloque', () => {
     expect(screen.queryByRole('dialog', { name: 'Editar bloque de trabajo' }))
       .not.toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Bloque operativo' })).toBeInTheDocument();
+  });
+});
+
+describe('Eliminación de bloque con doble confirmación', () => {
+  const testSegment = {
+    id: 'segment-real-1', teamId: 'team-1', teamName: 'Desarrollo',
+    name: 'Bloque operativo', startDate: '2026-11-04', endDate: '2026-11-24',
+    estimatedHours: 52, consumedHours: 6, members: [], closedAt: null,
+  };
+  const testTask = {
+    id: 'task-associated', teamId: 'team-1', teamName: 'Desarrollo',
+    assigneeUserId: 'user-1', assigneeName: 'Ana',
+    segmentId: testSegment.id, segmentName: testSegment.name, name: 'Desarrollo API',
+    status: 'done', estimatedHours: 52, actualHours: 6, pendingHours: 0,
+    date: '2026-11-24', startDate: '2026-11-04',
+    completedAt: null, cancelledAt: null, description: null,
+    rejectionReason: null, scope: 'desarrollo',
+  };
+  const testDelivery = {
+    id: 'delivery-1', name: 'Entrega de desarrollo',
+    segmentId: testSegment.id, status: 'approved',
+    estimatedDate: '2026-11-24', teamId: 'team-1', teamName: 'Desarrollo',
+  };
+  const renderLinkedBlock = () => {
+    show({ ...project, soldHours: 1656.5, usedHours: 548.5,
+      modules: [{ ...module, estimatedHours: 1108, segments: [testSegment],
+        tasks: [testTask], deliveries: [testDelivery] }],
+    } as unknown as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir segmento operativo' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Bloque operativo' }))
+      .getByRole('button', { name: 'Eliminar bloque' }));
+  };
+  it('requiere dos confirmaciones y elimina todas las dependencias mediante un solo endpoint', async () => {
+    renderLinkedBlock();
+    await waitFor(() => expect(mocks.deleteSegment).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', segmentId: testSegment.id,
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+    expect(mocks.confirm).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      title: 'Eliminar bloque y tareas relacionadas',
+      description: expect.stringContaining('1 tarea'),
+      warning: expect.stringContaining('No se modifican las HH vendidas'),
+    }));
+    expect(mocks.confirm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      title: 'Confirmación final · Eliminar bloque',
+      description: expect.stringContaining('52 HH planificadas quedarán disponibles'),
+      confirmLabel: 'Sí, eliminar bloque y tareas',
+    }));
+    expect(mocks.removeTask).not.toHaveBeenCalled();
+    expect(mocks.success).toHaveBeenCalledWith(expect.stringContaining('HH estimadas quedan disponibles'));
+  });
+  it('no muta si se rechaza la primera confirmación', async () => {
+    mocks.confirm.mockResolvedValueOnce(false);
+    renderLinkedBlock();
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1));
+    expect(mocks.deleteSegment).not.toHaveBeenCalled();
+  });
+  it('no muta si se cancela la segunda confirmación', async () => {
+    mocks.confirm.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    renderLinkedBlock();
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(2));
+    expect(mocks.deleteSegment).not.toHaveBeenCalled();
   });
 });
 
