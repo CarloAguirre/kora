@@ -501,9 +501,17 @@ describe('Cabecera de las fases · HTML v5', () => {
   it('permite borrar fase con bloques, tareas y entregas; conserva el total comercial', async () => {
     const populated = { ...project, soldHours: 1656.5, usedHours: 548.5,
       modules: [{ ...module,
-        segments: [{ id: 'segment-1', teamId: 'team-1', name: 'Bloque 1' }],
-        tasks: [{ id: 'task-1', segmentId: 'segment-1' }],
-        deliveries: [{ id: 'delivery-1', segmentId: 'segment-1' }],
+        segments: [{ id: 'segment-1', teamId: 'team-1', teamName: 'Desarrollo',
+          name: 'Bloque 1', startDate: '2026-11-09', endDate: '2026-11-29',
+          estimatedHours: 28, consumedHours: 0, closedAt: null, members: [] }],
+        tasks: [{ id: 'task-1', segmentId: 'segment-1',
+          teamId: 'team-1', name: 'Diseñar flujos', description: null,
+          status: 'done', estimatedHours: 28, actualHours: 0, pendingHours: 0,
+          startDate: '2026-11-09', date: '2026-11-29',
+          assigneeUserId: null, cancelledAt: null }],
+        deliveries: [{ id: 'delivery-1', segmentId: 'segment-1',
+          teamId: 'team-1', name: 'Entrega UX', status: 'approved',
+          estimatedDate: '2026-11-29' }],
       }],
     } as unknown as ProjectDetail;
     show(populated);
