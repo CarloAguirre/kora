@@ -283,7 +283,7 @@ export interface ProjectModuleRepository {
    * hour_entries conserva sus HH y aprobaciones: las FK se ponen en NULL.
    * La estimación y referencias de cotización NO se modifican.
    */
-  removeSegmentWithDependencies(id: string, context?: TransactionContext): Promise<{
+  removeSegmentWithDependencies(id: string, legacyTaskIds: readonly string[], context?: TransactionContext): Promise<{
     removed: boolean; taskCount: number; deliveryCount: number;
   }>;
   /** Reconciliar cierre real después de un cambio de aprobación de tarea, sin inferir fechas. */
