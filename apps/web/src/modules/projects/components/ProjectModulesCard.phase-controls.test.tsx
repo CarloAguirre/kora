@@ -44,12 +44,13 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     <section aria-label="Fase 0 · Prospecto y levantamiento">{hours ?? 0} HH consumidas · Solo lectura</section>,
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
     renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
-    renderSelectionDetail, operationalPresaleHours, operationalNotice }: {
+    renderSelectionDetail, renderOperationalBlockActions, operationalPresaleHours, operationalNotice }: {
     phaseRoadmap: { phases: { id: string }[]; rangeStartDate: string; rangeEndDate: string };
     toolbarActions?: ReactNode;
     operationalNotice?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
     renderPhaseHeaderActions?: (phase: { id: string }) => ReactNode;
+    renderOperationalBlockActions?: (phase: { id: string }, block: { id: string; label: string }) => ReactNode;
     renderPhaseReferences?: (phase: { id: string }) => ReactNode;
     operationalRows?: (phase: { id: string }) => Array<{
       id: string; label: string; hours: number; proposedStartDate?: string; proposedEndDate?: string;
@@ -72,6 +73,7 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
       {operationalPresaleHours != null && <output data-testid="presale-hours">{operationalPresaleHours}</output>}
       {toolbarActions}{operationalNotice}{renderPhaseHeaderName?.(phase)}
       {renderPhaseHeaderActions?.(phase)}
+      {renderOperationalBlockActions?.(phase, { id: 'segment-real-1', label: 'Bloque operativo' })}
       {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
         {row.proposedStartDate && row.proposedEndDate && <output data-testid="dates-propuesta">
           {row.proposedStartDate} → {row.proposedEndDate}
@@ -345,6 +347,19 @@ describe('Eliminación de bloque con doble confirmación', () => {
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Bloque operativo' }))
       .getByRole('button', { name: 'Eliminar bloque' }));
   };
+  it('la papelera propia del bloque dispara las dos confirmaciones sin entrar al panel lateral', async () => {
+    show({ ...project, soldHours: 1656.5, usedHours: 548.5,
+      modules: [{ ...module, estimatedHours: 1108, segments: [testSegment],
+        tasks: [testTask], deliveries: [testDelivery] }],
+    } as unknown as ProjectDetail);
+    const button = screen.getByRole('button', { name: 'Eliminar bloque Bloque operativo' });
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.deleteSegment).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', segmentId: testSegment.id,
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+  });
+
   it('requiere dos confirmaciones y elimina todas las dependencias mediante un solo endpoint', async () => {
     renderLinkedBlock();
     await waitFor(() => expect(mocks.deleteSegment).toHaveBeenCalledWith({
