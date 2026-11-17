@@ -59,7 +59,8 @@ function OriginIcon({ item }: { item: ForecastCapacityItem }) {
 
 function ProjectChips({ member }: { member: ForecastCapacityMember }) {
   const over = loadTone(member) === 'over';
-  const unassigned = freeHours(member);
+  // Redondeado a un decimal: la resta de horas arrastra ruido de punto flotante (0,28999…).
+  const unassigned = Math.round(freeHours(member) * 10) / 10;
 
   return (
     <div className={styles.chips}>
@@ -85,7 +86,7 @@ function ProjectChips({ member }: { member: ForecastCapacityMember }) {
           Entrega {formatWeekday(delivery.date)}
         </span>
       ))}
-      {unassigned > 0 && <span className={[styles.chip, styles.chipUnassigned].join(' ')}>Sin asignación: {unassigned}hh</span>}
+      {unassigned > 0 && <span className={[styles.chip, styles.chipUnassigned].join(' ')}>Sin asignación: {formatHours(unassigned)}hh</span>}
     </div>
   );
 }
