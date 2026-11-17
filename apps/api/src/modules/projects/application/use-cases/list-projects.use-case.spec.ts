@@ -153,6 +153,46 @@ describe('ListProjectsUseCase — resolución de slug en los filtros', () => {
     expect(filters.quotationViewerUserId).toBeUndefined();
   });
 
+  it('horas Prospecto permite transversalidad solo con permiso hours:register', async () => {
+    const projects = new FakeProjectRepository();
+    const useCase = new ListProjectsUseCase(
+      projects as unknown as ProjectRepository,
+      new FakeTeamRepository(new Map()) as unknown as TeamRepository,
+      new FakeClientReader(new Map()), MODULES, new FixedClock(),
+    );
+    const actor = { userId: 'colaborador-1', email: 'c@kabeli.cl' };
+    await useCase.execute({
+      query: { ...baseQuery(), hourEntryProspects: 'true',
+        kind: ['approved'], type: 'support', status: ['finished'],
+        assignedToUserId: 'otra-persona' },
+      actor, actorPermissions: ['hours:register'],
+    });
+    const filters: ProjectFilters = projects.search.mock.calls[0]![0];
+    expect(filters.type).toBe('development');
+    expect(filters.kind).toEqual(['prospect', 'quoted']);
+    expect(filters.status).toEqual(['draft', 'active']);
+    expect(filters.assignedToUserId).toBeUndefined();
+    expect(filters.quotationStatus).toBeUndefined();
+    expect(filters.teamId).toBeUndefined();
+    expect(filters.leaderUserId).toBeUndefined();
+  });
+  it('no concede catálogo transversal si el usuario carece de hours:register', async () => {
+    const projects = new FakeProjectRepository();
+    const useCase = new ListProjectsUseCase(
+      projects as unknown as ProjectRepository,
+      new FakeTeamRepository(new Map()) as unknown as TeamRepository,
+      new FakeClientReader(new Map()), MODULES, new FixedClock(),
+    );
+    await useCase.execute({
+      query: { ...baseQuery(), hourEntryProspects: 'true', kind: ['approved'] },
+      actor: { userId: 'usuario-1', email: 'u@kabeli.cl' },
+      actorPermissions: ['projects:read_assigned'],
+    });
+    const filters: ProjectFilters = projects.search.mock.calls[0]![0];
+    expect(filters.assignedToUserId).toBe('usuario-1');
+    expect(filters.kind).toEqual(['approved']);
+  });
+
   it('limita el filtro de cotización al líder asignado cuando no es Gerencia', async () => {
     const projects = new FakeProjectRepository();
     const useCase = new ListProjectsUseCase(

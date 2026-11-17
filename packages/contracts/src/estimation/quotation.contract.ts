@@ -51,10 +51,16 @@ export const quotationPhaseTeamHoursSchema = z.object({
   teamId: uuidSchema,
   hours: z.number().min(0).max(1000000),
 });
+/** Inicios y duraciones comerciales en incrementos de media semana. */
+export const quotationPhaseStartWeekSchema = z.number().min(1).max(520.5)
+  .refine((value) => Number.isInteger(value * 2), 'Usa incrementos de 0,5 semana.');
+export const quotationPhaseDurationWeeksSchema = z.number().min(0.5).max(520)
+  .refine((value) => Number.isInteger(value * 2), 'Usa incrementos de 0,5 semana.');
+
 export const quotationPhaseDraftSchema = z.object({
   name: nonEmptyTrimmed(300, 'El nombre de fase'),
-  startWeek: z.number().int().min(1).max(520),
-  durationWeeks: z.number().int().min(1).max(520),
+  startWeek: quotationPhaseStartWeekSchema,
+  durationWeeks: quotationPhaseDurationWeeksSchema,
   teamHours: z.array(quotationPhaseTeamHoursSchema).max(100),
 });
 export const quotationExternalCostSchema = z.object({
@@ -89,6 +95,12 @@ export const quotationDraftDataSchema = z.object({
   teams: z.array(quotationTeamDraftSchema).max(100).default([]),
   phases: z.array(quotationPhaseDraftSchema).max(100).default([]),
   /**
+   * Foto histórica cobrable de Fase 0 al crear la versión (o primer guardado
+   * de una versión legacy). Ya consumida; no se planifica como HH de la EDT.
+   * La API la obtiene del proyecto, no de una edición del cliente.
+   */
+  phaseZeroBillableHours: z.number().nonnegative().max(100000000).optional(),
+  /**
    * HH manuales por WBS y perfil. La EDT original en aiPoc.edt es inmutable;
    * esta lista representa solo diferencias revisables del borrador.
    */
@@ -118,8 +130,8 @@ export const quotationDraftDataSchema = z.object({
   edtCommercialStages: z.array(z.object({
     code: z.string().regex(/^KS-[a-f0-9-]{36}$/),
     name: nonEmptyTrimmed(300, 'El nombre de la fase'),
-    startWeek: z.number().int().min(1).max(520),
-    durationWeeks: z.number().int().min(1).max(520),
+    startWeek: quotationPhaseStartWeekSchema,
+    durationWeeks: quotationPhaseDurationWeeksSchema,
   })).max(100).optional(),
   edtCommercialTasks: z.array(z.object({
     wbs: z.string().regex(/^KT-[a-f0-9-]{36}$/),
@@ -139,8 +151,8 @@ export const quotationDraftDataSchema = z.object({
   edtStageSettings: z.array(z.object({
     stageCode: z.string().trim().min(1).max(40),
     name: nonEmptyTrimmed(300, 'El nombre del módulo'),
-    startWeek: z.number().int().min(1).max(520),
-    durationWeeks: z.number().int().min(1).max(520),
+    startWeek: quotationPhaseStartWeekSchema,
+    durationWeeks: quotationPhaseDurationWeeksSchema,
   })).max(100).optional(),
   /**
    * Calendario de referencia ESTABLE para recalcular dotación en EDT v2.
@@ -151,8 +163,8 @@ export const quotationDraftDataSchema = z.object({
    */
   edtWorkforceReferenceStages: z.array(z.object({
     stageCode: z.string().trim().min(1).max(40),
-    startWeek: z.number().int().min(1).max(520),
-    durationWeeks: z.number().int().min(1).max(520),
+    startWeek: quotationPhaseStartWeekSchema,
+    durationWeeks: quotationPhaseDurationWeeksSchema,
   })).max(100).optional(),
   costs: z.array(quotationExternalCostSchema).max(100).default([]),
   paymentPlan: z.array(quotationPaymentItemSchema).max(100).default([]),
@@ -231,6 +243,8 @@ export const quotationTransferResultSchema = z.object({
   teamCount: z.number().int().nonnegative(),
   moduleCount: z.number().int().nonnegative(),
   paymentMilestoneCount: z.number().int().nonnegative(),
+  /** El traspaso se confirmó, pero la materialización requiere revisión. */
+  calendarWarning: z.string().optional(),
 });
 export type QuotationTransferResult = z.infer<typeof quotationTransferResultSchema>;
 

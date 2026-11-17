@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   projects, projectModules, projectModuleSegments, projectModuleDeliveries,
-  projectTeams, quotationEvents,
+  projectTeams, quotationEvents, projectRoadmapReferenceExclusions,
   type Database,
 } from '@kora/db';
 import { DrizzleApprovedProjectCalendar } from './drizzle-approved-project-calendar';
@@ -17,6 +17,8 @@ function fixture(options: {
   existingSegment?: boolean;
   existingDates?: boolean;
   hitoOnly?: boolean;
+  historical?: boolean;
+  removedTeam?: boolean;
 } = {}) {
   const project = {
     id: projectId, type: 'development', status: options.active === false ? 'draft' : 'active',
@@ -34,7 +36,10 @@ function fixture(options: {
     }],
   };
   const source = options.transferred === false ? null : {
-    versionId, draft, transfer: { moduleIds: [moduleId] },
+    versionId, draft,
+    transferredAt: new Date('2026-11-16T14:00:00.000Z'),
+    transfer: { moduleIds: [moduleId],
+      priorCommercialState: { usedHours: options.historical ? 548.5 : 0 } },
   };
   const modules = [{
     id: moduleId, name: 'S1: Diseño UX',
@@ -60,6 +65,7 @@ function fixture(options: {
     if (table === projectModules) return modules;
     if (table === projectTeams) return [{ id: teamId, name: 'UX' }];
     if (table === projectModuleSegments) return segments;
+    if (table === projectRoadmapReferenceExclusions) return options.removedTeam ? [{ moduleId, teamId }] : [];
     return [];
   };
   const tx = {
@@ -142,6 +148,15 @@ describe('Materializar cronograma de cotización aprobada (sin segunda aprobaci�
     expect(fx.inserts.filter((item) => item.table === projectModuleDeliveries)).toHaveLength(1);
   });
 
+  it('un bloque retirado por el PM no vuelve a materializarse aunque no exista aún evento de calendario', async () => {
+    const fx = fixture({ removedTeam: true });
+    expect(await fx.calendar.ensure(projectId)).toBe(false);
+    expect(fx.inserts.filter((item) => item.table === projectModuleSegments)).toHaveLength(0);
+    expect(fx.inserts.filter((item) => item.table === projectModuleDeliveries)).toHaveLength(0);
+    expect(fx.persistedEvents[0]?.action).toBe('roadmap_calendar_materialized');
+    expect(await fx.calendar.ensure(projectId)).toBe(false);
+  });
+
   it('si el PM no definió start_date toma Hito 0, sin escribir una fecha artificial al proyecto', async () => {
     const fx = fixture({ hitoOnly: true });
     expect(await fx.calendar.ensure(projectId)).toBe(true);
@@ -152,6 +167,19 @@ describe('Materializar cronograma de cotización aprobada (sin segunda aprobaci�
       });
     expect(fx.persistedEvents[0]?.metadata).toMatchObject({ startDate: '2026-11-10' });
     expect(fx.tx.update).toHaveBeenCalledWith(projectModules);
+    expect(fx.tx.update).not.toHaveBeenCalledWith(projects);
+  });
+
+  it('traspaso a proyecto activo con Fase 0 comienza en fecha del traspaso, no en fecha histórica', async () => {
+    const fx = fixture({ historical: true });
+    expect(await fx.calendar.ensure(projectId)).toBe(true);
+    const block = fx.inserts.find((item) => item.table === projectModuleSegments)?.value;
+    // Semana 3: 14 días después del traspaso (16/11), NO del inicio (05/11).
+    expect(block?.startDate).toEqual(new Date('2026-11-30T00:00:00.000Z'));
+    expect(block?.endDate).toEqual(new Date('2027-01-03T00:00:00.000Z'));
+    expect(fx.persistedEvents[0]?.metadata).toMatchObject({
+      startDate: '2026-11-16', anchor: 'quotation_transfer_with_phase_zero',
+    });
     expect(fx.tx.update).not.toHaveBeenCalledWith(projects);
   });
 

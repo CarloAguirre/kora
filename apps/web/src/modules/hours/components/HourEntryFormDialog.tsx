@@ -14,11 +14,12 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { useHolidays, useHourEntriesList, useHourEntryDetail, useUpdateHourEntry } from '../api/hours.queries';
-import { useProjectsList } from '@/modules/projects/api/projects.queries';
+// El catálogo para registro incluye prospectos transversales de manera acotada.
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { HOUR_ENTRY_PROJECT_STATUSES, filterHourEntryProjects } from '../lib/selectable-project-statuses';
+import { filterHourEntryProjects } from '../lib/selectable-project-statuses';
+import { useHourEntryProjectOptions } from '../hooks/useHourEntryProjectOptions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import {
   DAILY_CAP_HOURS,
@@ -151,16 +152,11 @@ function EditEntryForm({
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Igual que el alta: el dueño (salvo PMO) solo ve sus proyectos asignados;
-  // admin/PMO editando el registro de otro ven todos.
+  // Las horas de Proyecto respetan asignación; Prospecto permite el catálogo completo.
   const restrictToAssigned = user?.id === entry.user.id && user?.role !== 'pmo';
-  const { data: projectsData } = useProjectsList({
-    page: 1,
-    pageSize: 200,
-    sortField: 'name',
-    assignedToUserId: restrictToAssigned ? user?.id : undefined,
-    status: HOUR_ENTRY_PROJECT_STATUSES,
-  });
+  const projectOptions = useHourEntryProjectOptions(
+    restrictToAssigned ? user?.id : undefined,
+  );
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
   /** Catálogo completo (unas decenas de filas): el calendario puede navegar a cualquier mes. */
   const { data: allHolidays } = useHolidays({});
@@ -170,10 +166,10 @@ function EditEntryForm({
   // El proyecto guardado puede no venir en la lista (p. ej. ya no está asignado
   // al autor, o ya se finalizó): se agrega para que el combobox lo siga mostrando.
   const projects = useMemo(() => {
-    const items = projectsData?.items ?? [];
+    const items = projectOptions.items;
     if (!entry.project || items.some((p) => p.id === entry.project?.id)) return items;
     return [{ id: entry.project.id, name: entry.project.name, client: null, allowsOvertime: false } as unknown as ProjectSummary, ...items];
-  }, [projectsData, entry.project]);
+  }, [projectOptions.items, entry.project]);
 
   const holiday = holidaysForDate?.[0] ?? null;
   const blockingMessage = !canEditAnyMonth(user?.role) && !isInCurrentMonth(date)

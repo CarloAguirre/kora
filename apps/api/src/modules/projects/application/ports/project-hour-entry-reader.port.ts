@@ -16,6 +16,20 @@ export interface CollaboratorProjectEventRecord {
   readonly hasBlocker: boolean;
   readonly blockerDescription: string | null;
 }
+export interface HistoricalPhaseZeroEntryRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  date: Date;
+  createdAt: Date;
+  status: 'pending' | 'approved' | 'rejected';
+  activity: string;
+  description: string;
+  taskName: string | null;
+  teamId: string | null;
+  hours: number;
+}
+
 export interface ProjectHourEntryReader {
   weeklyHoursByProjectForUser(
     userId: string, projectIds: readonly string[], from: Date, through: Date,
@@ -40,7 +54,11 @@ export interface ProjectHourEntryReader {
    * En transferencias antiguas sin metadatos retorna hours=null (fallback legado).
    */
   phaseZeroSnapshotForProject(projectId: string): Promise<{
-    transferred: boolean; hours: number | null;
+    transferred: boolean; hours: number | null; cutoffAt?: Date | null;
+  }>;
+  /** Entrada real hasta el momento del traspaso. Nunca se inventa una tarea. */
+  phaseZeroEntriesForProject?(projectId: string, cutoffAt: Date | null, limit: number): Promise<{
+    entries: HistoricalPhaseZeroEntryRecord[]; truncated: boolean;
   }>;
 }
 

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   createTask: vi.fn(),
   removeTask: vi.fn(),
   createSegment: vi.fn(),
+  deleteSegment: vi.fn(),
   excludeReference: vi.fn(),
   excluded: [] as Array<{ moduleId: string; versionId: string; wbs: string; role: string }>,
   confirm: vi.fn(),
@@ -43,12 +44,14 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
     <section aria-label="Fase 0 · Prospecto y levantamiento">{hours ?? 0} HH consumidas · Solo lectura</section>,
   PhaseRoadmap: ({ phaseRoadmap, toolbarActions, renderPhaseHeaderName,
     renderPhaseHeaderActions, renderPhaseReferences, operationalRows, onPlanOperationalRow, operationalFooter,
-    renderSelectionDetail, operationalPresaleHours, operationalNotice }: {
+    renderSelectionDetail, renderOperationalBlockActions, renderOperationalReferenceActions, operationalPresaleHours, operationalNotice }: {
     phaseRoadmap: { phases: { id: string }[]; rangeStartDate: string; rangeEndDate: string };
     toolbarActions?: ReactNode;
     operationalNotice?: ReactNode;
     renderPhaseHeaderName?: (phase: { id: string }) => ReactNode;
     renderPhaseHeaderActions?: (phase: { id: string }) => ReactNode;
+    renderOperationalBlockActions?: (phase: { id: string }, block: { id: string; label: string }) => ReactNode;
+    renderOperationalReferenceActions?: (phase: { id: string }, row: { id: string; label: string }) => ReactNode;
     renderPhaseReferences?: (phase: { id: string }) => ReactNode;
     operationalRows?: (phase: { id: string }) => Array<{
       id: string; label: string; hours: number; proposedStartDate?: string; proposedEndDate?: string;
@@ -71,7 +74,9 @@ vi.mock('@/modules/client-portal/components/PhaseRoadmap', () => ({
       {operationalPresaleHours != null && <output data-testid="presale-hours">{operationalPresaleHours}</output>}
       {toolbarActions}{operationalNotice}{renderPhaseHeaderName?.(phase)}
       {renderPhaseHeaderActions?.(phase)}
+      {renderOperationalBlockActions?.(phase, { id: 'segment-real-1', label: 'Bloque operativo' })}
       {operationalRows?.(phase).map((row) => <div key={row.id}>{row.label}
+        {renderOperationalReferenceActions?.(phase, row)}
         {row.proposedStartDate && row.proposedEndDate && <output data-testid="dates-propuesta">
           {row.proposedStartDate} → {row.proposedEndDate}
         </output>}
@@ -95,7 +100,7 @@ vi.mock('../api/projects.queries', () => ({
   useDeleteProjectModule: () => ({ mutateAsync: mocks.remove, isPending: false }),
   useUpdateProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateProjectModuleSegment: () => ({ mutateAsync: mocks.createSegment, isPending: false }),
-  useDeleteProjectModuleSegment: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteProjectModuleSegment: () => ({ mutateAsync: mocks.deleteSegment, isPending: false }),
   useUpdateProjectModuleDelivery: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateProjectModuleTask: () => ({ mutateAsync: mocks.updateTask, isPending: false }),
   useCreateProjectModuleTask: () => ({ mutateAsync: mocks.createTask, isPending: false }),
@@ -155,6 +160,7 @@ beforeEach(() => {
   mocks.removeTask.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
   mocks.createSegment.mockReset().mockResolvedValue(undefined);
+  mocks.deleteSegment.mockReset().mockResolvedValue(undefined);
   mocks.excludeReference.mockReset().mockResolvedValue(undefined);
   mocks.excluded = [];
   mocks.confirm.mockReset().mockResolvedValue(true);
@@ -314,6 +320,81 @@ describe('Edición superpuesta sobre el detalle lateral del bloque', () => {
   });
 });
 
+describe('Eliminación de bloque con doble confirmación', () => {
+  const testSegment = {
+    id: 'segment-real-1', teamId: 'team-1', teamName: 'Desarrollo',
+    name: 'Bloque operativo', startDate: '2026-11-04', endDate: '2026-11-24',
+    estimatedHours: 52, consumedHours: 6, members: [], closedAt: null,
+  };
+  const testTask = {
+    id: 'task-associated', teamId: 'team-1', teamName: 'Desarrollo',
+    assigneeUserId: 'user-1', assigneeName: 'Ana',
+    segmentId: testSegment.id, segmentName: testSegment.name, name: 'Desarrollo API',
+    status: 'done', estimatedHours: 52, actualHours: 6, pendingHours: 0,
+    date: '2026-11-24', startDate: '2026-11-04',
+    completedAt: null, cancelledAt: null, description: null,
+    rejectionReason: null, scope: 'desarrollo',
+  };
+  const testDelivery = {
+    id: 'delivery-1', name: 'Entrega de desarrollo',
+    segmentId: testSegment.id, status: 'approved',
+    estimatedDate: '2026-11-24', teamId: 'team-1', teamName: 'Desarrollo',
+  };
+  const renderLinkedBlock = () => {
+    show({ ...project, soldHours: 1656.5, usedHours: 548.5,
+      modules: [{ ...module, estimatedHours: 1108, segments: [testSegment],
+        tasks: [testTask], deliveries: [testDelivery] }],
+    } as unknown as ProjectDetail);
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir segmento operativo' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Bloque operativo' }))
+      .getByRole('button', { name: 'Eliminar bloque' }));
+  };
+  it('la papelera propia del bloque dispara las dos confirmaciones sin entrar al panel lateral', async () => {
+    show({ ...project, soldHours: 1656.5, usedHours: 548.5,
+      modules: [{ ...module, estimatedHours: 1108, segments: [testSegment],
+        tasks: [testTask], deliveries: [testDelivery] }],
+    } as unknown as ProjectDetail);
+    const button = screen.getByRole('button', { name: 'Eliminar bloque Bloque operativo' });
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.deleteSegment).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', segmentId: testSegment.id,
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+  });
+
+  it('requiere dos confirmaciones y elimina todas las dependencias mediante un solo endpoint', async () => {
+    renderLinkedBlock();
+    await waitFor(() => expect(mocks.deleteSegment).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1', segmentId: testSegment.id,
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+    expect(mocks.confirm).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      title: 'Eliminar bloque y tareas relacionadas',
+      description: expect.stringContaining('1 tarea'),
+      warning: expect.stringContaining('No se modifican las HH vendidas'),
+    }));
+    expect(mocks.confirm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      title: 'Confirmación final · Eliminar bloque',
+      description: expect.stringContaining('52 HH planificadas quedarán disponibles'),
+      confirmLabel: 'Sí, eliminar bloque y tareas',
+    }));
+    expect(mocks.removeTask).not.toHaveBeenCalled();
+    expect(mocks.success).toHaveBeenCalledWith(expect.stringContaining('HH estimadas quedan disponibles'));
+  });
+  it('no muta si se rechaza la primera confirmación', async () => {
+    mocks.confirm.mockResolvedValueOnce(false);
+    renderLinkedBlock();
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1));
+    expect(mocks.deleteSegment).not.toHaveBeenCalled();
+  });
+  it('no muta si se cancela la segunda confirmación', async () => {
+    mocks.confirm.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    renderLinkedBlock();
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(2));
+    expect(mocks.deleteSegment).not.toHaveBeenCalled();
+  });
+});
+
 describe('Cabecera de las fases · HTML v5', () => {
   it('no muestra la antigua Hoja de ruta ni el resumen duplicado de etapas', () => {
     show();
@@ -409,20 +490,59 @@ describe('Cabecera de las fases · HTML v5', () => {
     }));
   });
 
-  it('solicita confirmación y elimina solo una fase vacía', async () => {
+  it('solicita dos confirmaciones y elimina una fase vacía', async () => {
     show();
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' }));
     await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({
       projectId: 'project-1', moduleId: 'module-1',
     }));
-    expect(mocks.confirm).toHaveBeenCalledOnce();
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
   });
 
-  it('bloquea borrado de fases que contienen trabajo operativo', () => {
-    show({ ...project, modules: [{ ...module, tasks: [{ id: 'task-1' }] }] } as unknown as ProjectDetail);
+  it('permite borrar fase con bloques, tareas y entregas; conserva el total comercial', async () => {
+    const populated = { ...project, soldHours: 1656.5, usedHours: 548.5,
+      modules: [{ ...module,
+        segments: [{ id: 'segment-1', teamId: 'team-1', teamName: 'Desarrollo',
+          name: 'Bloque 1', startDate: '2026-11-09', endDate: '2026-11-29',
+          estimatedHours: 28, consumedHours: 0, closedAt: null, members: [] }],
+        tasks: [{ id: 'task-1', segmentId: 'segment-1',
+          teamId: 'team-1', name: 'Diseñar flujos', description: null,
+          status: 'done', estimatedHours: 28, actualHours: 0, pendingHours: 0,
+          startDate: '2026-11-09', date: '2026-11-29',
+          assigneeUserId: null, cancelledAt: null }],
+        deliveries: [{ id: 'delivery-1', segmentId: 'segment-1',
+          teamId: 'team-1', name: 'Entrega UX', status: 'approved',
+          estimatedDate: '2026-11-29' }],
+      }],
+    } as unknown as ProjectDetail;
+    show(populated);
     fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
-    expect(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' })).toBeDisabled();
+    const button = screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+    expect(mocks.confirm).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      title: 'Eliminar fase y toda su planificación',
+      description: expect.stringContaining('1 bloque'),
+    }));
+    expect(mocks.confirm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      title: 'Confirmación final · Eliminar fase',
+      confirmLabel: 'Sí, eliminar fase y tareas',
+    }));
+    expect(populated.soldHours).toBe(1656.5);
+    expect(populated.usedHours).toBe(548.5);
+  });
+
+  it('cancelar la segunda confirmación de la fase evita borrar', async () => {
+    mocks.confirm.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Planificar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar fase Diseño Backend' }));
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(2));
     expect(mocks.remove).not.toHaveBeenCalled();
   });
 });
@@ -450,6 +570,49 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
     expect(screen.getByText('03-11-2026 → 08-12-2026, 120 HH de fase · 1 bloque sin HH')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Planificar bloque' })).not.toBeInTheDocument();
     expect(screen.queryByText(/propuesta/i)).not.toBeInTheDocument();
+  });
+
+  it('permite retirar un bloque fantasma heredado y sus tareas EDT con doble confirmación', async () => {
+    seedReference();
+    mocks.appliedPlan.modules[0]!.tasks = [{
+      wbs: 'WBS-UX', role: 'Diseñador UX', teamId: 'team-1',
+      name: 'Diseñar flujos y prototipo por rol', hours: 28, description: '',
+    }];
+    show({ ...project, status: 'active', startDate: '2026-11-09',
+      modules: [{ ...module, segments: [], tasks: [] }],
+    } as unknown as ProjectDetail);
+    const remove = screen.getByRole('button', {
+      name: 'Quitar bloque pendiente Diseño Backend · Desarrollo',
+    });
+    fireEvent.click(remove);
+    await waitFor(() => expect(mocks.excludeReference).toHaveBeenCalledWith({
+      projectId: 'project-1', moduleId: 'module-1',
+      input: { versionId: 'version-1',
+        wbs: '__KORA_REMOVED_TEAM_BLOCK__', role: 'team-1' },
+    }));
+    expect(mocks.confirm).toHaveBeenCalledTimes(2);
+    expect(mocks.confirm).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      title: 'Confirmación final · Quitar bloque referencial',
+    }));
+  });
+
+  it('después de borrar un bloque no reaparecen ni el bloque pendiente ni sus referencias EDT', () => {
+    seedReference();
+    mocks.appliedPlan.modules[0]!.tasks = [{
+      wbs: 'WBS-UX', role: 'Diseñador UX',
+      name: 'Diseñar flujos y prototipo por rol', hours: 28, description: '',
+    }];
+    mocks.excluded = [{
+      moduleId: 'module-1', versionId: 'version-1',
+      wbs: '__KORA_REMOVED_TEAM_BLOCK__', role: 'team-1',
+    }];
+    show({ ...project, soldHours: 1656.5, modules: [{
+      ...module, segments: [], tasks: [], estimatedHours: 120,
+    }] } as unknown as ProjectDetail);
+    expect(screen.queryByText(/pendiente de materializar/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Diseñar flujos y prototipo por rol')).not.toBeInTheDocument();
+    expect(screen.queryByText(/1 tarea espera asignación/)).not.toBeInTheDocument();
+    expect(mocks.appliedPlan.modules[0]!.totalHours).toBe(160);
   });
 
   it('una fase sin bloques antes de Hito 0 aún no muestra fechas operativas', () => {

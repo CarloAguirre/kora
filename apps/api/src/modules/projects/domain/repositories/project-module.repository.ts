@@ -279,6 +279,13 @@ export interface ProjectModuleRepository {
     context?: TransactionContext,
   ): Promise<void>;
   removeSegment(id: string, context?: TransactionContext): Promise<void>;
+  /** Elimina bloque, tareas y entregas de cierre vinculadas en una única transacción.
+   * hour_entries conserva sus HH y aprobaciones: las FK se ponen en NULL.
+   * La estimación y referencias de cotización NO se modifican.
+   */
+  removeSegmentWithDependencies(id: string, legacyTaskIds: readonly string[], context?: TransactionContext): Promise<{
+    removed: boolean; taskCount: number; deliveryCount: number;
+  }>;
   /** Reconciliar cierre real después de un cambio de aprobación de tarea, sin inferir fechas. */
   refreshSegmentClosure(segmentId: string, now: Date, context?: TransactionContext): Promise<void>;
   /** Reemplaza todos los colaboradores del tramo por `members`. */

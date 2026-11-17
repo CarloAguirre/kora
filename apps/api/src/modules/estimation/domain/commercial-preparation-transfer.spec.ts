@@ -67,6 +67,19 @@ describe('Fase 1 no calendarizada: presupuestos preexistentes al traspasar', () 
     expect(startDate).toBe('2026-11-09');
   });
 
+  it('suma 548,5 HH históricas cobrables sin calendarizarlas ni sumarlas a los equipos', () => {
+    const plan = planCommercialPreparationTransfer({
+      previousSoldHours: 0, approvedQuotationHours: 1108,
+      phaseZeroBillableHours: 548.5,
+      existingTeams: [],
+      quotationTeams: [{ teamId: 'dev', quotedHours: 930 },
+        { teamId: 'ux', quotedHours: 58 }, { teamId: 'qa', quotedHours: 120 }],
+    });
+    expect(plan.projectSoldHours).toBe(1656.5);
+    expect(plan.teamAllocations.reduce((sum, row) => sum + row.quotationHours, 0)).toBe(1108);
+    expect(plan.phase1AssignedHours).toBe(0);
+  });
+
   it('NULL sin horas declaradas no genera presupuestos ficticios', () => {
     const plan = planCommercialPreparationTransfer({
       previousSoldHours: 0, approvedQuotationHours: 40,

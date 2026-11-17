@@ -23,7 +23,8 @@ function commercialNet(draft: QuotationDraftData, hourlyRate: number | null) {
       sum + phase.teamHours.reduce((hours, row) => hours + row.hours, 0), 0);
   const once = draft.costs.filter((cost) => cost.recurrence === 'once')
     .reduce((sum, cost) => sum + cost.amount, 0);
-  return Math.round((teamHours * hourlyRate + once + Number.EPSILON) * 10000) / 10000;
+  const billableHours = teamHours + (draft.phaseZeroBillableHours ?? 0);
+  return Math.round((billableHours * hourlyRate + once + Number.EPSILON) * 10000) / 10000;
 }
 
 function readableAnswer(questionId: string, value: unknown, version: QuotationVersion,

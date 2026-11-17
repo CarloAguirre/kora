@@ -139,8 +139,12 @@ export const appliedQuotationPlanningSchema = z.object({
     /** Referencia comercial sin fechas concretas; no crea tramos de Forecast. */
     relativeTeamBlocks: z.array(z.object({
       teamId: uuidSchema, hours: z.number().nonnegative(),
-      startWeek: z.number().int().positive(),
-      durationWeeks: z.number().int().positive(),
+      // Baseline comercial puede empezar a mitad de semana. La EDT IA
+      // original (quotationReferenceStageSchema) sigue siendo inmutable.
+      startWeek: z.number().min(1).max(520.5)
+        .refine((value) => Number.isInteger(value * 2)),
+      durationWeeks: z.number().min(0.5).max(520)
+        .refine((value) => Number.isInteger(value * 2)),
     })).optional(),
   })),
   /** Referencias cuyo módulo de ejecución no es inequívoco, para revisión humana. */

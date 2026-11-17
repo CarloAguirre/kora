@@ -11,7 +11,7 @@ const round = (n: number, places: number) =>
   Math.round((n + Number.EPSILON) * 10 ** places) / 10 ** places;
 
 /** Vista previa del mismo cálculo de quotation-math.ts; el servidor es autoritativo al guardar. */
-function preview(draft: QuotationDraftData, rate: number | null, tax: 'iva19' | 'igv18' | 'exempt') {
+function preview(draft: QuotationDraftData, rate: number | null, tax: 'iva19' | 'igv18' | 'exempt', historicalFallback = 0) {
   const active = new Set(draft.teams.map((row) => row.teamId));
   const byTeam = draft.teams.map((team) => ({
     teamId: team.teamId,
@@ -23,12 +23,14 @@ function preview(draft: QuotationDraftData, rate: number | null, tax: 'iva19' | 
           .reduce((acc, row) => acc + row.hours, 0), 0),
   }));
   const totalHours = round(byTeam.reduce((sum, row) => sum + row.hours, 0), 2);
-  if (rate === null) return { totalHours, netAmount: null, totalAmount: null, byTeam };
+  const historicalHours = round(draft.phaseZeroBillableHours ?? historicalFallback, 2);
+  const billableHours = round(totalHours + historicalHours, 2);
+  if (rate === null) return { totalHours, billableHours, historicalHours, netAmount: null, totalAmount: null, byTeam };
   const once = draft.costs.filter((row) => row.recurrence === 'once')
     .reduce((sum, row) => sum + row.amount, 0);
-  const netAmount = round(totalHours * rate + once, 4);
+  const netAmount = round(billableHours * rate + once, 4);
   return {
-    totalHours,
+    totalHours, billableHours, historicalHours,
     netAmount,
     totalAmount: round(netAmount * (tax === 'iva19' ? 1.19 : tax === 'igv18' ? 1.18 : 1), 4),
     byTeam,
@@ -46,7 +48,7 @@ function durationLabel(draft: QuotationDraftData) {
 }
 
 export function QuotationCommercialSummary({
-  version, draft, hourlyRate, currency, tax, teamNames, dirty, actions,
+  version, draft, hourlyRate, currency, tax, teamNames, historicalHours = 0, dirty, actions,
 }: {
   version: QuotationVersion | null;
   draft: QuotationDraftData | null;
@@ -54,6 +56,8 @@ export function QuotationCommercialSummary({
   currency: 'UF' | 'CLP' | 'USD';
   tax: 'iva19' | 'igv18' | 'exempt';
   teamNames: ReadonlyMap<string, string>;
+  /** Valor de lectura para versiones antiguas sin foto histórica persistida. */
+  historicalHours?: number;
   editable: boolean;
   dirty: boolean;
   saving: boolean;
@@ -61,10 +65,11 @@ export function QuotationCommercialSummary({
   actions?: ReactNode;
 }) {
   if (!version || !draft) return <Card><h2>Resumen comercial</h2><p>Selecciona una versión.</p></Card>;
-  const numbers = preview(draft, hourlyRate, tax);
+  const numbers = preview(draft, hourlyRate, tax, historicalHours);
   const edt = draft.aiPoc?.edt ? effectiveQuotationEdt(draft) : null;
   const referenceOnly = Boolean(edt && (draft.mode !== 'phases' || draft.phases.length === 0));
-  const hoursShown = referenceOnly && edt ? edt.totalHours : numbers.totalHours;
+  const futureHoursShown = referenceOnly && edt ? edt.totalHours : numbers.totalHours;
+  const hoursShown = round(futureHoursShown + numbers.historicalHours, 2);
   const commercialRows: TeamHours[] = numbers.byTeam.filter((row) => row.hours > 0)
     .map((row) => {
       const name = teamNames.get(row.teamId) ?? 'Equipo no disponible';
@@ -108,6 +113,13 @@ export function QuotationCommercialSummary({
           {dirty && <span className={styles.unsaved}>Sin guardar</span>}
         </div>
         <div className={styles.bigNumber}>{fmt(hoursShown)}<small> hh</small></div>
+        {numbers.historicalHours > 0 && (
+          <div className={styles.billableBreakdown} aria-label="Desglose de HH cobrables">
+            <div><span>Fase 0 · Levantamiento ya consumido</span><strong>{fmt(numbers.historicalHours)} HH</strong></div>
+            <div><span>Fases futuras · Trabajo estimado</span><strong>{fmt(futureHoursShown)} HH</strong></div>
+            <small>Las HH de Fase 0 se cobran una sola vez y no se vuelven a planificar.</small>
+          </div>
+        )}
         <p className={styles.duration}>{duration}</p>
         <div className={styles.money}>
           <div><span>Neto</span>
@@ -131,12 +143,17 @@ export function QuotationCommercialSummary({
         <div className={styles.distribution}
           aria-label={referenceOnly ? 'Distribución referencial de HH, con perfiles pendientes' :
             'Distribución de horas por equipo'}>
-          {rows.length > 0 ? rows.map((row) =>
+          {rows.map((row) =>
             <span key={row.teamId}
               style={{ width: (row.hours / Math.max(1, hoursShown) * 100) + '%',
                 background: row.color }}
               title={row.name + ': ' + fmt(row.hours) + ' hh'} />
-          ) : <span className={styles.emptyBar} />}
+          )}
+          {numbers.historicalHours > 0 && <span
+            style={{ width: (numbers.historicalHours / Math.max(1, hoursShown) * 100) + '%',
+              background: '#94a3b8' }}
+            title={'Fase 0 · Levantamiento: ' + fmt(numbers.historicalHours) + ' hh'} />}
+          {rows.length === 0 && numbers.historicalHours === 0 && <span className={styles.emptyBar} />}
         </div>
         <div className={styles.legend}>
           {rows.length > 0 ? rows.map((row) => (
@@ -144,7 +161,12 @@ export function QuotationCommercialSummary({
               <span className={styles.name}><span className={styles.dot} style={{ background: row.color }} />{row.name}</span>
               <strong>{fmt(row.hours)} hh</strong>
             </div>
-          )) : <p>Sin HH distribuidas.</p>}
+          )) : numbers.historicalHours === 0 ? <p>Sin HH distribuidas.</p> : null}
+          {numbers.historicalHours > 0 && <div className={styles.legendRow}>
+            <span className={styles.name}><span className={styles.dot}
+              style={{ background: '#94a3b8' }}/>Fase 0 · Levantamiento</span>
+            <strong>{fmt(numbers.historicalHours)} hh</strong>
+          </div>}
         </div>
         {actions}
       </section>

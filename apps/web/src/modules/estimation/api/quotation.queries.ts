@@ -157,9 +157,12 @@ export function useApplyQuotationPlanning(projectId: string) {
 /** Acciones del ciclo comercial, independientes de aceptar el presupuesto IA. */
 export function useQuotationLifecycle(projectId: string) {
   const client = useQueryClient();
-  const refresh = () => {
-    void client.invalidateQueries({ queryKey: quotationKeys.project(projectId) });
-    void client.invalidateQueries({ queryKey: ['projects'] });
+  const refresh = async () => {
+    await Promise.all([
+      client.invalidateQueries({ queryKey: quotationKeys.project(projectId) }),
+      client.invalidateQueries({ queryKey: ['projects'] }),
+      client.invalidateQueries({ queryKey: quotationKeys.appliedPlan(projectId) }),
+    ]);
   };
   const acceptAi = useMutation({
     mutationFn: ({ versionId, revision }: { versionId: string; revision: number }) =>
@@ -185,8 +188,8 @@ export function useQuotationLifecycle(projectId: string) {
       quotationApi.transferApproved(projectId, versionId, {
         revision, confirmation: 'TRASPASAR_COTIZACION_APROBADA',
       }),
-    onSuccess: () => {
-      refresh();
+    onSuccess: async () => {
+      await refresh();
       // Tras el traspaso, el líder efectivo ve de inmediato el pendiente de
       // incorporación de colaboradores en la campanita (sin esperar al polling).
       void client.invalidateQueries({ queryKey: ['notifications', 'reminders'] });

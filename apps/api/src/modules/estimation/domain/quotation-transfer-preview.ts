@@ -145,6 +145,8 @@ export function buildQuotationTransferPreview(
       status: version.status, origin: version.origin,
       aiReviewStatus: version.aiReviewStatus,
       currency: version.currency, totalHours: totals.totalHours,
+      phaseZeroBillableHours: version.draft.phaseZeroBillableHours ?? 0,
+      billableHours: totals.billableHours,
       netAmount: totals.netAmount, totalAmount: totals.totalAmount,
       hourlyRateDefined: version.hourlyRate !== null,
       paymentPercent,
@@ -158,7 +160,8 @@ export function buildQuotationTransferPreview(
       segmentCount: project.segmentCount, milestoneCounts,
     },
     difference: {
-      soldHoursDelta: round(totals.totalHours - project.soldHours),
+      // La transferencia es aditiva, no reemplazo del presupuesto existente.
+      soldHoursDelta: totals.billableHours,
       remainingComparedToUsed: round(totals.totalHours - project.usedHours),
       netAmountDelta: comparable && totals.netAmount !== null && project.contractAmount !== null
         ? round(totals.netAmount - project.contractAmount) : null,

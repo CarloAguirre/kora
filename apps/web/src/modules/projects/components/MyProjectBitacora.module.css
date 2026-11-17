@@ -12,3 +12,6 @@
 .detail { display: grid; grid-template-columns: 110px 1fr; gap: var(--kora-space-3); }
 .detail dt { color: var(--kora-blue-700); }
 .detail dd { margin: 0; overflow-wrap: anywhere; }
+
+.actions { display: flex; justify-content: flex-start; align-items: center; }
+.actions > button { flex: 0 0 auto; }

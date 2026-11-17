@@ -76,7 +76,7 @@ describe('Detalle de proyecto del colaborador', () => {
     expect(screen.queryByText('CON_PLANIFICACION')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Bitácora' }));
     expect(screen.getByText('Bitácora en consulta')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /planificar|editar|agregar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /planificar|editar|eliminar/i })).not.toBeInTheDocument();
     expect(mocks.detail).toHaveBeenCalledWith('p-1');
   });
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationEdtStage, withQuotationCommercialTask, withoutQuotationEdtTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
+import { assertQuotationPhaseCapacity, estimationAnalysisArtifactSchema, isQuotationDraftEligibleProject, quotationDraftDataSchema, effectiveQuotationEdt, reconcilePocCommercialDraft, synchronizeQuotationEdtTeamLoad, projectPocRolesToQuotationDraft, withQuotationTaskSetting, withQuotationEdtStageSetting, quotationEdtAssignments, withQuotationCommercialStage, withoutQuotationEdtStage, withQuotationCommercialTask, withoutQuotationEdtTask, patchQuotationCommercialTask, withQuotationTaskDisplayName, type EstimationAnalysisArtifact, type QuotationDraftData, type QuotationVersion, type UpdateQuotationDraftInput } from '@kora/contracts';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { useProjectDetail } from '@/modules/projects/api/projects.queries';
@@ -126,6 +126,21 @@ export function QuotationWorkspacePage() {
   const mayWrite = Boolean(project && isQuotationDraftEligibleProject(project) && !quotationClosed);
   const editable = Boolean(mayWrite && selected?.status === 'draft' && form &&
     appliedPlan.data?.versionId !== selected?.id && !appliedPlan.isLoading);
+
+  // Versiones existentes previas a la valorización de Fase 0: preparar un
+  // guardado explícito para fijar el monto histórico sin tocar Gemini ni EDT.
+  useEffect(() => {
+    if (!editable || !project || !selected ||
+        selected.draft.phaseZeroBillableHours !== undefined ||
+        (project.phaseZeroHours ?? 0) <= 0) return;
+    setForm((current) => {
+      if (!current || current.draft.phaseZeroBillableHours !== undefined) return current;
+      return { ...current, draft: { ...current.draft,
+        phaseZeroBillableHours: project.phaseZeroHours } };
+    });
+    setDirty(true);
+  }, [editable, project?.phaseZeroHours, selected?.id, selected?.revision]);
+
 
   // Compatibilidad con cotizaciones anteriores a la generación con catálogo.
   // Reutiliza la EDT ya guardada: nunca gasta una nueva llamada Gemini.
@@ -330,9 +345,21 @@ export function QuotationWorkspacePage() {
         'No se pudo modificar la dedicación del equipo.');
     }
   };
-  const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>) => {
-    updateDraft({ phases: phaseRows.map((row, position) =>
-      position === index ? { ...row, ...patch } : row) });
+  const editPhase = (index: number, patch: Partial<QuotationDraftData['phases'][number]>): boolean => {
+    if (!editable || !form) return false;
+    try {
+      const phases = phaseRows.map((row, position) =>
+        position === index ? { ...row, ...patch } : row);
+      if (patch.startWeek !== undefined || patch.durationWeeks !== undefined) {
+        assertQuotationPhaseCapacity({ ...form.draft, phases },
+          (id) => teamById.get(id) ?? id);
+      }
+      updateDraft({ phases });
+      return true;
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message : 'El plazo no es viable para el equipo.');
+      return false;
+    }
   };
   const applyEdtChanges = (draft: QuotationDraftData) => {
     try {
@@ -410,12 +437,19 @@ export function QuotationWorkspacePage() {
   };
   const editEdtStage = (
     stageCode: string, patch: { name?: string; startWeek?: number; durationWeeks?: number },
-  ) => {
-    if (!editable || !form) return;
+  ): boolean => {
+    if (!editable || !form) return false;
     try {
-      applyEdtChanges(withQuotationEdtStageSetting(form.draft, stageCode, patch));
+      const next = withQuotationEdtStageSetting(form.draft, stageCode, patch);
+      if (patch.startWeek !== undefined || patch.durationWeeks !== undefined) {
+        const projected = reconcilePocCommercialDraft(next);
+        assertQuotationPhaseCapacity(projected, (id) => teamById.get(id) ?? id);
+      }
+      applyEdtChanges(next);
+      return true;
     } catch (cause) {
       reportError(cause instanceof Error ? cause.message : 'No se pudo actualizar el tramo.');
+      return false;
     }
   };
   /** Las nuevas fases y tareas no modifican el artefacto de origen Gemini. */
@@ -805,7 +839,7 @@ export function QuotationWorkspacePage() {
                       no la opción de presentación «Por equipo». */}
                   <QuotationPhaseWorkspace
                       commercialMode={form.draft.mode}
-                      historicalHours={project?.phaseZeroHours ?? 0}
+                      historicalHours={form.draft.phaseZeroBillableHours ?? project?.phaseZeroHours ?? 0}
                       draft={form.draft}
                       phases={phaseRows}
                       teams={teamRows}
@@ -935,6 +969,9 @@ export function QuotationWorkspacePage() {
                 tax={form?.tax ?? 'iva19'}
                 currency={form?.currency ?? 'UF'}
                 teamNames={teamById}
+                historicalHours={selected?.status === 'draft'
+                  ? (form?.draft.phaseZeroBillableHours ?? project?.phaseZeroHours ?? 0)
+                  : (form?.draft.phaseZeroBillableHours ?? 0)}
                 editable={editable}
                 dirty={dirty}
                 saving={saveDraft.isPending}

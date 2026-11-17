@@ -407,6 +407,20 @@
 .phaseHeadingActions .phaseAddBlock { min-height: 29px; height: auto; padding: 5px 9px; border-radius: 7px; font-size: 11px; font-weight: 500; white-space: nowrap; background: #fff; }
 .phaseHeadingActions .phaseDeleteButton { min-height: 28px; width: 28px; padding: 3px; color: #8a97a9; font-size: 14px; }
 .phaseHeadingActions .phaseDeleteButton:hover:not(:disabled) { color: #af3a3a; }
+/* Papelera de bloque: no debe confundirse con la papelera de fase. */
+.blockDeleteButton {
+  flex: 0 0 30px;
+  width: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 5px;
+  border-radius: 6px;
+  color: #8b96a6;
+  background: #fff;
+}
+.blockDeleteButton:hover:not(:disabled) { color: #b42318; background: #fff1f0; }
+.blockDeleteButton:focus-visible { outline: 2px solid #b42318; outline-offset: -2px; }
+
 @media (max-width: 1050px) {
   .phaseHeadingActions { flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
   .phaseHeadingProgress { min-width: 106px; }

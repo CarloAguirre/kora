@@ -149,7 +149,11 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                       {!closed && v.status === 'draft' && v.origin === 'ai' && v.aiReviewStatus === 'pending' &&
                         <Badge tone="brand">✦ Por revisar</Badge>}
                     </div></td>
-                    <td>{number(v.totalHours)} HH</td>
+                    <td>{number(v.totalHours)} HH futuras
+                      {(v.draft.phaseZeroBillableHours ?? 0) > 0 && (
+                        <small>+ {number(v.draft.phaseZeroBillableHours!)} HH Fase 0
+                          = {number(v.totalHours + v.draft.phaseZeroBillableHours!)} HH cobrables</small>
+                      )}</td>
                     <td>{v.totalAmount === null ? 'Sin valor HH' : number(v.totalAmount) + ' ' + v.currency}</td>
                     <td>
                       <div className={styles.actionLinks}>
@@ -193,7 +197,14 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
                 </div>
                 <div className={styles.summaryGrid}>
                   <span><small>Valor HH</small><strong>{transferredVersion.hourlyRate === null ? '—' : number(transferredVersion.hourlyRate)} {transferredVersion.currency}</strong></span>
-                  <span><small>Horas cotizadas</small><strong>{number(transferredVersion.totalHours)} HH</strong></span>
+                  <span><small>Horas cobrables</small>
+                    <strong>{number(transferredVersion.totalHours +
+                      (transferredVersion.draft.phaseZeroBillableHours ?? 0))} HH</strong>
+                    {(transferredVersion.draft.phaseZeroBillableHours ?? 0) > 0 && (
+                      <small>{number(transferredVersion.draft.phaseZeroBillableHours!)} HH Fase 0
+                        + {number(transferredVersion.totalHours)} HH futuras</small>
+                    )}
+                  </span>
                   <span><small>Neto</small><strong>{transferredVersion.netAmount === null ? '—' : number(transferredVersion.netAmount)} {transferredVersion.currency}</strong></span>
                   <span><small>Total con IVA</small><strong>{transferredVersion.totalAmount === null ? '—' : number(transferredVersion.totalAmount)} {transferredVersion.currency}</strong></span>
                 </div>

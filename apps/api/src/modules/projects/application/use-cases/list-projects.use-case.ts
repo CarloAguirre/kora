@@ -51,6 +51,10 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
   async execute(command: ListProjectsQueryCommand): Promise<Result<Page<ProjectSummary>>> {
     const { query, actor, actorPermissions } = command;
     const hasFullRead = actorPermissions.includes('projects:read');
+    // Acceso exclusivamente al selector de registro de horas comerciales.
+    // No otorga projects:read ni permite listar proyectos aprobados/soporte.
+    const openProspectPicker = query.hourEntryProspects === 'true' &&
+      actorPermissions.includes('hours:register');
 
     // `query.clientId`/`query.teamId` llegan como el slug de la URL (ficha de cliente/equipo), no como UUID.
     const client = query.clientId ? await this.clients.findById(query.clientId) : null;
@@ -59,14 +63,16 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
     const team = query.teamId ? await this.teams.findById(query.teamId) : null;
     if (query.teamId && !team) return ok(buildPage<ProjectSummary>([], 0, { page: query.page, pageSize: query.pageSize }));
 
-    let teamId = team?.id;
+    let teamId = openProspectPicker ? undefined : team?.id;
     if (teamId && !hasFullRead) {
       const isLeader = await this.teams.isLeaderOfTeam(actor.userId, teamId);
       if (!isLeader) teamId = undefined;
     }
 
     let assignedToUserId: string | undefined;
-    if (hasFullRead) {
+    if (openProspectPicker) {
+      assignedToUserId = undefined;
+    } else if (hasFullRead) {
       assignedToUserId = query.assignedToUserId;
     } else if (teamId) {
       assignedToUserId = undefined;
@@ -80,18 +86,21 @@ export class ListProjectsUseCase implements UseCase<ListProjectsQueryCommand, Pa
     const page = await this.projects.search(
       {
         search: query.search,
-        type: query.type,
-        status: query.status,
-        phase: query.phase,
-        salesStage: query.salesStage,
-        quotationStatus: query.quotationStatus,
-        quotationViewerUserId: query.quotationStatus?.length && !actorPermissions.includes('projects:manage')
+        // Forzar alcance en servidor: ignorar filtros potencialmente
+        // manipulados cuando se solicita acceso transversal a prospectos.
+        type: openProspectPicker ? 'development' : query.type,
+        status: openProspectPicker ? ['draft', 'active'] : query.status,
+        phase: openProspectPicker ? undefined : query.phase,
+        salesStage: openProspectPicker ? undefined : query.salesStage,
+        quotationStatus: openProspectPicker ? undefined : query.quotationStatus,
+        quotationViewerUserId: !openProspectPicker && query.quotationStatus?.length &&
+            !actorPermissions.includes('projects:manage')
           ? actor.userId : undefined,
-        kind: query.kind,
-        clientId: client?.id,
-        clientIds: query.clientIds,
-        periods: query.period,
-        leaderUserId: query.leaderUserId,
+        kind: openProspectPicker ? ['prospect', 'quoted'] : query.kind,
+        clientId: openProspectPicker ? undefined : client?.id,
+        clientIds: openProspectPicker ? undefined : query.clientIds,
+        periods: openProspectPicker ? undefined : query.period,
+        leaderUserId: openProspectPicker ? undefined : query.leaderUserId,
         teamId,
         assignedToUserId,
       },
