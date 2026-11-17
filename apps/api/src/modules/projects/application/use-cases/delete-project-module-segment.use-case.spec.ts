@@ -48,8 +48,8 @@ describe('Eliminar bloque operativo con tareas y entregas vinculadas', () => {
     const result = await uc.execute(command);
     expect(result.isOk()).toBe(true);
     expect(modules.removeSegmentWithDependencies).toHaveBeenCalledOnce();
-    expect(modules.removeSegmentWithDependencies).toHaveBeenCalledWith('segment-1', expect.anything());
-    const tx = vi.mocked(modules.removeSegmentWithDependencies).mock.calls[0]![1];
+    expect(modules.removeSegmentWithDependencies).toHaveBeenCalledWith('segment-1', ['task-1', 'task-2'], expect.anything());
+    const tx = vi.mocked(modules.removeSegmentWithDependencies).mock.calls[0]![2];
     expect(forecast.syncModuleTasks).toHaveBeenCalledWith(
       project, 'module-1', expect.any(Date), tx);
     expect(progress.recalculate).toHaveBeenCalledWith('project-1', tx);
