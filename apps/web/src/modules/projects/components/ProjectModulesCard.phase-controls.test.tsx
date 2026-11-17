@@ -599,7 +599,7 @@ describe('Referencias de bloque de trabajo de la cotización', () => {
   it('después de borrar un bloque no reaparecen ni el bloque pendiente ni sus referencias EDT', () => {
     seedReference();
     mocks.appliedPlan.modules[0]!.tasks = [{
-      wbs: 'WBS-UX', role: 'Diseñador UX', teamId: 'team-1',
+      wbs: 'WBS-UX', role: 'Diseñador UX',
       name: 'Diseñar flujos y prototipo por rol', hours: 28, description: '',
     }];
     mocks.excluded = [{
