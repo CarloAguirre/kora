@@ -59,6 +59,17 @@ export class DeleteProjectModuleSegmentUseCase
       return err(new CannotManageProjectError());
     }
 
+    // Guardar en auditoría la identidad de la planificación retirada: las FK
+    // de hour_entries pasan a NULL, pero los registros y estados no se borran.
+    const removedTasks = module.tasks.filter((task) => task.segmentId === command.segmentId)
+      .map((task) => ({ id: task.id, name: task.name,
+        estimatedHours: task.estimatedHours, status: task.status }));
+    const removedDeliveries = module.deliveries.filter((delivery) =>
+      delivery.segmentId === command.segmentId)
+      .map((delivery) => ({ id: delivery.id, name: delivery.name, status: delivery.status }));
+    const removedSegment = module.segments.find((segment) =>
+      segment.id === command.segmentId)!;
+
     // Eliminar el conjunto OPERATIVO; no tocar projects.sold_hours,
     // cotizaciones, EDT ni HH de hour_entries. Sin borrar las tareas vinculadas
     // se convertirían silenciosamente en tareas huérfanas por ON DELETE SET NULL.
@@ -79,6 +90,8 @@ export class DeleteProjectModuleSegmentUseCase
         event: 'module_segment_deleted', moduleId: command.moduleId,
         segmentId: command.segmentId,
         taskCount: removed.taskCount, deliveryCount: removed.deliveryCount,
+        segmentName: removedSegment.name, plannedHoursReleased: removedSegment.estimatedHours,
+        tasksSnapshot: removedTasks, deliveriesSnapshot: removedDeliveries,
         soldHoursPreserved: true, hourEntriesPreserved: true,
       },
     });
