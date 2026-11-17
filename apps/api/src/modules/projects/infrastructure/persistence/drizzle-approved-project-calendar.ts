@@ -6,7 +6,7 @@ import {
   projectQuotations, projectTeams, teams, quotationEvents, quotationVersions,
   type Database,
 } from '@kora/db';
-import { approvedCalendarPeriod, quotationDraftDataSchema } , ROADMAP_REMOVED_TEAM_BLOCK_WBS } from '@kora/contracts';
+import { approvedCalendarPeriod, quotationDraftDataSchema, ROADMAP_REMOVED_TEAM_BLOCK_WBS } from '@kora/contracts';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { buildQuotationTransferReferences } from '../../../estimation/domain/quotation-transfer-references';
 import type { ApprovedProjectCalendar } from '../../application/ports/approved-project-calendar.port';
