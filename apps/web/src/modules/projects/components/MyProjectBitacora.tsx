@@ -10,7 +10,9 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { Pagination, DEFAULT_PAGE_SIZE } from '@/shared/components/ui/Pagination';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
-import { SearchIcon, EyeIcon } from '@/shared/components/icons/Icons';
+import { SearchIcon, EyeIcon, PlusIcon } from '@/shared/components/icons/Icons';
+import { useToast } from '@/shared/components/ui/Toast';
+import { AddBitacoraRecordModal } from './AddBitacoraRecordModal';
 import styles from './MyProjectBitacora.module.css';
 
 interface Row {
@@ -51,6 +53,8 @@ function rowsFromProject(project: CollaboratorProjectDetail): Row[] {
 const dateLabel = (iso: string) => new Date(iso.slice(0, 10) + 'T12:00:00').toLocaleDateString('es-CL');
 
 export function MyProjectBitacora({ project }: { project: CollaboratorProjectDetail }) {
+  const toast = useToast();
+  const [addOpen, setAddOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'incidents' | 'work' | 'milestones'>('all');
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
@@ -95,6 +99,11 @@ export function MyProjectBitacora({ project }: { project: CollaboratorProjectDet
       <TextField className={styles.date} label="Hasta" type="date" value={to}
         onChange={(e) => { setTo(e.target.value); setPage(1); }} />
     </div>
+    <div className={styles.actions}>
+      <Button iconLeft={<PlusIcon size={16} />} onClick={() => setAddOpen(true)}>
+        Agregar registro
+      </Button>
+    </div>
     {project.activityTruncated && <p className={styles.notice}>
       Se muestran las últimas 500 horas aprobadas; los registros anteriores no están incluidos.
     </p>}
@@ -113,5 +122,13 @@ export function MyProjectBitacora({ project }: { project: CollaboratorProjectDet
         <dt>Descripción</dt><dd>{selected.detail || selected.title}</dd>
       </dl>}
     </Modal>
+    <AddBitacoraRecordModal
+      open={addOpen}
+      projectId={project.id}
+      modules={project.modules}
+      initialType="observacion"
+      onClose={() => setAddOpen(false)}
+      onSuccess={(message) => { setPage(1); setFilter('all'); setSearch(''); setFrom(''); setTo(''); toast.success(message); }}
+    />
   </Card>;
 }
