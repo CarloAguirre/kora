@@ -469,9 +469,17 @@ export function ProjectModulesCard({
   const referenceIsPending = (
     module: ProjectModule,
     reference: AppliedQuotationPlanning['modules'][number]['tasks'][number],
-  ) => !referenceIsConverted(module, reference) &&
-    !referenceIsExcluded(module, reference) &&
-    !referenceTeamIsRemoved(module.id, reference.teamId);
+  ) => {
+    const teamBlocks = appliedPlanning.data?.modules.find((item) =>
+      item.moduleId === module.id)?.relativeTeamBlocks ?? [];
+    // Sin teamId explícito, solo inferirlo cuando esta fase comercial tiene
+    // UN único equipo. Nunca eliminar actividades de otro equipo por su nombre.
+    const teamId = reference.teamId ??
+      (teamBlocks.length === 1 ? teamBlocks[0]!.teamId : null);
+    return !referenceIsConverted(module, reference) &&
+      !referenceIsExcluded(module, reference) &&
+      !referenceTeamIsRemoved(module.id, teamId);
+  };
 
   const onDiscardReference = async (
     module: ProjectModule,
