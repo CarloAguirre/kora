@@ -599,6 +599,51 @@ export function ProjectModulesCard({
     </div>;
   };
 
+  /** Para cotizaciones ya transferidas cuyo bloque real fue borrado ANTES de
+   * añadir la supresión transaccional. No existe un segmento que borrar.
+   * Registrar su retiro usando el mismo almacén de exclusiones de EDT. */
+  const onDeleteReferenceBlock = async (moduleId: string, teamId: string, name: string) => {
+    const versionId = appliedPlanning.data?.versionId;
+    if (!versionId || !modulesById.has(moduleId)) return;
+    if (!await confirm({
+      title: 'Quitar bloque pendiente y tareas EDT',
+      description: 'Se retirará «' + name + '» de la planificación operativa, ' +
+        'incluidas sus tareas EDT pendientes de asignación para ese equipo.',
+      warning: 'El presupuesto y la cotización aprobada seguirán intactos. ' +
+        'No se eliminan las HH realmente registradas.',
+      confirmLabel: 'Continuar', cancelLabel: 'Cancelar', destructive: true,
+    })) return;
+    if (!await confirm({
+      title: 'Confirmación final · Quitar bloque referencial',
+      description: '¿Confirmas que no quieres volver a materializar «' + name + '»? ' +
+        'Las HH quedarán disponibles para volver a planificarlas cuando corresponda.',
+      warning: 'Este bloque y las tareas EDT asociadas desaparecerán del Roadmap.',
+      confirmLabel: 'Sí, quitar bloque y tareas', cancelLabel: 'Volver', destructive: true,
+    })) return;
+    try {
+      await excludeRoadmapReference.mutateAsync({
+        projectId: project.id, moduleId,
+        input: { versionId, wbs: ROADMAP_REMOVED_TEAM_BLOCK_WBS, role: teamId },
+      });
+      toast.success('Bloque referencial y tareas EDT pendientes retirados del Roadmap.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo retirar el bloque pendiente.');
+    }
+  };
+
+  const renderOperationalReferenceActions = (
+    phase: { id: string }, row: OperationalRoadmapRow,
+  ) => {
+    if (!canManage || !modulesById.has(phase.id)) return null;
+    return <Button variant="ghost" size="sm" className={styles.blockDeleteButton}
+      title={'Quitar bloque pendiente ' + row.label + ' y sus tareas EDT'}
+      aria-label={'Quitar bloque pendiente ' + row.label}
+      disabled={excludeRoadmapReference.isPending}
+      onClick={() => void onDeleteReferenceBlock(phase.id, row.id, row.label)}>
+      <TrashIcon size={14} />
+    </Button>;
+  };
+
   /** Papelera del BLOQUE operativo, independiente de la papelera de FASE.
    * Disponible en Ver y Planificar a usuarios con permisos de gestión. */
   const renderOperationalBlockActions = (
@@ -812,6 +857,7 @@ export function ProjectModulesCard({
         renderPhaseHeaderName={renderPhaseHeaderName}
         renderPhaseHeaderActions={renderPhaseHeaderActions}
         renderOperationalBlockActions={renderOperationalBlockActions}
+        renderOperationalReferenceActions={renderOperationalReferenceActions}
         toolbarActions={canManage ? (
           <PillSwitcher aria-label="Modo del Roadmap"
             options={ROADMAP_MODE_OPTIONS}
