@@ -202,6 +202,66 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(brief.objective + brief.scope).not.toMatch(/Gemini|página|documento|PDF/iu);
   });
 
+  it('la diapositiva 10 presenta un alcance propio del proyecto sin enviar al cliente a un Excel', () => {
+    const v = version({ draft: {
+      ...version().draft, mode: 'phases',
+      phases: [
+        'Gestión de usuarios y accesos',
+        'Inspecciones y chequeos',
+        'Aprobaciones y validaciones',
+        'Reportes e indicadores',
+        'Integraciones y servicios',
+        'Diseño UX/UI y prototipos',
+      ].map((name, index) => ({
+        name, startWeek: index + 1, durationWeeks: 1, teamHours: [],
+      })),
+      aiPoc: {
+        confirmedUnderstanding:
+          'Implementar una plataforma para que supervisores registren y validen inspecciones operativas. ' +
+          'Los responsables podrán consultar la trazabilidad de las inspecciones por sede y revisar sus resultados.',
+        proposal: {
+          summary: 'El sistema facilita el seguimiento de las inspecciones.',
+        },
+      },
+    } });
+    const model = quotationExportModel({
+      ...context(v),
+      project: {
+        name: 'Control de inspecciones',
+        description: 'Portal de inspecciones para distintas sedes.',
+        client: { companyName: 'Cliente QA' },
+      },
+    });
+    const brief = quotationClientBrief(model);
+    expect(brief.scope).toContain('aprobaciones y validaciones');
+    expect(brief.scope).toContain('trazabilidad de las inspecciones por sede');
+    expect(brief.scope).not.toMatch(/Excel|HH por equipo|EDT|documento|PDF/iu);
+    const ns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const slide = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="' + ns + '"><p:spTree>' +
+      Array.from({ length: 12 }, (_, i) =>
+        '<p:sp><p:txBody><a:p><a:r><a:t>Campo ' + i +
+        '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
+    const xml = patchQuotationSlideXml(slide, 10, model);
+    const paragraphs = Array.from(new DOMParser().parseFromString(xml, 'application/xml')
+      .getElementsByTagNameNS(ns, 'p'));
+    expect(paragraphs[3]?.textContent).toBe(brief.scope);
+    expect(xml).not.toMatch(/Excel de cotización|desglose de tareas y HH/iu);
+  });
+
+  it('sin narrativa adicional, no inventa entregables ni referencia documentación ajena', () => {
+    const v = version({ draft: {
+      ...version().draft, mode: 'phases',
+      phases: ['Aprobaciones y validaciones', 'Reportes e indicadores', 'Integraciones y servicios']
+        .map((name) => ({
+          name, startWeek: 1, durationWeeks: 1, teamHours: [],
+        })),
+    } });
+    const brief = quotationClientBrief(quotationExportModel(context(v)));
+    expect(brief.scope).toContain('integración de servicios');
+    expect(brief.scope).not.toMatch(/Excel|EDT|HH por equipo|plantilla|documentación/iu);
+  });
+
   it('la lámina 11 cubre todos los equipos con HH y una actividad propia aunque las primeras WBS sean del mismo equipo', () => {
     const teamNames = new Map([
       ['dev', 'Desarrollo'], ['ux', 'UX-UI'], ['qa', 'QA'],
