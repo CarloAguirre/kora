@@ -34,6 +34,12 @@ describe('Registrar factura desde Facturación: período e historial', () => {
     expect(within(dialog).getByText('Soporte Amicar · 7,10 UF')).toBeInTheDocument();
     const link = within(dialog).getByRole('link', { name: 'Ver todos los períodos' });
     expect(link).toHaveAttribute('href', planPath);
+    expect(link.closest('footer')).toBe(dialog.querySelector('footer'));
+    expect(dialog.querySelector('header')).not.toContainElement(link);
+    const footer = within(dialog.querySelector('footer')!);
+    expect(footer.getByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+    expect(footer.getByRole('button', { name: 'Guardar' })).toBeInTheDocument();
+    expect(link.compareDocumentPosition(footer.getByRole('button', { name: 'Cancelar' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(link);
     expect(screen.getByRole('heading', { name: 'Historial de facturaciones del contrato' })).toBeInTheDocument();
   });
@@ -42,7 +48,9 @@ describe('Registrar factura desde Facturación: período e historial', () => {
     renderDialog({ periodLabel: 'marzo de 2027', historyPath: planPath });
     fireEvent.click(screen.getByRole('button', { name: 'Dividir en varias facturas' }));
     const dialog = screen.getByRole('dialog', { name: 'Registrar facturas · marzo de 2027' });
-    expect(within(dialog).getByRole('link', { name: 'Ver todos los períodos' })).toHaveAttribute('href', planPath);
+    const link = within(dialog).getByRole('link', { name: 'Ver todos los períodos' });
+    expect(link).toHaveAttribute('href', planPath);
+    expect(link.closest('footer')).toBe(dialog.querySelector('footer'));
   });
 
   it('conserva el título original sin enlace en invocaciones que no pasan el período ni el destino', () => {
