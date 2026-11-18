@@ -86,12 +86,13 @@ describe('Facturación de Soporte: período visible e historial por contrato', (
   it('mantiene el nombre y agrega Ver historial junto al contrato enlazando su ficha', () => {
     show();
     const table = screen.getByRole('table');
-    const name = within(table).getByRole('link', { name: 'Soporte Amicar' });
+    expect(within(table).getByText('Soporte Amicar')).toBeInTheDocument();
+    expect(within(table).queryByRole('link', { name: 'Soporte Amicar' })).not.toBeInTheDocument();
     const history = within(table).getByRole('link', {
       name: 'Ver historial de facturación de Soporte Amicar',
     });
-    expect(name).toHaveAttribute('href', '/soporte/b5b1c217-8585-43f4-b491-8ac94346ef93');
-    expect(history).toHaveAttribute('href', name.getAttribute('href'));
+    expect(history).toHaveAttribute('href', '/soporte/b5b1c217-8585-43f4-b491-8ac94346ef93');
     expect(history).toHaveTextContent('Ver historial');
+    expect(within(table).getAllByRole('link')).toHaveLength(1);
   });
 });
