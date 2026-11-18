@@ -257,6 +257,56 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(paragraphs[1]?.textContent).toContain('cada equipo');
   });
 
+  it('agrupa equipos desde las asignaciones WBS×perfil de una EDT Gemini real, no desde las primeras actividades', () => {
+    const teamNames = new Map([
+      ['dev', 'Desarrollo'], ['ux', 'UX-UI'], ['qa', 'QA'],
+      ['ia', 'IA'], ['rpa', 'RPA'], ['pmo', 'PMO'],
+    ]);
+    const work = [
+      ['Dev', 'Desarrollo 1', 20], ['Dev', 'Desarrollo 2', 20],
+      ['Dev', 'Desarrollo 3', 20], ['Dev', 'Desarrollo 4', 20],
+      ['UX', 'Diseño de pantallas', 12], ['QA', 'Pruebas de aceptación', 10],
+      ['IA', 'Configurar extracción', 8], ['RPA', 'Integrar automatización', 6],
+      ['PMO', 'Planificar entregas', 4],
+    ] as const;
+    const roleIds = Object.fromEntries([...teamNames.keys()].map((id) =>
+      [id === 'dev' ? 'Dev' : id.toUpperCase(), id]));
+    const modules = [{
+      name: 'Módulo único',
+      totalHours: 120,
+      tasks: work.map(([role, name, hours], index) => ({
+        wbs: 'WBS-' + index, role, name, description: '', hours,
+      })),
+    }];
+    const draft = {
+      ...version().draft,
+      teams: [...teamNames.keys()].map((teamId) => ({
+        teamId, collaborators: 1, unit: 'week', duration: 1,
+        hoursPerWeek: 40, dedicationPercent: 100,
+      })),
+      aiPoc: {
+        source: 'drive',
+        proposal: { roles: work.map(([role]) => ({ role })) },
+        roleTeamIds: roleIds,
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v1',
+          source: 'drive', provider: 'gemini', modules, totalHours: 120,
+        },
+      },
+    };
+    const model = quotationExportModel({
+      ...context(version({ totalHours: 120, draft })), teamNames,
+    });
+    expect(model.details).toHaveLength(work.length);
+    const rows = quotationRepresentativeTeamActivities(model);
+    expect(rows).toHaveLength(4);
+    for (const team of teamNames.values()) {
+      expect(rows.map((row) => row.team).join(' / ')).toContain(team);
+    }
+    expect(rows.map((row) => row.name).join(' · ')).toContain('Integrar automatización');
+    expect(rows.map((row) => row.name).join(' · ')).toContain('Planificar entregas');
+  });
+
   it('lámina 18 y Excel usan exclusiones confirmadas del cuestionario y análisis, sin asumir que todo F05 es exclusión', () => {
     const draft = {
       ...version().draft,
