@@ -160,10 +160,16 @@ export function quotationRepresentativeTeamActivities(
     }));
   const rows: typeof teams[] = Array.from({ length: Math.min(4, teams.length) }, () => []);
   teams.forEach((team, index) => { rows[index % rows.length]!.push(team); });
-  return rows.map((group) => ({
-    team: group.map((entry) => entry.team).join(' / '),
-    name: group.map((entry) => entry.name).join(' · '),
-  }));
+  return rows.map((group) => {
+    // Asignar espacio a CADA equipo evita truncar por completo el último
+    // cuando una fila de la plantilla contiene más de uno.
+    const teamWidth = Math.max(10, Math.floor((46 - (group.length - 1) * 3) / group.length));
+    const activityWidth = Math.max(15, Math.floor((94 - (group.length - 1) * 3) / group.length));
+    return {
+      team: group.map((entry) => compact(entry.team, teamWidth)).join(' / '),
+      name: group.map((entry) => compact(entry.name, activityWidth)).join(' · '),
+    };
+  });
 }
 
 const sheet = (book: XLSX.WorkBook, name: string, data: Cell[][], widths?: number[]) => {
@@ -454,10 +460,10 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   const additional = features.slice(2, 6);
   const scope = additional.length
     ? 'El trabajo comprende ' + joinItems(additional.map(nominal)) +
-      '. Las actividades y entregables de cada equipo se detallan en la EDT adjunta.'
+      '. El desglose de tareas y HH por equipo está disponible en el Excel de cotización.'
     : features.length
       ? 'El alcance comprende ' + joinItems(features.map(nominal)) +
-        ', según las actividades y entregables detallados en la EDT.'
+        ', según las actividades y entregables definidos en la estimación.'
       : 'El alcance específico corresponde a las actividades y entregables aprobados en la cotización.';
   return { objective, scope, features };
 }
