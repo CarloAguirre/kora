@@ -119,50 +119,78 @@ export function quotationClientExclusions(draft: QuotationVersion['draft']): str
     });
 }
 
-/** Cuatro filas de la plantilla: cubrir TODOS los equipos con HH, no las cuatro primeras WBS.
- * Si hay >4 equipos se agrupan filas, dejando al menos una actividad propia por equipo.
+/** Detecta perfil de liderazgo en la EDT sin inferirlo desde el equipo Kora:
+ * Líder técnico puede tener teamId de Desarrollo, pero su actividad no
+ * representa el trabajo de los desarrolladores.
+ */
+function isTechnicalLeadAssignment(role: string, taskName: string): boolean {
+  const normalize = (value: string) => value.normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '').toLowerCase().trim();
+  const profile = normalize(role);
+  if (/\b(?:lider[\s-]+tecnic[oa]|tech(?:nical)?[\s-]+lead|team[\s-]+lead|lead[\s-]+developer|tl)\b/u.test(profile)) {
+    return true;
+  }
+  // Algunas EDT heredadas usan el equipo "Desarrollo" también como perfil.
+  // El fallback se limita al nombre explícito de esta labor de supervisión.
+  const task = normalize(taskName);
+  return /^(?:supervisar\s+(?:calidad|riesgos?|decisiones?\s+tecnicas?)|gobierno\s+tecnico|supervision\s+y\s+control\s+tecnico)\b/u.test(task) &&
+    /^(?:desarrollo|desarrollador(?:a)?|full[\s-]?stack|dev|sin\s+perfil)$/u.test(profile);
+}
+
+/** La plantilla tiene cuatro filas. Cada equipo con HH debe figurar, y
+ * Líder técnico es un PERFIL propio aunque esté adscrito a Desarrollo.
+ * Si hay >4 categorías, se combinan algunas filas sin perder sus nombres.
  */
 export function quotationRepresentativeTeamActivities(
   model: ReturnType<typeof quotationExportModel>,
 ): Array<{ team: string; name: string }> {
   type Candidate = { name: string; hours: number };
-  const byId = new Map<string, { label: string; candidates: Candidate[]; hours: number }>();
-  const add = (id: string, label: string, name: string, hours: number) => {
+  type Group = { label: string; candidates: Candidate[]; hours: number; order: number };
+  const byId = new Map<string, Group>();
+  const teamOrder = new Map(model.draft.teams.map((row, i) => [row.teamId, i]));
+  const technicalLeadKey = '__technical_lead_profile__';
+  const add = (id: string, label: string, name: string, hours: number, order: number) => {
     if (!(hours > 0)) return;
-    const group = byId.get(id) ?? { label, candidates: [], hours: 0 };
+    const group = byId.get(id) ?? { label, candidates: [], hours: 0, order };
     group.hours += hours;
     if (name.trim()) group.candidates.push({ name: name.trim(), hours });
     byId.set(id, group);
   };
   if (model.details.length) {
     for (const row of model.details) {
-      const id = row.teamId ?? 'unmapped';
-      add(id, model.team(row.teamId), row.name, row.hours);
+      const isLead = isTechnicalLeadAssignment(row.role, row.name);
+      // La misma asignación WBS×perfil pertenece a UNA sola categoría.
+      // Nunca usar su alta dedicación para escoger la tarea de Desarrollo.
+      const id = isLead ? technicalLeadKey : row.teamId ?? 'unmapped';
+      const label = isLead ? 'Líder técnico' : model.team(row.teamId);
+      const order = isLead ? -1 : (teamOrder.get(row.teamId ?? '') ?? 999);
+      add(id, label, row.name, row.hours, order);
     }
   } else if (model.draft.mode === 'phases') {
     for (const phase of model.draft.phases) for (const item of phase.teamHours) {
-      add(item.teamId, model.team(item.teamId), phase.name, item.hours);
+      add(item.teamId, model.team(item.teamId), phase.name, item.hours,
+        teamOrder.get(item.teamId) ?? 999);
     }
   } else {
     for (const row of model.draft.teams) {
       const hours = row.collaborators * (row.unit === 'day' ? row.duration / 5 : row.duration) *
         row.hoursPerWeek * row.dedicationPercent / 100;
-      add(row.teamId, model.team(row.teamId), 'Actividades por definir en EDT', hours);
+      add(row.teamId, model.team(row.teamId), 'Actividades por definir en EDT', hours,
+        teamOrder.get(row.teamId) ?? 999);
     }
   }
-  const order = new Map(model.draft.teams.map((row, i) => [row.teamId, i]));
-  const teams = [...byId.entries()]
-    .sort(([a], [b]) => (order.get(a) ?? 999) - (order.get(b) ?? 999))
+  const categories = [...byId.entries()]
+    .sort(([aId, a], [bId, b]) => a.order - b.order ||
+      aId.localeCompare(bId))
     .map(([, group]) => ({
       team: group.label,
       name: [...group.candidates].sort((a, b) => b.hours - a.hours)[0]?.name ??
         'Actividad pendiente de desglose',
     }));
-  const rows: typeof teams[] = Array.from({ length: Math.min(4, teams.length) }, () => []);
-  teams.forEach((team, index) => { rows[index % rows.length]!.push(team); });
+  const rows: typeof categories[] = Array.from({ length: Math.min(4, categories.length) }, () => []);
+  categories.forEach((category, index) => { rows[index % rows.length]!.push(category); });
   return rows.map((group) => {
-    // Asignar espacio a CADA equipo evita truncar por completo el último
-    // cuando una fila de la plantilla contiene más de uno.
+    // Cada categoría conserva texto propio aun si comparte una fila de la tabla.
     const teamWidth = Math.max(10, Math.floor((46 - (group.length - 1) * 3) / group.length));
     const activityWidth = Math.max(15, Math.floor((94 - (group.length - 1) * 3) / group.length));
     return {
@@ -561,7 +589,8 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       };
     }
     case 11: return {
-      1: 'Actividades representativas de cada equipo · detalle completo en Excel.',
+      1: 'Actividades principales por equipo y perfil · alcance representativo.',
+      2: 'EQUIPO / PERFIL',
       5: compact(chunk(0)?.team ?? '—', 48),
       6: compact(chunk(0)?.name ?? 'Sin EDT desglosada', 98),
       // La columna TOTAL H/H está combinada verticalmente en el PPTX original.
