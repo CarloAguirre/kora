@@ -314,7 +314,106 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     for (const team of teamNames.values()) {
       expect([5, 8, 10, 12].map((i) => paragraphs[i]?.textContent).join(' / ')).toContain(team);
     }
-    expect(paragraphs[1]?.textContent).toContain('cada equipo');
+    expect(paragraphs[1]?.textContent).toContain('equipo y perfil');
+  });
+
+  it('separa Líder técnico de Desarrollo aun si Gemini mapea ambos al mismo equipo Kora', () => {
+    const task = (role: string, name: string, hours: number, index: number) => ({
+      wbs: 'WBS-' + index, role, name, description: '', hours,
+    });
+    const tasks = [
+      task('Líder Técnico', 'Supervisar calidad, riesgos y decisiones técnicas de forma semanal', 48, 1),
+      task('Desarrollador Fullstack', 'Implementar módulos y servicios de negocio', 32, 2),
+      task('Diseñador UX', 'Diseñar interfaces y prototipos', 12, 3),
+      task('Tester QA', 'Ejecutar pruebas de regresión integradas', 8, 4),
+    ];
+    const teamNames = new Map([
+      ['dev', 'Desarrollo'], ['ux', 'UX-UI'], ['qa', 'QA'],
+    ]);
+    const draft = {
+      ...version().draft,
+      teams: [...teamNames.keys()].map((teamId) => ({
+        teamId, collaborators: 1, unit: 'week', duration: 1,
+        hoursPerWeek: 40, dedicationPercent: 100,
+      })),
+      aiPoc: {
+        source: 'drive',
+        roleTeamIds: {
+          'Líder Técnico': 'dev', 'Desarrollador Fullstack': 'dev',
+          'Diseñador UX': 'ux', 'Tester QA': 'qa',
+        },
+        proposal: { roles: tasks.map(({ role }) => ({ role })) },
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v1',
+          source: 'drive', provider: 'gemini',
+          modules: [{ name: 'Sistema de inspecciones', totalHours: 100, tasks }],
+          totalHours: 100,
+        },
+      },
+    };
+    const model = quotationExportModel({
+      ...context(version({ totalHours: 100, draft })), teamNames,
+    });
+    expect(model.details).toHaveLength(4);
+    // Las 48 HH de TL NO pueden elegir la actividad más representativa
+    // del equipo Desarrollo, aunque superen las 32 HH de implementación.
+    const rows = quotationRepresentativeTeamActivities(model);
+    expect(rows).toEqual([
+      { team: 'Líder técnico',
+        name: 'Supervisar calidad, riesgos y decisiones técnicas de forma semanal' },
+      { team: 'Desarrollo', name: 'Implementar módulos y servicios de negocio' },
+      { team: 'UX-UI', name: 'Diseñar interfaces y prototipos' },
+      { team: 'QA', name: 'Ejecutar pruebas de regresión integradas' },
+    ]);
+    const ns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const xml = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="' + ns + '"><p:spTree>' +
+      Array.from({ length: 14 }, (_, i) =>
+        '<p:sp><p:txBody><a:p><a:r><a:t>Campo ' + i +
+        '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
+    const output = patchQuotationSlideXml(xml, 11, model);
+    const paragraphs = Array.from(new DOMParser().parseFromString(output, 'application/xml')
+      .getElementsByTagNameNS(ns, 'p'));
+    expect(paragraphs[2]?.textContent).toBe('EQUIPO / PERFIL');
+    expect(paragraphs[5]?.textContent).toBe('Líder técnico');
+    expect(paragraphs[6]?.textContent).toContain('Supervisar calidad');
+    expect(paragraphs[8]?.textContent).toBe('Desarrollo');
+    expect(paragraphs[9]?.textContent).toContain('Implementar módulos');
+    expect(paragraphs[7]?.textContent).toBe('100 H/H');
+  });
+
+  it('una supervisión técnica con perfil legacy genérico no sustituye la actividad de Desarrollo', () => {
+    const tasks = [
+      { wbs: 'WBS-A', role: 'Desarrollo',
+        name: 'Supervisar calidad, riesgos y decisiones técnicas de forma semanal',
+        description: '', hours: 45 },
+      { wbs: 'WBS-B', role: 'Desarrollo',
+        name: 'Construir el módulo de inspecciones', description: '', hours: 15 },
+    ];
+    const draft = {
+      ...version().draft,
+      teams: [{ teamId: 'dev', collaborators: 1, unit: 'week', duration: 1,
+        hoursPerWeek: 40, dedicationPercent: 100 }],
+      aiPoc: {
+        source: 'drive', proposal: { roles: [{ role: 'Desarrollo' }] },
+        roleTeamIds: { Desarrollo: 'dev' },
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v1',
+          source: 'drive', provider: 'gemini',
+          modules: [{ name: 'Operación', totalHours: 60, tasks }],
+          totalHours: 60,
+        },
+      },
+    };
+    const model = quotationExportModel({
+      ...context(version({ totalHours: 60, draft })),
+      teamNames: new Map([['dev', 'Desarrollo']]),
+    });
+    expect(quotationRepresentativeTeamActivities(model)).toEqual([
+      { team: 'Líder técnico',
+        name: 'Supervisar calidad, riesgos y decisiones técnicas de forma semanal' },
+      { team: 'Desarrollo', name: 'Construir el módulo de inspecciones' },
+    ]);
   });
 
   it('agrupa equipos desde las asignaciones WBS×perfil de una EDT Gemini real, no desde las primeras actividades', () => {
