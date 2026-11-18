@@ -407,6 +407,7 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   const lower = (value: string) => value.charAt(0).toLocaleLowerCase('es') + value.slice(1);
   const nominal = (value: string): string => {
     const item = lower(value);
+    if (/^(?:diseño|control|levantamiento)\b/iu.test(value)) return 'el ' + item;
     if (/^inspecciones y chequeos$/iu.test(value)) return 'la realización de inspecciones y chequeos';
     if (/^reportes e indicadores$/iu.test(value)) return 'la generación de reportes e indicadores';
     if (/^integraciones y servicios$/iu.test(value)) return 'la integración de servicios';
@@ -417,9 +418,11 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   const joinItems = (items: string[]): string => items.length === 1 ? items[0]! :
     items.length === 2 ? items.join(' y ') :
     items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1]!;
+  // La comprensión revisada por el usuario tiene prioridad frente al resumen
+  // automático y a la descripción breve que figura en la ficha del proyecto.
   const sourceSentences = [
-    model.projectDescription,
     model.draft.aiPoc?.confirmedUnderstanding,
+    model.projectDescription,
     model.draft.aiPoc?.proposal.summary,
   ];
   let objective: string | null = null;
@@ -427,7 +430,7 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
     if (!source) continue;
     for (const original of tidy(source).split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÜÑ])/u)) {
       const sentence = original.replace(/^["'“”«»\s]+|["'“”«»\s]+$/gu, '').trim();
-      if (!sentence || sentence.length > 165 || sourceNarration(sentence) ||
+      if (!sentence || sentence.length > 285 || sourceNarration(sentence) ||
           !/\b(?:desarrollar|implementar|construir|crear|digitalizar|automatizar|mejorar|facilitar|habilitar|permitir|optimizar|centralizar|gestionar|el\s+proyecto\s+busca|la\s+soluci[oó]n\s+(?:permite|busca)|el\s+sistema\s+(?:permite|busca))\b/iu.test(sentence)) {
         continue;
       }
@@ -442,10 +445,20 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
         joinItems(business.slice(0, 2).map(nominal)) + '.' :
       'Desarrollar las capacidades definidas para el proyecto ' + tidy(model.projectName) + '.';
   }
-  const scope = features.length > 2 ?
-    'El alcance incluye ' + joinItems(features.slice(2, 4).map(nominal)) +
-      ', con entregables definidos para cada componente.' :
-    'El alcance considera los componentes y entregables acordados en esta propuesta comercial.';
+  // En la plantilla hay dos párrafos amplios: no limitar la síntesis a la
+  // primera frase ni a sólo dos funcionalidades si la EDT trae más detalle.
+  const distinct = features.filter((feature) => !norm(objective).includes(norm(feature)));
+  if (distinct.length >= 2 && objective.length < 240) {
+    objective += ' Se priorizan ' + joinItems(distinct.slice(0, 2).map(nominal)) + '.';
+  }
+  const additional = features.slice(2, 6);
+  const scope = additional.length
+    ? 'El trabajo comprende ' + joinItems(additional.map(nominal)) +
+      '. Las actividades y entregables de cada equipo se detallan en la EDT adjunta.'
+    : features.length
+      ? 'El alcance comprende ' + joinItems(features.map(nominal)) +
+        ', según las actividades y entregables detallados en la EDT.'
+      : 'El alcance específico corresponde a las actividades y entregables aprobados en la cotización.';
   return { objective, scope, features };
 }
 
@@ -457,8 +470,11 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
   const isRpa = draft.teams.length > 0 && draft.teams.every((row) =>
     /rpa|robot/i.test(m.team(row.teamId)));
 
-  const activities = details.length ? details.map((row) => ({ team: m.team(row.teamId), name: row.name, hours: row.hours }))
-    : draft.phases.flatMap((p) => p.teamHours.map((r) => ({ team: m.team(r.teamId), name: p.name, hours: r.hours })));
+  const activities = quotationRepresentativeTeamActivities(m);
+  const exclusions = quotationClientExclusions(draft);
+  const visibleExclusions = exclusions.length > 4
+    ? [...exclusions.slice(0, 3), (exclusions.length - 3) + ' exclusiones más (ver Excel)']
+    : exclusions;
   const ass = draft.assumptions;
   const pay = draft.paymentPlan.map((p) => p.name + ': ' + fmt(p.percent) + '%');
   const phaseLabel = (n: number) => phases[n]?.name ?? '—';
@@ -506,17 +522,17 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       };
     }
     case 11: return {
-      1: 'Actividades principales · HH futuras por ejecutar. Fase 0 histórica separada en Excel.',
-      5: compact(chunk(0)?.team ?? '—', 28),
+      1: 'Actividades representativas de cada equipo · detalle completo en Excel.',
+      5: compact(chunk(0)?.team ?? '—', 48),
       6: compact(chunk(0)?.name ?? 'Sin EDT desglosada', 98),
       // La columna TOTAL H/H está combinada verticalmente en el PPTX original.
       // Fase 0 es comercial, no actividad nueva. La presentación muestra ambas HH.
       7: fmt(version.totalHours + (draft.phaseZeroBillableHours ?? 0)) + ' H/H',
-      8: compact(chunk(1)?.team ?? '—', 28),
+      8: compact(chunk(1)?.team ?? '—', 48),
       9: compact(chunk(1)?.name ?? '—', 98),
-      10: compact(chunk(2)?.team ?? '—', 28),
+      10: compact(chunk(2)?.team ?? '—', 48),
       11: compact(chunk(2)?.name ?? '—', 98),
-      12: compact(chunk(3)?.team ?? '—', 28),
+      12: compact(chunk(3)?.team ?? '—', 48),
       13: compact(chunk(3)?.name ?? '—', 98),
     };
     case 12: return { 1: 'Arquitectura sujeta a validación del líder técnico.',
@@ -562,11 +578,13 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       13: 'Condiciones de equipamiento según acuerdo comercial firmado.',
       16: compact(ass[1] ?? 'Garantía y soporte sujetos al contrato aplicable.', 135),
     };
-    case 18: return { 2: 'Exclusiones registradas para esta versión comercial:',
-      3: compact(draft.exclusions[0] ?? 'No se registraron exclusiones específicas.', 95),
-      4: compact(draft.exclusions[1] ?? '—', 95),
-      5: compact(draft.exclusions[2] ?? '—', 95),
-      6: compact(draft.exclusions[3] ?? '—', 95) };
+    case 18: return {
+      2: 'Fuera de alcance · decisiones registradas en cotización, análisis y cuestionario:',
+      3: compact(visibleExclusions[0] ?? 'No se registraron exclusiones explícitas.', 125),
+      4: compact(visibleExclusions[1] ?? '', 125),
+      5: compact(visibleExclusions[2] ?? '', 125),
+      6: compact(visibleExclusions[3] ?? '', 125),
+    };
     default: return {};
   }
 }
