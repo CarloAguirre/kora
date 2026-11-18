@@ -8,6 +8,7 @@ import type {
 } from '../../domain/repositories/support-invoice.repository';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
+import { saveInvoiceDocument, readInvoiceDocument, discardNewInvoiceDocument } from '../../../../shared/infrastructure/storage/invoice-document.storage';
 
 interface SupportInvoiceRow {
   id: string;
@@ -55,17 +56,27 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
   };
 
   async attachDocument(id: string, attachment: { name: string; content: string }): Promise<boolean> {
-    return this.database.transaction(async (tx) => {
-      const inserted = await tx.insert(supportInvoiceAttachments)
-        .values({ invoiceId: id, content: attachment.content })
-        .onConflictDoNothing()
-        .returning({ invoiceId: supportInvoiceAttachments.invoiceId });
-      if (inserted.length === 0) return false;
-      await tx.update(supportInvoices)
-        .set({ attachmentName: attachment.name, updatedAt: new Date() })
-        .where(eq(supportInvoices.id, id));
-      return true;
-    });
+    // Guardar el archivo ANTES de insertar la referencia: nunca se confirma
+    // una fila que apunte a un archivo que falló al escribirse.
+    const reference = await saveInvoiceDocument('support-invoice', attachment.content);
+    try {
+      const inserted = await this.database.transaction(async (tx) => {
+        const rows = await tx.insert(supportInvoiceAttachments)
+          .values({ invoiceId: id, content: reference })
+          .onConflictDoNothing()
+          .returning({ invoiceId: supportInvoiceAttachments.invoiceId });
+        if (rows.length === 0) return false;
+        await tx.update(supportInvoices)
+          .set({ attachmentName: attachment.name, updatedAt: new Date() })
+          .where(eq(supportInvoices.id, id));
+        return true;
+      });
+      if (!inserted) await discardNewInvoiceDocument(reference);
+      return inserted;
+    } catch (error) {
+      await discardNewInvoiceDocument(reference);
+      throw error;
+    }
   }
 
   async getAttachment(id: string): Promise<{ name: string; content: string } | null> {
@@ -74,7 +85,7 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
       .from(supportInvoiceAttachments)
       .innerJoin(supportInvoices, eq(supportInvoices.id, supportInvoiceAttachments.invoiceId))
       .where(eq(supportInvoices.id, id));
-    return row && row.name ? { name: row.name, content: row.content } : null;
+    return row && row.name ? { name: row.name, content: await readInvoiceDocument(row.content) } : null;
   }
 
   async findById(id: string, context?: TransactionContext): Promise<SupportInvoiceRecord | null> {
@@ -156,10 +167,22 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
         monthlyPeriodId: input.monthlyPeriodId,
       })),
     );
-    const attachments = inputs.flatMap((input) =>
-      input.attachmentContent ? [{ invoiceId: input.id, content: input.attachmentContent }] : [],
-    );
-    if (attachments.length > 0) await db.insert(supportInvoiceAttachments).values(attachments);
+    // Registrar múltiples facturas respeta la misma transacción del período.
+    // Los contenidos nuevos en DB son solo referencias de archivos privados.
+    const attachments: Array<{ invoiceId: string; content: string }> = [];
+    try {
+      for (const input of inputs) {
+        if (!input.attachmentContent) continue;
+        attachments.push({
+          invoiceId: input.id,
+          content: await saveInvoiceDocument('support-invoice', input.attachmentContent),
+        });
+      }
+      if (attachments.length > 0) await db.insert(supportInvoiceAttachments).values(attachments);
+    } catch (error) {
+      await Promise.all(attachments.map((row) => discardNewInvoiceDocument(row.content)));
+      throw error;
+    }
   }
 
   async markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void> {
