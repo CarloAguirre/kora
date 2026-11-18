@@ -108,6 +108,10 @@ export function SupportBillingSection() {
   };
 
   const period = `${year}-${String(month).padStart(2, '0')}`;
+  // El título y la consulta usan exactamente el mismo período seleccionado.
+  const selectedPeriodLabel = new Intl.DateTimeFormat('es-CL', {
+    month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
   const { data: overview, isLoading } = useSupportBillingOverview(period);
 
   const rowsQuery = useMemo<ListSupportBillingRowsQuery>(
@@ -137,10 +141,19 @@ export function SupportBillingSection() {
       header: 'Contrato',
       sortable: true,
       render: (r) => (
-        <Link to={supportPlanPath({ id: r.planId })} className={styles.planCell}>
-          {r.planName}
-          {r.scope === 'consolidated' && <SupportPlanScopeBadge scope={r.scope} />}
-        </Link>
+        <span className={styles.planCellGroup}>
+          <Link to={supportPlanPath({ id: r.planId })} className={styles.planCell}>
+            {r.planName}
+            {r.scope === 'consolidated' && <SupportPlanScopeBadge scope={r.scope} />}
+          </Link>
+          <Link
+            to={supportPlanPath({ id: r.planId })}
+            className={styles.planHistoryLink}
+            aria-label={`Ver historial de facturación de ${r.planName}`}
+          >
+            Ver historial
+          </Link>
+        </span>
       ),
     },
     { key: 'type', header: 'Tipo', sortable: true, render: (r) => <SupportPlanTypeBadge planType={r.planType} /> },
@@ -256,8 +269,10 @@ export function SupportBillingSection() {
         />
       </div>
 
+      <h2 className={styles.tableTitle}>Facturación mes de {selectedPeriodLabel}</h2>
+
       <DataTable
-        caption="Contratos por facturar en el período"
+        caption={`Facturación de soporte de ${selectedPeriodLabel}`}
         columns={columns}
         items={rowsPage?.items ?? []}
         getRowKey={(r) => r.planId}
