@@ -85,10 +85,6 @@
   text-decoration: none;
 }
 
-.planCell:hover {
-  text-decoration: underline;
-}
-
 .alertIcons {
   display: inline-flex;
   align-items: center;
