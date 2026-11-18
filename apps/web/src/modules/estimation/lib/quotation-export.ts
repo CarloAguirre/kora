@@ -58,7 +58,7 @@ export function quotationExportModel({ version, project, teamNames }: QuotationE
     projectDescription: project.description ?? null,
     weekly: quotationTeamWeeklyPlan(draft),
     scope: draft.aiPoc?.confirmedUnderstanding ||
-      draft.aiPoc?.proposal.summary || project.description ||
+      draft.aiPoc?.proposal?.summary || project.description ||
       'Objetivo pendiente de definición comercial.',
     status: version.status === 'approved' ? 'Aprobada' :
       version.status === 'sent' ? 'Enviada' : 'Borrador',
@@ -102,7 +102,7 @@ export function quotationClientExclusions(draft: QuotationVersion['draft']): str
     }
     // Si se pregunta expresamente por INCLUIR un componente, «Excluir/No incluir»
     // es una decisión; «No definido» u opciones sin respuesta no lo son.
-    if (/\b(?:incluir|incluye|contemplar|considerar|dentro\s+del\s+alcance)\b/iu.test(question.question) &&
+    if (/\b(?:incluir(?:se)?|incluye(?:n)?|contemplar|considerar|dentro\s+del\s+alcance)\b/iu.test(question.question) &&
         labels.some((label) => /^(?:no|excluir|no\s+incluir|fuera\s+de\s+alcance|no\s+se\s+incluye)$/iu.test(label))) {
       found.push('No incluido según cuestionario: ' + question.question.replace(/[¿?]+/gu, '').trim());
     }
@@ -423,7 +423,7 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   const sourceSentences = [
     model.draft.aiPoc?.confirmedUnderstanding,
     model.projectDescription,
-    model.draft.aiPoc?.proposal.summary,
+    model.draft.aiPoc?.proposal?.summary,
   ];
   let objective: string | null = null;
   for (const source of sourceSentences) {
