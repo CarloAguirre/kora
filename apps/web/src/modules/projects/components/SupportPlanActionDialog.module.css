@@ -62,9 +62,10 @@
   cursor: pointer;
 }
 
-/* Acceso explícito al historial de meses desde Registrar factura (Facturación).
-   Se ubica en la cabecera del modal, antes del botón de cierre. */
+/* Enlace exclusivo de Facturación: a la izquierda del pie, antes de Cancelar y Guardar.
+   No cambia la alineación de otros diálogos que comparten el modal. */
 .historyLink {
+  margin-right: auto;
   display: inline-flex;
   align-items: center;
   padding: 6px 8px;
