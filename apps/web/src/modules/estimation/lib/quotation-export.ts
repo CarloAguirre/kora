@@ -472,7 +472,7 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   }
   // En la plantilla hay dos párrafos amplios: no limitar la síntesis a la
   // primera frase ni a sólo dos funcionalidades si la EDT trae más detalle.
-  const distinct = features.filter((feature) => !norm(objective).includes(norm(feature)));
+  const distinct = features.filter((feature) => !norm(objective ?? '').includes(norm(feature)));
   if (distinct.length >= 2 && objective.length < 240) {
     objective += ' Se priorizan ' + joinItems(distinct.slice(0, 2).map(nominal)) + '.';
   }
