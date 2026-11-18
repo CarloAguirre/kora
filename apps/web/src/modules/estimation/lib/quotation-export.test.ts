@@ -368,7 +368,7 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     const ns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
     const xml = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
       'xmlns:a="' + ns + '"><p:spTree>' +
-      Array.from({ length: 14 }, (_, i) =>
+      Array.from({ length: 15 }, (_, i) =>
         '<p:sp><p:txBody><a:p><a:r><a:t>Campo ' + i +
         '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
     const output = patchQuotationSlideXml(xml, 11, model);
