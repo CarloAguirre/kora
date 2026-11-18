@@ -6,6 +6,8 @@ import { SupportBillingSection } from './SupportBillingSection';
 
 const mockUseSupportBillingRows = vi.hoisted(() => vi.fn());
 const mockUseSupportBillingOverview = vi.hoisted(() => vi.fn());
+const mockCanManageBilling = vi.hoisted(() => vi.fn());
+const mockIssueDialog = vi.hoisted(() => vi.fn());
 
 vi.mock('../api/billing.queries', () => ({
   useSupportBillingOverview: mockUseSupportBillingOverview,
@@ -15,13 +17,16 @@ vi.mock('../api/billing.queries', () => ({
 }));
 
 vi.mock('@/modules/auth/hooks/usePermissions', () => ({
-  usePermissions: () => ({ can: () => false }),
+  usePermissions: () => ({ can: mockCanManageBilling }),
 }));
 vi.mock('@/shared/components/ui/Toast', () => ({
   useToast: () => ({ success: vi.fn() }),
 }));
 vi.mock('@/modules/projects/components/IssueSupportInvoiceDialog', () => ({
-  IssueSupportInvoiceDialog: () => null,
+  IssueSupportInvoiceDialog: (props: unknown) => {
+    mockIssueDialog(props);
+    return null;
+  },
 }));
 vi.mock('@/modules/projects/components/MarkSupportInvoicePaidDialog', () => ({
   MarkSupportInvoicePaidDialog: () => null,
@@ -46,6 +51,9 @@ const sampleRow = {
 } as SupportBillingRow;
 
 beforeEach(() => {
+  mockCanManageBilling.mockReset();
+  mockCanManageBilling.mockReturnValue(false);
+  mockIssueDialog.mockClear();
   mockUseSupportBillingOverview.mockReset();
   mockUseSupportBillingRows.mockReset();
   mockUseSupportBillingOverview.mockImplementation(() => ({
@@ -81,6 +89,28 @@ describe('Facturación de Soporte: período visible e historial por contrato', (
     fireEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
     expect(screen.getByRole('heading', { level: 2, name: 'Facturación mes de febrero de 2027' }))
       .toBeInTheDocument();
+  });
+
+  it('desde Registrar factura pasa el mes filtrado y la ruta de historial del contrato al modal', () => {
+    mockCanManageBilling.mockReturnValue(true);
+    mockUseSupportBillingRows.mockImplementation(() => ({
+      data: { items: [{ ...sampleRow, canInvoice: true }], page: 1, pageCount: 1, pageSize: 20, total: 1 },
+      isLoading: false,
+      error: null,
+    }));
+    show();
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Mes' }), { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Año' }), { target: { value: '2027' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar factura' }));
+
+    const openCall = mockIssueDialog.mock.calls
+      .map(([props]) => props as { open: boolean; periodLabel?: string; historyPath?: string })
+      .find((props) => props.open);
+    expect(openCall).toMatchObject({
+      periodLabel: 'marzo de 2027',
+      historyPath: '/soporte/b5b1c217-8585-43f4-b491-8ac94346ef93',
+    });
   });
 
   it('mantiene el nombre y agrega Ver historial junto al contrato enlazando su ficha', () => {
