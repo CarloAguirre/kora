@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { QuotationVersion } from '@kora/contracts';
-import { buildQuotationWorkbook, patchQuotationSlideXml, quotationClientBrief, quotationExportModel } from './quotation-export';
+import { buildQuotationWorkbook, patchQuotationSlideXml, quotationClientBrief, quotationClientExclusions, quotationRepresentativeTeamActivities, quotationExportModel } from './quotation-export';
 import { patchStyledTableSheet } from './quotation-export-template';
 
 const version = (patch: Record<string, unknown> = {}): QuotationVersion => ({
@@ -168,6 +168,142 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(brief.features).toHaveLength(0);
     expect(brief.objective).toContain('Proyecto sin EDT');
     expect(brief.objective).not.toContain('finanzas');
+  });
+
+  it('enriquece el objetivo con entendimiento confirmado y funcionalidades de la EDT sin inventar contenido', () => {
+    const names = [
+      'Gestión de usuarios y accesos',
+      'Inspecciones y chequeos',
+      'Aprobaciones y validaciones',
+      'Reportes e indicadores',
+      'Integraciones y servicios',
+      'Diseño UX/UI y prototipos',
+    ];
+    const v = version({ draft: {
+      ...version().draft,
+      mode: 'phases',
+      phases: names.map((name, index) => ({
+        name, startWeek: index + 1, durationWeeks: 1, teamHours: [],
+      })),
+      aiPoc: {
+        confirmedUnderstanding: 'Implementar una plataforma para la gestión de inspecciones, validaciones y responsables operativos.',
+        proposal: { summary: 'El cliente requiere trazabilidad y reportes.' },
+      },
+    } });
+    const model = quotationExportModel({
+      ...context(v),
+      project: { name: 'Inspecciones', description: 'Proyecto de inspecciones.', client: { companyName: 'Cliente QA' } },
+    });
+    const brief = quotationClientBrief(model);
+    expect(brief.objective).toContain('Implementar una plataforma');
+    expect(brief.objective.length).toBeGreaterThan(115);
+    expect(brief.scope).toMatch(/reportes|integraciones|diseño/iu);
+    expect(brief.scope.length).toBeGreaterThan(125);
+    expect(brief.objective + brief.scope).not.toMatch(/Gemini|página|documento|PDF/iu);
+  });
+
+  it('la lámina 11 cubre todos los equipos con HH y una actividad propia aunque las primeras WBS sean del mismo equipo', () => {
+    const teamNames = new Map([
+      ['dev', 'Desarrollo'], ['ux', 'UX-UI'], ['qa', 'QA'],
+      ['ia', 'IA'], ['rpa', 'RPA'], ['pmo', 'PMO'],
+    ]);
+    const phase = (name: string, teamId: string, hours: number) => ({
+      name, startWeek: 1, durationWeeks: 1,
+      teamHours: [{ teamId, hours }],
+    });
+    const v = version({ totalHours: 180, draft: {
+      ...version().draft, mode: 'phases',
+      teams: [...teamNames.keys()].map((teamId) => ({
+        teamId, collaborators: 1, unit: 'week', duration: 1,
+        hoursPerWeek: 40, dedicationPercent: 100,
+      })),
+      phases: [
+        phase('Desarrollo de APIs', 'dev', 30),
+        phase('Desarrollo de reglas', 'dev', 30),
+        phase('Desarrollo de plataforma', 'dev', 30),
+        phase('Desarrollo de controles', 'dev', 30),
+        phase('Diseñar prototipos', 'ux', 15),
+        phase('Validación de calidad', 'qa', 15),
+        phase('Entrenar modelos', 'ia', 10),
+        phase('Implementar robot', 'rpa', 10),
+        phase('Coordinar entregas', 'pmo', 10),
+      ],
+    } });
+    const model = quotationExportModel({ ...context(v), teamNames });
+    const rows = quotationRepresentativeTeamActivities(model);
+    expect(rows).toHaveLength(4);
+    for (const team of teamNames.values()) {
+      expect(rows.map((row) => row.team).join(' / ')).toContain(team);
+    }
+    for (const activity of [
+      'Diseñar prototipos', 'Validación de calidad', 'Entrenar modelos',
+      'Implementar robot', 'Coordinar entregas',
+    ]) {
+      expect(rows.map((row) => row.name).join(' · ')).toContain(activity);
+    }
+    const ns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const xml = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="' + ns + '"><p:spTree>' +
+      Array.from({ length: 15 }, (_, i) =>
+        '<p:sp><p:txBody><a:p><a:r><a:t>Campo ' + i +
+        '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
+    const patched = patchQuotationSlideXml(xml, 11, model);
+    const paragraphs = Array.from(new DOMParser().parseFromString(patched, 'application/xml')
+      .getElementsByTagNameNS(ns, 'p'));
+    expect(paragraphs[7]?.textContent).toBe('180 H/H');
+    for (const team of teamNames.values()) {
+      expect([5, 8, 10, 12].map((i) => paragraphs[i]?.textContent).join(' / ')).toContain(team);
+    }
+    expect(paragraphs[1]?.textContent).toContain('cada equipo');
+  });
+
+  it('lámina 18 y Excel usan exclusiones confirmadas del cuestionario y análisis, sin asumir que todo F05 es exclusión', () => {
+    const draft = {
+      ...version().draft,
+      exclusions: ['Integración SAP fuera de alcance'],
+      assumptions: ['La API será proporcionada por el cliente'],
+      analysis: { scope: { excluded: ['Aplicación móvil nativa'] } },
+      aiPoc: {
+        answers: [
+          { questionId: 'F05', value: 'No se incluye la migración histórica', usedAssumption: false },
+          { questionId: 'F04', value: ['none'], usedAssumption: false },
+          { questionId: 'D01', value: 'exclude', usedAssumption: false },
+          { questionId: 'D02', value: 'no_definido', usedAssumption: false },
+        ],
+        dynamicQuestions: [
+          { id: 'D01', kind: 'dynamic', question: '¿Debe incluirse la generación de facturas?',
+            options: [{ value: 'exclude', label: 'Excluir' }] },
+          { id: 'D02', kind: 'dynamic', question: '¿Debe incluirse notificación SMS?',
+            options: [{ value: 'no_definido', label: 'No definido' }] },
+        ],
+      },
+    };
+    const exclusions = quotationClientExclusions(draft as QuotationVersion['draft']);
+    expect(exclusions).toHaveLength(5);
+    expect(exclusions.join(' ')).toContain('Integración SAP');
+    expect(exclusions.join(' ')).toContain('Aplicación móvil');
+    expect(exclusions.join(' ')).toContain('migración histórica');
+    expect(exclusions.join(' ')).toContain('UAT');
+    expect(exclusions.join(' ')).toContain('generación de facturas');
+    expect(exclusions.join(' ')).not.toMatch(/SMS|La API será proporcionada/);
+    const v = version({ draft });
+    const workbook = buildQuotationWorkbook(context(v));
+    const sheetData = workbook.Sheets.Supuestos!;
+    expect(Object.values(sheetData).filter((cell) => cell?.v === 'Fuera de alcance')).toHaveLength(5);
+    const model = quotationExportModel(context(v));
+    const ns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const xml = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="' + ns + '"><p:spTree>' +
+      Array.from({ length: 8 }, (_, i) =>
+        '<p:sp><p:txBody><a:p><a:r><a:t>Campo ' + i +
+        '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
+    const patched = patchQuotationSlideXml(xml, 18, model);
+    const paragraphs = Array.from(new DOMParser().parseFromString(patched, 'application/xml')
+      .getElementsByTagNameNS(ns, 'p'));
+    expect(paragraphs[2]?.textContent).toContain('cuestionario');
+    expect(paragraphs[3]?.textContent).toContain('Integración SAP');
+    expect(paragraphs[6]?.textContent).toContain('2 exclusiones más');
+    expect(patched).not.toContain('No definido');
   });
 
   it('separa las hojas comerciales y fuentes solo cuando hay datos persistidos', () => {
