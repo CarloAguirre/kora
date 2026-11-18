@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { ProjectDetail, ProjectStatus, TicketSummary } from '@kora/contracts';
 import { SUPPORT_PLAN_TYPE_LABELS } from '@kora/contracts';
 import styles from './SupportProjectDetailView.module.css';
@@ -19,10 +18,11 @@ import { CloseSupportPlanDialog } from '../components/CloseSupportPlanDialog';
 import { SUPPORT_STATUS_OPTIONS, supportProjectStatusLabel, supportSubTabForStatus, type SupportSubTab } from '../lib/projects-list-search';
 import { useTicketsList } from '@/modules/tickets/api/tickets.queries';
 import { TicketPriorityBadge } from '@/modules/tickets/components/TicketPriorityBadge';
+import { TicketDetailModal } from '@/modules/tickets/components/TicketDetailModal';
+import { formatTicketReportDate } from '@/modules/tickets/lib/ticket-history-dates';
 import { SupportHoursStatus } from '../components/SupportHoursStatus';
 import { SupportProgressChart } from '../components/SupportProgressChart';
 import { formatMoney } from '@/shared/lib/format-money';
-import { ticketPath } from '@/app/router/paths';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
 const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:00`).toLocaleDateString('es-CL') : '—');
@@ -66,6 +66,7 @@ export function SupportProjectDetailView({
     sortField: 'createdAt',
     sortDirection: 'desc',
   });
+  const [openTicketId, setOpenTicketId] = useState<string | null>(null);
 
   // El contacto del PROYECTO (v1: `proyecto.id_contacto`) puede ser distinto
   // del contacto general del cliente — antes esto siempre mostraba el primer
@@ -99,11 +100,12 @@ export function SupportProjectDetailView({
       header: 'ID ticket',
       width: '110px',
       render: (t) => (
-        <Link to={ticketPath(t)} className={styles.ticketLink}>
+        <button type="button" className={styles.ticketLink} onClick={() => setOpenTicketId(t.id)}>
           {t.code ?? '—'}
-        </Link>
+        </button>
       ),
     },
+    { key: 'createdAt', header: 'Fecha', width: '110px', render: (t) => formatTicketReportDate(t.createdAt) || '—' },
     { key: 'title', header: 'Título', render: (t) => t.title },
     { key: 'assignee', header: 'Responsable', render: (t) => t.assignee?.fullName ?? 'Sin asignar' },
     { key: 'estimatedHours', header: 'HH Est.', align: 'right', render: (t) => t.estimatedHours ?? 0 },
@@ -239,6 +241,7 @@ export function SupportProjectDetailView({
           )}
         </div>
       </Card>
+      {openTicketId && <TicketDetailModal ticketId={openTicketId} onClose={() => setOpenTicketId(null)} />}
       <CloseSupportPlanDialog
         open={closing}
         onClose={() => setClosing(false)}
