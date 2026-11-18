@@ -292,12 +292,10 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     const model = quotationExportModel({ ...context(v), teamNames });
     const rows = quotationRepresentativeTeamActivities(model);
     expect(rows).toHaveLength(4);
-    for (const team of teamNames.values()) {
-      expect(rows.map((row) => row.team).join(' / ')).toContain(team);
-    }
+    expect(rows.map((row) => row.team)).toEqual(['Desarrollo', 'UX-UI', 'QA', 'IA']);
+    expect(rows.every((row) => !row.team.includes(' / '))).toBe(true);
     for (const activity of [
-      'Diseñar prototipos', 'Validación de calidad', 'Entrenar modelos',
-      'Implementar robot', 'Coordinar entregas',
+      'Desarrollo de APIs', 'Diseñar prototipos', 'Validación de calidad', 'Entrenar modelos',
     ]) {
       expect(rows.map((row) => row.name).join(' · ')).toContain(activity);
     }
@@ -382,6 +380,67 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(paragraphs[7]?.textContent).toBe('100 H/H');
   });
 
+  it('si hay 5 perfiles, muestra UX-UI con su propia fila y NO mezcla su tarea con Líder técnico', () => {
+    const task = (role: string, name: string, hours: number, i: number) => ({
+      wbs: 'T' + i, role, name, description: '', hours,
+    });
+    const tasks = [
+      task('Líder técnico', 'Supervisar calidad, riesgos y decisiones técnicas de forma semanal', 50, 1),
+      task('Desarrollador', 'Implementar formulario y borrador mensual', 70, 2),
+      task('Diseñador UX', 'Diseñar prototipos de ambos módulos', 25, 3),
+      task('Especialista IA', 'Construir análisis IA de consistencia documental', 45, 4),
+      task('Tester QA', 'Ejecutar pruebas funcionales integradas', 30, 5),
+    ];
+    const draft = {
+      ...version().draft,
+      teams: ['dev', 'ux', 'ai', 'qa'].map((teamId) => ({
+        teamId, collaborators: 1, unit: 'week', duration: 1,
+        hoursPerWeek: 40, dedicationPercent: 100,
+      })),
+      aiPoc: {
+        source: 'drive',
+        roleTeamIds: {
+          'Líder técnico': 'dev', Desarrollador: 'dev',
+          'Diseñador UX': 'ux', 'Especialista IA': 'ai', 'Tester QA': 'qa',
+        },
+        proposal: { roles: tasks.map(({ role }) => ({ role })) },
+        edt: {
+          schemaVersion: 'kora.quotation.reference-edt.v1',
+          source: 'drive', provider: 'gemini',
+          modules: [{ name: 'Proyecto', totalHours: 220, tasks }],
+          totalHours: 220,
+        },
+      },
+    };
+    const model = quotationExportModel({
+      ...context(version({ totalHours: 220, draft })),
+      teamNames: new Map([
+        ['dev', 'Desarrollo'], ['ux', 'UX-UI'],
+        ['ai', 'IA'], ['qa', 'QA'],
+      ]),
+    });
+    expect(quotationRepresentativeTeamActivities(model)).toEqual([
+      { team: 'Desarrollo', name: 'Implementar formulario y borrador mensual' },
+      { team: 'UX-UI', name: 'Diseñar prototipos de ambos módulos' },
+      { team: 'IA', name: 'Construir análisis IA de consistencia documental' },
+      { team: 'QA', name: 'Ejecutar pruebas funcionales integradas' },
+    ]);
+    const ns = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+    const xml = '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" ' +
+      'xmlns:a="' + ns + '"><p:spTree>' +
+      Array.from({ length: 15 }, (_, i) =>
+        '<p:sp><p:txBody><a:p><a:r><a:t>Campo ' + i +
+        '</a:t></a:r></a:p></p:txBody></p:sp>').join('') + '</p:spTree></p:sld>';
+    const patched = patchQuotationSlideXml(xml, 11, model);
+    const paragraphs = Array.from(new DOMParser().parseFromString(patched, 'application/xml')
+      .getElementsByTagNameNS(ns, 'p'));
+    expect([5, 8, 10, 12].map((i) => paragraphs[i]?.textContent)).toEqual([
+      'Desarrollo', 'UX-UI', 'IA', 'QA',
+    ]);
+    expect(patched).not.toContain('Supervisar calidad');
+    expect(paragraphs[7]?.textContent).toBe('220 H/H');
+  });
+
   it('una supervisión técnica con perfil legacy genérico no sustituye la actividad de Desarrollo', () => {
     const tasks = [
       { wbs: 'WBS-A', role: 'Desarrollo',
@@ -459,11 +518,10 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(model.details).toHaveLength(work.length);
     const rows = quotationRepresentativeTeamActivities(model);
     expect(rows).toHaveLength(4);
-    for (const team of teamNames.values()) {
-      expect(rows.map((row) => row.team).join(' / ')).toContain(team);
-    }
-    expect(rows.map((row) => row.name).join(' · ')).toContain('Integrar automatización');
-    expect(rows.map((row) => row.name).join(' · ')).toContain('Planificar entregas');
+    expect(rows.map((row) => row.team)).toEqual(['Desarrollo', 'UX-UI', 'QA', 'IA']);
+    expect(rows.every((row) => !row.team.includes(' / '))).toBe(true);
+    expect(rows.map((row) => row.name).join(' · ')).toContain('Diseño de pantallas');
+    expect(rows.map((row) => row.name).join(' · ')).toContain('Configurar extracción');
   });
 
   it('lámina 18 y Excel usan exclusiones confirmadas del cuestionario y análisis, sin asumir que todo F05 es exclusión', () => {
