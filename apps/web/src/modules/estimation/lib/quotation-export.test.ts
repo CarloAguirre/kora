@@ -309,9 +309,8 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     const paragraphs = Array.from(new DOMParser().parseFromString(patched, 'application/xml')
       .getElementsByTagNameNS(ns, 'p'));
     expect(paragraphs[7]?.textContent).toBe('180 H/H');
-    for (const team of teamNames.values()) {
-      expect([5, 8, 10, 12].map((i) => paragraphs[i]?.textContent).join(' / ')).toContain(team);
-    }
+    expect([5, 8, 10, 12].map((i) => paragraphs[i]?.textContent))
+      .toEqual(['Desarrollo', 'UX-UI', 'QA', 'IA']);
     expect(paragraphs[1]?.textContent).toContain('equipo y perfil');
   });
 
