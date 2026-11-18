@@ -8,14 +8,14 @@ function setup() {
     weeklyHoursByProjectForUser: vi.fn().mockResolvedValue([
       { projectId: 'project-a', hours: 8 }, { projectId: 'project-b', hours: 2 },
     ]),
-    approvedProjectEvents: vi.fn().mockResolvedValue({
+    projectBitacoraEvents: vi.fn().mockResolvedValue({
       truncated: false,
       entries: [{
         id: 'hour-a', date: new Date('2026-11-04T00:00:00Z'),
         createdAt: new Date('2026-11-04T14:30:00Z'),
         userName: 'Colaborador', moduleName: 'Fase 1',
         activity: 'Desarrollo', description: 'Maquetación',
-        hours: 8, hasBlocker: false, blockerDescription: null,
+        hours: 8, hasBlocker: false, blockerDescription: null, status: 'approved',
       }],
     }),
   } as unknown as ProjectHourEntryReader;
@@ -34,12 +34,12 @@ describe('CollaboratorProjectActivityService', () => {
     );
   });
 
-  it('retorna solo eventos aprobados con datos de lectura y fecha ISO', async () => {
+  it('retorna eventos aprobados y bloqueos pendientes con datos de lectura y fecha ISO', async () => {
     const { service, reader } = setup();
-    const result = await service.approvedEvents('project-a');
-    expect(reader.approvedProjectEvents).toHaveBeenCalledWith('project-a', 500);
+    const result = await service.bitacoraEvents('project-a');
+    expect(reader.projectBitacoraEvents).toHaveBeenCalledWith('project-a', 500);
     expect(result.entries).toEqual([expect.objectContaining({
-      date: '2026-11-04', userName: 'Colaborador', hours: 8,
+      date: '2026-11-04', userName: 'Colaborador', hours: 8, status: 'approved',
     })]);
     expect(result.truncated).toBe(false);
   });
