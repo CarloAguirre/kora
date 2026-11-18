@@ -477,13 +477,27 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
     objective += ' Se priorizan ' + joinItems(distinct.slice(0, 2).map(nominal)) + '.';
   }
   const additional = features.slice(2, 6);
-  const scope = additional.length
-    ? 'El trabajo comprende ' + joinItems(additional.map(nominal)) +
-      '. El desglose de tareas y HH por equipo está disponible en el Excel de cotización.'
+  // Redacción autocontenida para presentar al cliente: no remitir a un Excel,
+  // a WBS internas ni a artefactos que la audiencia no necesariamente recibe.
+  const scopeBase = additional.length
+    ? 'El trabajo comprende ' + joinItems(additional.map(nominal)) + '.'
     : features.length
-      ? 'El alcance comprende ' + joinItems(features.map(nominal)) +
-        ', según las actividades y entregables definidos en la estimación.'
-      : 'El alcance específico corresponde a las actividades y entregables aprobados en la cotización.';
+      ? 'El alcance comprende ' + joinItems(features.map(nominal)) + '.'
+      : 'El alcance específico está sujeto a la definición comercial del proyecto.';
+  // Cuando existe un segundo enunciado confirmado/relevante, incorporarlo
+  // literalmente: es más preciso que agregar un cierre genérico o inventado.
+  const narrative = sourceSentences
+    .filter((source): source is string => typeof source === 'string' && Boolean(source.trim()))
+    .flatMap((source) => tidy(source).split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÜÑ])/u))
+    .map((sentence) => sentence.replace(/^["'“”«»\s]+|["'“”«»\s]+$/gu, '').trim())
+    .find((sentence) => sentence.length >= 40 && sentence.length <= 175 &&
+      !sourceNarration(sentence) &&
+      !norm(objective).includes(norm(sentence)) &&
+      !norm(scopeBase).includes(norm(sentence)) &&
+      !/^(?:desarrollar|implementar|construir|crear)\s+(?:una?|el|la)\b/iu.test(sentence));
+  const scope = narrative && scopeBase.length + narrative.length + 1 <= 300
+    ? scopeBase + ' ' + (/[.!?]$/u.test(narrative) ? narrative : narrative + '.')
+    : scopeBase;
   return { objective, scope, features };
 }
 
