@@ -15,7 +15,7 @@ function controllerWithMocks() {
   const getProject = { execute: vi.fn() };
   const collaboratorActivity = {
     weeklyHours: vi.fn().mockResolvedValue(new Map()),
-    approvedEvents: vi.fn().mockResolvedValue({ entries: [], truncated: false }),
+    bitacoraEvents: vi.fn().mockResolvedValue({ entries: [], truncated: false }),
   };
   const controller = Object.assign(Object.create(ProjectsController.prototype), {
     listProjects, getProject, collaboratorActivity,
@@ -51,7 +51,7 @@ describe('ProjectsController — visor personal de colaborador', () => {
     expect(getProject.execute).toHaveBeenCalledWith({
       projectId: 'other-project', actorUserId: 'collaborator-1', actorPermissions: [],
     });
-    expect(collaboratorActivity.approvedEvents).not.toHaveBeenCalled();
+    expect(collaboratorActivity.bitacoraEvents).not.toHaveBeenCalled();
   });
 
   it('proyecta detalle de consulta y neutraliza toda capacidad de edición', async () => {
