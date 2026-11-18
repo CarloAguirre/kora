@@ -117,15 +117,56 @@ describe('SendSupportBillingDigestUseCase', () => {
 
     const result = (await useCase.execute({ today: '2026-10-30', dryRun: false, onlyOnLastBusinessDay: true })).unwrap();
 
-    expect(result).toMatchObject({ month: '2026-10', skippedNotLastBusinessDay: false, plans: 4, recipients: 2, sent: 2 });
+    expect(result).toMatchObject({ month: '2026-10', skippedNotLastBusinessDay: false, plans: 3, recipients: 2, sent: 2 });
     const digest = sender.supportBillingDigests[0]!;
     expect(digest.monthLabel).toBe('octubre de 2026');
+    // El "a demanda" sin HH no aparece; el mensual sin HH sí (su cuota se cobra igual).
     expect(digest.items.map((i) => [i.clientName, i.contractType, i.usedHours, i.pendingHours])).toEqual([
       ['Cliente amicar', 'Mensual · acumulado', 5.5, 1],
       ['Cliente asys', 'Mensual · con vencimiento', 0, 0],
-      ['Cliente cbt', 'A demanda', 0, 0],
       ['Cliente cemin', 'Bolsa', 4, 0],
     ]);
+  });
+
+  it('incluye un "a demanda" con HH aprobadas o por aprobar en el mes', async () => {
+    const { sender, useCase } = setup({
+      plans: [
+        plan({ id: 'p1', clientId: 'cristal', planType: 'on_demand', surplusPolicy: null }),
+        plan({ id: 'p2', clientId: 'gmc', planType: 'on_demand', surplusPolicy: null }),
+        plan({ id: 'p3', clientId: 'denham', planType: 'on_demand', surplusPolicy: null }),
+      ],
+      hours: [
+        { projectId: 'proj-p1', date: '2026-10-05', hours: 3, status: 'approved' },
+        { projectId: 'proj-p2', date: '2026-10-06', hours: 2, status: 'pending' },
+        // HH de un mes anterior no hacen aparecer al contrato.
+        { projectId: 'proj-p3', date: '2026-09-15', hours: 4, status: 'approved' },
+      ],
+    });
+
+    await useCase.execute({ today: '2026-10-30', dryRun: false, onlyOnLastBusinessDay: false });
+
+    expect(sender.supportBillingDigests[0]!.items.map((i) => [i.clientName, i.usedHours, i.pendingHours])).toEqual([
+      ['Cliente cristal', 3, 0],
+      ['Cliente gmc', 0, 2],
+    ]);
+  });
+
+  it('omite los contratos que terminaron antes del mes y corta las HH en la fecha de término', async () => {
+    const { sender, useCase } = setup({
+      plans: [
+        plan({ id: 'p1', clientId: 'vencido', planType: 'bundle', surplusPolicy: null, endDate: new Date('2026-09-30T00:00:00Z') }),
+        plan({ id: 'p2', clientId: 'termina', endDate: new Date('2026-10-15T00:00:00Z') }),
+      ],
+      hours: [
+        { projectId: 'proj-p1', date: '2026-10-05', hours: 3, status: 'approved' },
+        { projectId: 'proj-p2', date: '2026-10-10', hours: 2, status: 'approved' },
+        { projectId: 'proj-p2', date: '2026-10-20', hours: 5, status: 'approved' },
+      ],
+    });
+
+    await useCase.execute({ today: '2026-10-30', dryRun: false, onlyOnLastBusinessDay: false });
+
+    expect(sender.supportBillingDigests[0]!.items.map((i) => [i.clientName, i.usedHours])).toEqual([['Cliente termina', 2]]);
   });
 
   it('solo envía el último día hábil del mes, saltando fines de semana y feriados', async () => {

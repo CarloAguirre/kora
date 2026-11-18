@@ -61,6 +61,20 @@
   font-weight: var(--kora-weight-bold);
 }
 
+/* Celdas de horas de Soporte: la cifra y, debajo, el saldo acumulado o el desglose mes / total. */
+.hoursCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.hoursUnit,
+.hoursHint {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
 /* Encabezados sin mayúsculas forzadas: los ordenables ya se ven así (el <button> no hereda
    `text-transform`), y los no ordenables (Etapa, Acciones) salían en MAYÚSCULAS. */
 .table th {

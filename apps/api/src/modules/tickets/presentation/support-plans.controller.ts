@@ -5,15 +5,18 @@ import {
   closeSupportPlanSchema,
   createProjectSchema,
   createSupportPlanSchema,
+  listSupportProjectUsageSchema,
   markSupportInvoiceIssuedSchema,
   updateSupportPlanSchema,
   type CloseSupportPlanInput,
   type CreateProjectInput,
   type CreateSupportPlanInput,
+  type ListSupportProjectUsageInput,
   type MarkSupportInvoiceIssuedInput,
   type SupportPlanListItem,
   type SupportPlanWithInvoices,
   type SupportProjectDetailSummary,
+  type SupportProjectUsage,
   type UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { RequireAnyPermission, RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
@@ -29,6 +32,7 @@ import { CloseSupportPlanUseCase } from '../application/use-cases/close-support-
 import { GetSupportPlanUseCase } from '../application/use-cases/get-support-plan.use-case';
 import { ListSupportPlansForClientUseCase } from '../application/use-cases/list-support-plans-for-client.use-case';
 import { MarkSupportInvoiceIssuedUseCase } from '../application/use-cases/mark-support-invoice-issued.use-case';
+import { ListSupportProjectUsageUseCase } from '../application/use-cases/list-support-project-usage.use-case';
 
 @Controller('support-plans')
 export class SupportPlansController {
@@ -41,6 +45,7 @@ export class SupportPlansController {
     private readonly listForClient: ListSupportPlansForClientUseCase,
     private readonly markInvoiceIssued: MarkSupportInvoiceIssuedUseCase,
     private readonly createProjectWithPlan: CreateSupportProjectUseCase,
+    private readonly listUsage: ListSupportProjectUsageUseCase,
   ) {}
 
   @Get('project/:projectId')
@@ -50,6 +55,22 @@ export class SupportPlansController {
     @CurrentUser() actor: RequestUser,
   ): Promise<SupportProjectDetailSummary | null> {
     return unwrapOrThrow(await this.getSummary.execute({ projectId, actorUserId: actor.id, actorPermissions: actor.permissions }));
+  }
+
+  /**
+   * Columnas de horas de la tabla de Soporte (`ProjectsListPage`) para los proyectos de la página visible.
+   * POST porque viaja una lista de ids (hasta 200 al exportar). Declarada ANTES de `:id`.
+   */
+  @Post('usage')
+  @RequireAnyPermission('projects:read', 'projects:read_assigned')
+  @HttpCode(HttpStatus.OK)
+  async usage(
+    @Body(new ZodValidationPipe(listSupportProjectUsageSchema)) body: ListSupportProjectUsageInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<SupportProjectUsage[]> {
+    return unwrapOrThrow(
+      await this.listUsage.execute({ projectIds: body.projectIds, actorUserId: actor.id, actorPermissions: actor.permissions }),
+    );
   }
 
   /** Alimenta la tabla "Contratos" de la ficha de cliente — declarada ANTES de `:id` para no chocar con esa ruta. */

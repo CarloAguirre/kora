@@ -7,6 +7,7 @@ import type {
   SupportPlanListItem,
   SupportPlanWithInvoices,
   SupportProjectDetailSummary,
+  SupportProjectUsage,
   UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
@@ -18,6 +19,10 @@ export type SupportInvoiceUploadInput = Omit<MarkSupportInvoiceIssuedInput, 'inv
 export const supportPlanApi = {
   getSummaryForProject(projectId: string): Promise<SupportProjectDetailSummary | null> {
     return api.get<SupportProjectDetailSummary | null>(`/support-plans/project/${projectId}`);
+  },
+  /** Columnas de horas de la tabla de Soporte — mismo cálculo que "Estado del proyecto" de la ficha. */
+  listUsage(projectIds: readonly string[]): Promise<SupportProjectUsage[]> {
+    return api.post<SupportProjectUsage[]>('/support-plans/usage', { projectIds });
   },
   listForClient(clientId: string): Promise<SupportPlanListItem[]> {
     return api.get<SupportPlanListItem[]>(`/support-plans/client/${clientId}`);
@@ -71,6 +76,8 @@ export const supportPlanApi = {
 
 export const supportPlanKeys = {
   summary: (projectId: string) => ['support-plan', 'summary', projectId] as const,
+  /** Bajo el prefijo `summary` para que lo invaliden las mismas mutaciones que el resumen de la ficha. */
+  usage: (projectIds: readonly string[]) => ['support-plan', 'summary', 'usage', ...projectIds] as const,
   forClient: (clientId: string) => ['support-plan', 'client', clientId] as const,
   /** Prefijo de todos los detalles — el detalle se cachea bajo el slug de la URL, no bajo el UUID que usan las mutaciones. */
   details: () => ['support-plan', 'detail'] as const,

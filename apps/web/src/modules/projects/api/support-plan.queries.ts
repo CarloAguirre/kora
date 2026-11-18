@@ -19,6 +19,15 @@ export function useSupportPlanSummary(projectId: string | null) {
   });
 }
 
+/** Consumo del contrato de cada proyecto de la página visible de la tabla de Soporte. */
+export function useSupportProjectUsage(projectIds: readonly string[], options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: supportPlanKeys.usage(projectIds),
+    queryFn: () => supportPlanApi.listUsage(projectIds),
+    enabled: (options.enabled ?? true) && projectIds.length > 0,
+  });
+}
+
 export function useSupportPlansForClient(clientId: string | null) {
   return useQuery({
     queryKey: supportPlanKeys.forClient(clientId ?? ''),

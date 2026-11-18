@@ -105,6 +105,43 @@ export const supportProjectSummarySchema = z.object({
 });
 export type SupportProjectSummary = z.infer<typeof supportProjectSummarySchema>;
 
+/**
+ * Consumo del contrato activo de un proyecto de soporte, para las columnas de
+ * horas de la tabla de Soporte. Sale del mismo `SupportPlanSummaryBuilder`
+ * que "Estado del proyecto" en la ficha, así que ambos muestran lo mismo:
+ * - `month` (mensual con período vigente): cifras del MES en curso — plan del
+ *   mes + saldo acumulado vs. lo usado este mes.
+ * - `contract` (bolsa / a demanda, o mensual sin período vigente): toda la
+ *   vigencia del contrato; las horas anteriores a su inicio no cuentan.
+ */
+export const supportProjectUsageSchema = z.object({
+  projectId: uuidSchema,
+  planType: supportPlanTypeSchema,
+  scope: z.enum(['month', 'contract']),
+  /** HH vendidas: las del plan del mes (mensual) o la bolsa contratada. `null` en "a demanda" (sin tope). */
+  planHours: z.number().nullable(),
+  /** Saldo acumulado de meses anteriores (solo mensual acumulable; 0 en otro caso). */
+  priorSurplusHours: z.number(),
+  usedHours: z.number(),
+  /** `null` cuando no hay tope con qué comparar (a demanda, mensual sin período vigente). */
+  remainingHours: z.number().nullable(),
+  deviationHours: z.number().nullable(),
+  /**
+   * Desglose informativo de las consumidas — solo mensual y bolsa (`null` en a demanda):
+   * - `monthUsedHours`: lo usado en el mes en curso (mensual: período vigente, `null` si no hay;
+   *   bolsa: mes calendario dentro de la vigencia).
+   * - `contractUsedHours`: lo usado en toda la vigencia del contrato.
+   */
+  monthUsedHours: z.number().nullable(),
+  contractUsedHours: z.number().nullable(),
+});
+export type SupportProjectUsage = z.infer<typeof supportProjectUsageSchema>;
+
+export const listSupportProjectUsageSchema = z.object({
+  projectIds: z.array(uuidSchema).max(200),
+});
+export type ListSupportProjectUsageInput = z.infer<typeof listSupportProjectUsageSchema>;
+
 /** Resumen de la ficha de proyecto con el identificador del contrato activo que se puede cerrar. */
 export const supportProjectDetailSummarySchema = supportProjectSummarySchema.extend({ planId: uuidSchema });
 export type SupportProjectDetailSummary = z.infer<typeof supportProjectDetailSummarySchema>;
