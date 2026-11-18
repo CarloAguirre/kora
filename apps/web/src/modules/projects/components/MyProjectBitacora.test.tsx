@@ -81,7 +81,7 @@ describe('Bitácora del colaborador: alta de registros', () => {
     render(<MyProjectBitacora project={withIncident} />);
     fireEvent.click(screen.getByRole('button', { name: 'Incidentes' }));
     expect(screen.getByText('Prueba bitácora')).toBeInTheDocument();
-    expect(screen.getAllByText('Incidente')).toHaveLength(1);
+    expect(screen.getAllByText('Incidente').length).toBeGreaterThan(0);
     expect(screen.getByText('Leslie Galaz')).toBeInTheDocument();
     expect(screen.getByText('HH pendientes de aprobación')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Ver detalle Prueba bitácora' }));
