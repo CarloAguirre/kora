@@ -291,6 +291,8 @@ export function SupportBillingSection() {
         description={issueRow ? `${issueRow.planName} · ${formatMoney(issueRow.amountUf ?? 0, issueRow.currency)}` : ''}
         totalAmount={issueRow?.amountUf ?? 0}
         currency={issueRow?.currency ?? 'UF'}
+        periodLabel={selectedPeriodLabel}
+        historyPath={issueRow ? supportPlanPath({ id: issueRow.planId }) : undefined}
         onClose={() => setIssueRow(null)}
         onConfirm={async (input) => {
           if (!issueRow) return;
