@@ -142,10 +142,10 @@ export function SupportBillingSection() {
       sortable: true,
       render: (r) => (
         <span className={styles.planCellGroup}>
-          <Link to={supportPlanPath({ id: r.planId })} className={styles.planCell}>
+          <span className={styles.planCell}>
             {r.planName}
             {r.scope === 'consolidated' && <SupportPlanScopeBadge scope={r.scope} />}
-          </Link>
+          </span>
           <Link
             to={supportPlanPath({ id: r.planId })}
             className={styles.planHistoryLink}
