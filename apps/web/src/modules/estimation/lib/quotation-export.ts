@@ -182,22 +182,26 @@ export function quotationRepresentativeTeamActivities(
   const categories = [...byId.entries()]
     .sort(([aId, a], [bId, b]) => a.order - b.order ||
       aId.localeCompare(bId))
-    .map(([, group]) => ({
+    .map(([key, group]) => ({
+      key,
       team: group.label,
+      hours: group.hours,
+      order: group.order,
       name: [...group.candidates].sort((a, b) => b.hours - a.hours)[0]?.name ??
         'Actividad pendiente de desglose',
     }));
-  const rows: typeof categories[] = Array.from({ length: Math.min(4, categories.length) }, () => []);
-  categories.forEach((category, index) => { rows[index % rows.length]!.push(category); });
-  return rows.map((group) => {
-    // Cada categoría conserva texto propio aun si comparte una fila de la tabla.
-    const teamWidth = Math.max(10, Math.floor((46 - (group.length - 1) * 3) / group.length));
-    const activityWidth = Math.max(15, Math.floor((94 - (group.length - 1) * 3) / group.length));
-    return {
-      team: group.map((entry) => compact(entry.team, teamWidth)).join(' / '),
-      name: group.map((entry) => compact(entry.name, activityWidth)).join(' · '),
-    };
-  });
+  // Cuatro filas reales: NUNCA combinar dos equipos/perfiles en una sola.
+  // Cuando hay más de cuatro, priorizar los equipos de ejecución. El TL tiene
+  // fila exclusiva solo si queda espacio: no reemplaza UX, QA ni Desarrollo.
+  const withoutLead = categories.filter((row) => row.key !== technicalLeadKey);
+  const options = withoutLead.length >= 4 ? withoutLead : categories;
+  const selected = options.length > 4
+    ? [...options].sort((a, b) => b.hours - a.hours || a.order - b.order).slice(0, 4)
+    : options;
+  return selected.sort((a, b) => a.order - b.order).map(({ team, name }) => ({
+    team: compact(team, 46),
+    name: compact(name, 94),
+  }));
 }
 
 const sheet = (book: XLSX.WorkBook, name: string, data: Cell[][], widths?: number[]) => {
