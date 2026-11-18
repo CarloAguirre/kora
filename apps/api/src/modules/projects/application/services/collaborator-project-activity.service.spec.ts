@@ -8,14 +8,14 @@ function setup() {
     weeklyHoursByProjectForUser: vi.fn().mockResolvedValue([
       { projectId: 'project-a', hours: 8 }, { projectId: 'project-b', hours: 2 },
     ]),
-    approvedProjectEvents: vi.fn().mockResolvedValue({
+    projectBitacoraEvents: vi.fn().mockResolvedValue({
       truncated: false,
       entries: [{
         id: 'hour-a', date: new Date('2026-11-04T00:00:00Z'),
         createdAt: new Date('2026-11-04T14:30:00Z'),
         userName: 'Colaborador', moduleName: 'Fase 1',
         activity: 'Desarrollo', description: 'Maquetación',
-        hours: 8, hasBlocker: false, blockerDescription: null,
+        hours: 8, hasBlocker: false, blockerDescription: null, status: 'approved',
       }],
     }),
   } as unknown as ProjectHourEntryReader;
@@ -34,14 +34,35 @@ describe('CollaboratorProjectActivityService', () => {
     );
   });
 
-  it('retorna solo eventos aprobados con datos de lectura y fecha ISO', async () => {
+  it('retorna eventos aprobados y bloqueos pendientes con datos de lectura y fecha ISO', async () => {
     const { service, reader } = setup();
-    const result = await service.approvedEvents('project-a');
-    expect(reader.approvedProjectEvents).toHaveBeenCalledWith('project-a', 500);
+    const result = await service.bitacoraEvents('project-a');
+    expect(reader.projectBitacoraEvents).toHaveBeenCalledWith('project-a', 500);
     expect(result.entries).toEqual([expect.objectContaining({
-      date: '2026-11-04', userName: 'Colaborador', hours: 8,
+      date: '2026-11-04', userName: 'Colaborador', hours: 8, status: 'approved',
     })]);
     expect(result.truncated).toBe(false);
+  });
+
+  it('devuelve el bloqueo reportado en HH pendientes como un único incidente con su texto y estado', async () => {
+    const { service, reader } = setup();
+    vi.mocked(reader.projectBitacoraEvents).mockResolvedValueOnce({
+      truncated: false,
+      entries: [{
+        id: 'hour-blocker', date: new Date('2026-11-18T00:00:00Z'),
+        createdAt: new Date('2026-11-18T14:15:00Z'),
+        userName: 'Leslie Galaz', moduleName: 'T02 Diseño',
+        activity: 'Diseñar prototipos', description: 'Diseñar prototipos de ambos módulos',
+        hours: 8, hasBlocker: true, blockerDescription: 'Prueba bitácora',
+        status: 'pending',
+      }],
+    });
+    const result = await service.bitacoraEvents('project-a');
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]).toMatchObject({
+      userName: 'Leslie Galaz', hasBlocker: true, blockerDescription: 'Prueba bitácora',
+      status: 'pending', hours: 8, date: '2026-11-18',
+    });
   });
 
   it('evita consultar base cuando no hay proyectos', async () => {

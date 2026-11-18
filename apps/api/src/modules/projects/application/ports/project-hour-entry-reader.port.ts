@@ -15,6 +15,7 @@ export interface CollaboratorProjectEventRecord {
   readonly hours: number;
   readonly hasBlocker: boolean;
   readonly blockerDescription: string | null;
+  readonly status: 'approved' | 'pending';
 }
 export interface HistoricalPhaseZeroEntryRecord {
   id: string;
@@ -34,7 +35,7 @@ export interface ProjectHourEntryReader {
   weeklyHoursByProjectForUser(
     userId: string, projectIds: readonly string[], from: Date, through: Date,
   ): Promise<readonly { projectId: string; hours: number }[]>;
-  approvedProjectEvents(
+  projectBitacoraEvents(
     projectId: string, limit: number,
   ): Promise<{ entries: readonly CollaboratorProjectEventRecord[]; truncated: boolean }>;
 

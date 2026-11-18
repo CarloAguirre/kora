@@ -58,11 +58,150 @@ export function quotationExportModel({ version, project, teamNames }: QuotationE
     projectDescription: project.description ?? null,
     weekly: quotationTeamWeeklyPlan(draft),
     scope: draft.aiPoc?.confirmedUnderstanding ||
-      draft.aiPoc?.proposal.summary || project.description ||
+      draft.aiPoc?.proposal?.summary || project.description ||
       'Objetivo pendiente de definición comercial.',
     status: version.status === 'approved' ? 'Aprobada' :
       version.status === 'sent' ? 'Enviada' : 'Borrador',
   };
+}
+
+
+/** Exclusiones expresamente registradas; no convierte supuestos ni respuestas ambiguas en exclusiones. */
+export function quotationClientExclusions(draft: QuotationVersion['draft']): string[] {
+  const found = [
+    ...draft.exclusions,
+    ...(draft.analysis?.scope.excluded ?? []),
+  ];
+  const questions = new Map((draft.aiPoc?.dynamicQuestions ?? []).map((q) => [q.id, q]));
+  for (const answer of draft.aiPoc?.answers ?? []) {
+    if (answer.usedAssumption || answer.value == null) continue;
+    if (answer.questionId === 'F04' && Array.isArray(answer.value) &&
+        answer.value.includes('none')) {
+      found.push('Actividades posteriores al desarrollo: UAT, estabilización, marcha blanca y soporte inicial.');
+      continue;
+    }
+    if (answer.questionId === 'F05') {
+      const note = Array.isArray(answer.value) ? answer.value.join('; ') : String(answer.value);
+      if (/\b(?:exclu(?:ir|ido|ida|siones?)|fuera\s+de\s+alcance|no\s+(?:se\s+)?(?:incluye|incluyen|contempla|contemplan|considera|consideran|abarca|abarcan))\b/iu.test(note)) {
+        found.push(note);
+      }
+      continue;
+    }
+    const question = questions.get(answer.questionId);
+    if (!question || question.kind !== 'dynamic') continue;
+    const raw = Array.isArray(answer.value) ? answer.value : [answer.value];
+    const labels = raw.map((value) => {
+      const token = String(value);
+      return question.options.find((option) => option.value === token)?.label ?? token;
+    }).filter(Boolean);
+    if (!labels.length) continue;
+    // Preguntas sobre EXCLUSIONES: la respuesta se refiere a elementos excluidos.
+    if (/\b(?:qu[eé]\s+(?:queda|quedan)\s+fuera|qu[eé]\s+(?:se\s+)?exclu|fuera\s+de\s+alcance|exclusiones?\s+(?:del|de))\b/iu.test(question.question)) {
+      found.push(...labels.filter((label) => !/^(?:ningun[ao]s?|no|sin\s+exclusiones?|no\s+aplica)$/iu.test(label)));
+      continue;
+    }
+    // Si se pregunta expresamente por INCLUIR un componente, «Excluir/No incluir»
+    // es una decisión; «No definido» u opciones sin respuesta no lo son.
+    if (/\b(?:incluir(?:se)?|incluye(?:n)?|contemplar|considerar|dentro\s+del\s+alcance)\b/iu.test(question.question) &&
+        labels.some((label) => /^(?:no|excluir|no\s+incluir|fuera\s+de\s+alcance|no\s+se\s+incluye)$/iu.test(label))) {
+      found.push('No incluido según cuestionario: ' + question.question.replace(/[¿?]+/gu, '').trim());
+    }
+  }
+  const seen = new Set<string>();
+  return found.map((item) => item.replace(/\s+/gu, ' ').trim())
+    .filter((item) => item.length > 2 && !/^(?:—|-|ninguna?|no se registraron)/iu.test(item))
+    .filter((item) => {
+      const key = item.normalize('NFD').replace(/[\u0300-\u036f]/gu, '').toLowerCase()
+        .replace(/[.!,;:\s]+$/gu, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+/** Detecta perfil de liderazgo en la EDT sin inferirlo desde el equipo Kora:
+ * Líder técnico puede tener teamId de Desarrollo, pero su actividad no
+ * representa el trabajo de los desarrolladores.
+ */
+function isTechnicalLeadAssignment(role: string, taskName: string): boolean {
+  const normalize = (value: string) => value.normalize('NFD')
+    .replace(/[\u0300-\u036f]/gu, '').toLowerCase().trim();
+  const profile = normalize(role);
+  if (/\b(?:lider[\s-]+tecnic[oa]|tech(?:nical)?[\s-]+lead|team[\s-]+lead|lead[\s-]+developer|tl)\b/u.test(profile)) {
+    return true;
+  }
+  // Algunas EDT heredadas usan el equipo "Desarrollo" también como perfil.
+  // El fallback se limita al nombre explícito de esta labor de supervisión.
+  const task = normalize(taskName);
+  return /^(?:supervisar\s+(?:calidad|riesgos?|decisiones?\s+tecnicas?)|gobierno\s+tecnico|supervision\s+y\s+control\s+tecnico)\b/u.test(task) &&
+    /^(?:desarrollo|desarrollador(?:a)?|full[\s-]?stack|dev|sin\s+perfil)$/u.test(profile);
+}
+
+/** La plantilla tiene cuatro filas. Cada equipo con HH debe figurar, y
+ * Líder técnico es un PERFIL propio aunque esté adscrito a Desarrollo.
+ * Si hay >4 categorías, se combinan algunas filas sin perder sus nombres.
+ */
+export function quotationRepresentativeTeamActivities(
+  model: ReturnType<typeof quotationExportModel>,
+): Array<{ team: string; name: string }> {
+  type Candidate = { name: string; hours: number };
+  type Group = { label: string; candidates: Candidate[]; hours: number; order: number };
+  const byId = new Map<string, Group>();
+  const teamOrder = new Map(model.draft.teams.map((row, i) => [row.teamId, i]));
+  const technicalLeadKey = '__technical_lead_profile__';
+  const add = (id: string, label: string, name: string, hours: number, order: number) => {
+    if (!(hours > 0)) return;
+    const group = byId.get(id) ?? { label, candidates: [], hours: 0, order };
+    group.hours += hours;
+    if (name.trim()) group.candidates.push({ name: name.trim(), hours });
+    byId.set(id, group);
+  };
+  if (model.details.length) {
+    for (const row of model.details) {
+      const isLead = isTechnicalLeadAssignment(row.role, row.name);
+      // La misma asignación WBS×perfil pertenece a UNA sola categoría.
+      // Nunca usar su alta dedicación para escoger la tarea de Desarrollo.
+      const id = isLead ? technicalLeadKey : row.teamId ?? 'unmapped';
+      const label = isLead ? 'Líder técnico' : model.team(row.teamId);
+      const order = isLead ? -1 : (teamOrder.get(row.teamId ?? '') ?? 999);
+      add(id, label, row.name, row.hours, order);
+    }
+  } else if (model.draft.mode === 'phases') {
+    for (const phase of model.draft.phases) for (const item of phase.teamHours) {
+      add(item.teamId, model.team(item.teamId), phase.name, item.hours,
+        teamOrder.get(item.teamId) ?? 999);
+    }
+  } else {
+    for (const row of model.draft.teams) {
+      const hours = row.collaborators * (row.unit === 'day' ? row.duration / 5 : row.duration) *
+        row.hoursPerWeek * row.dedicationPercent / 100;
+      add(row.teamId, model.team(row.teamId), 'Actividades por definir en EDT', hours,
+        teamOrder.get(row.teamId) ?? 999);
+    }
+  }
+  const categories = [...byId.entries()]
+    .sort(([aId, a], [bId, b]) => a.order - b.order ||
+      aId.localeCompare(bId))
+    .map(([key, group]) => ({
+      key,
+      team: group.label,
+      hours: group.hours,
+      order: group.order,
+      name: [...group.candidates].sort((a, b) => b.hours - a.hours)[0]?.name ??
+        'Actividad pendiente de desglose',
+    }));
+  // Cuatro filas reales: NUNCA combinar dos equipos/perfiles en una sola.
+  // Cuando hay más de cuatro, priorizar los equipos de ejecución. El TL tiene
+  // fila exclusiva solo si queda espacio: no reemplaza UX, QA ni Desarrollo.
+  const withoutLead = categories.filter((row) => row.key !== technicalLeadKey);
+  const options = withoutLead.length >= 4 ? withoutLead : categories;
+  const selected = options.length > 4
+    ? [...options].sort((a, b) => b.hours - a.hours || a.order - b.order).slice(0, 4)
+    : options;
+  return selected.sort((a, b) => a.order - b.order).map(({ team, name }) => ({
+    team: compact(team, 46),
+    name: compact(name, 94),
+  }));
 }
 
 const sheet = (book: XLSX.WorkBook, name: string, data: Cell[][], widths?: number[]) => {
@@ -174,7 +313,7 @@ export function buildQuotationWorkbook(context: QuotationExportContext): XLSX.Wo
     ]), [25, 55, 24, 38]);
   const notes = [
     ...draft.assumptions.map((note) => ['Supuesto', note]),
-    ...draft.exclusions.map((note) => ['Fuera de alcance', note]),
+    ...quotationClientExclusions(draft).map((note) => ['Fuera de alcance', note]),
   ];
   if (notes.length) sheet(book, 'Supuestos', rows('Declaraciones explícitas de la cotización',
     ['Tipo', 'Descripción'], notes), [24, 100]);
@@ -306,6 +445,26 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   const lower = (value: string) => value.charAt(0).toLocaleLowerCase('es') + value.slice(1);
   const nominal = (value: string): string => {
     const item = lower(value);
+    const actionNominals: Array<[RegExp, string]> = [
+      [/^alinear\s+/iu, 'la alineación de '],
+      [/^facilitar\s+/iu, 'la facilitación de '],
+      [/^analizar\s+/iu, 'el análisis de '],
+      [/^resolver\s+/iu, 'la resolución de '],
+      [/^diseñar\s+/iu, 'el diseño de '],
+      [/^preparar\s+/iu, 'la preparación de '],
+      [/^definir\s+/iu, 'la definición de '],
+      [/^implementar\s+/iu, 'la implementación de '],
+      [/^desarrollar\s+/iu, 'el desarrollo de '],
+      [/^validar\s+/iu, 'la validación de '],
+      [/^coordinar\s+/iu, 'la coordinación de '],
+      [/^generar\s+/iu, 'la generación de '],
+      [/^crear\s+/iu, 'la creación de '],
+      [/^documentar\s+/iu, 'la documentación de '],
+    ];
+    for (const [pattern, replacement] of actionNominals) {
+      if (pattern.test(item)) return item.replace(pattern, replacement);
+    }
+    if (/^(?:diseño|control|levantamiento)\b/iu.test(value)) return 'el ' + item;
     if (/^inspecciones y chequeos$/iu.test(value)) return 'la realización de inspecciones y chequeos';
     if (/^reportes e indicadores$/iu.test(value)) return 'la generación de reportes e indicadores';
     if (/^integraciones y servicios$/iu.test(value)) return 'la integración de servicios';
@@ -316,17 +475,19 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   const joinItems = (items: string[]): string => items.length === 1 ? items[0]! :
     items.length === 2 ? items.join(' y ') :
     items.slice(0, -1).join(', ') + ' y ' + items[items.length - 1]!;
+  // La comprensión revisada por el usuario tiene prioridad frente al resumen
+  // automático y a la descripción breve que figura en la ficha del proyecto.
   const sourceSentences = [
-    model.projectDescription,
     model.draft.aiPoc?.confirmedUnderstanding,
-    model.draft.aiPoc?.proposal.summary,
+    model.projectDescription,
+    model.draft.aiPoc?.proposal?.summary,
   ];
   let objective: string | null = null;
   for (const source of sourceSentences) {
     if (!source) continue;
     for (const original of tidy(source).split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÜÑ])/u)) {
       const sentence = original.replace(/^["'“”«»\s]+|["'“”«»\s]+$/gu, '').trim();
-      if (!sentence || sentence.length > 165 || sourceNarration(sentence) ||
+      if (!sentence || sentence.length > 285 || sourceNarration(sentence) ||
           !/\b(?:desarrollar|implementar|construir|crear|digitalizar|automatizar|mejorar|facilitar|habilitar|permitir|optimizar|centralizar|gestionar|el\s+proyecto\s+busca|la\s+soluci[oó]n\s+(?:permite|busca)|el\s+sistema\s+(?:permite|busca))\b/iu.test(sentence)) {
         continue;
       }
@@ -341,10 +502,34 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
         joinItems(business.slice(0, 2).map(nominal)) + '.' :
       'Desarrollar las capacidades definidas para el proyecto ' + tidy(model.projectName) + '.';
   }
-  const scope = features.length > 2 ?
-    'El alcance incluye ' + joinItems(features.slice(2, 4).map(nominal)) +
-      ', con entregables definidos para cada componente.' :
-    'El alcance considera los componentes y entregables acordados en esta propuesta comercial.';
+  // En la plantilla hay dos párrafos amplios: no limitar la síntesis a la
+  // primera frase ni a sólo dos funcionalidades si la EDT trae más detalle.
+  const distinct = features.filter((feature) => !norm(objective ?? '').includes(norm(feature)));
+  if (distinct.length >= 2 && objective.length < 240) {
+    objective += ' Se priorizan ' + joinItems(distinct.slice(0, 2).map(nominal)) + '.';
+  }
+  const additional = features.slice(2, 6);
+  // Redacción autocontenida para presentar al cliente: no remitir a un Excel,
+  // a WBS internas ni a artefactos que la audiencia no necesariamente recibe.
+  const scopeBase = additional.length
+    ? 'El trabajo comprende ' + joinItems(additional.map(nominal)) + '.'
+    : features.length
+      ? 'El alcance comprende ' + joinItems(features.map(nominal)) + '.'
+      : 'El alcance específico está sujeto a la definición comercial del proyecto.';
+  // Cuando existe un segundo enunciado confirmado/relevante, incorporarlo
+  // literalmente: es más preciso que agregar un cierre genérico o inventado.
+  const narrative = sourceSentences
+    .filter((source): source is string => typeof source === 'string' && Boolean(source.trim()))
+    .flatMap((source) => tidy(source).split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÜÑ])/u))
+    .map((sentence) => sentence.replace(/^["'“”«»\s]+|["'“”«»\s]+$/gu, '').trim())
+    .find((sentence) => sentence.length >= 40 && sentence.length <= 175 &&
+      !sourceNarration(sentence) &&
+      !norm(objective).includes(norm(sentence)) &&
+      !norm(scopeBase).includes(norm(sentence)) &&
+      !/^(?:desarrollar|implementar|construir|crear)\s+(?:una?|el|la)\b/iu.test(sentence));
+  const scope = narrative && scopeBase.length + narrative.length + 1 <= 300
+    ? scopeBase + ' ' + (/[.!?]$/u.test(narrative) ? narrative : narrative + '.')
+    : scopeBase;
   return { objective, scope, features };
 }
 
@@ -352,12 +537,15 @@ const PPT_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.p
 /** Orden de párrafos NO VACÍOS del archivo Kabeli_Cotizaciones_DS.pptx adjunto.
  * Los números se validan antes de editar para evitar sustituir otra plantilla. */
 function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Record<number, string> {
-  const { draft, version, details, phases } = m;
+  const { draft, version, phases } = m;
   const isRpa = draft.teams.length > 0 && draft.teams.every((row) =>
     /rpa|robot/i.test(m.team(row.teamId)));
 
-  const activities = details.length ? details.map((row) => ({ team: m.team(row.teamId), name: row.name, hours: row.hours }))
-    : draft.phases.flatMap((p) => p.teamHours.map((r) => ({ team: m.team(r.teamId), name: p.name, hours: r.hours })));
+  const activities = quotationRepresentativeTeamActivities(m);
+  const exclusions = quotationClientExclusions(draft);
+  const visibleExclusions = exclusions.length > 4
+    ? [...exclusions.slice(0, 3), (exclusions.length - 3) + ' exclusiones más (ver Excel)']
+    : exclusions;
   const ass = draft.assumptions;
   const pay = draft.paymentPlan.map((p) => p.name + ': ' + fmt(p.percent) + '%');
   const phaseLabel = (n: number) => phases[n]?.name ?? '—';
@@ -405,17 +593,18 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       };
     }
     case 11: return {
-      1: 'Actividades principales · HH futuras por ejecutar. Fase 0 histórica separada en Excel.',
-      5: compact(chunk(0)?.team ?? '—', 28),
+      1: 'Actividades principales por equipo y perfil · alcance representativo.',
+      2: 'EQUIPO / PERFIL',
+      5: compact(chunk(0)?.team ?? '—', 48),
       6: compact(chunk(0)?.name ?? 'Sin EDT desglosada', 98),
       // La columna TOTAL H/H está combinada verticalmente en el PPTX original.
       // Fase 0 es comercial, no actividad nueva. La presentación muestra ambas HH.
       7: fmt(version.totalHours + (draft.phaseZeroBillableHours ?? 0)) + ' H/H',
-      8: compact(chunk(1)?.team ?? '—', 28),
+      8: compact(chunk(1)?.team ?? '—', 48),
       9: compact(chunk(1)?.name ?? '—', 98),
-      10: compact(chunk(2)?.team ?? '—', 28),
+      10: compact(chunk(2)?.team ?? '—', 48),
       11: compact(chunk(2)?.name ?? '—', 98),
-      12: compact(chunk(3)?.team ?? '—', 28),
+      12: compact(chunk(3)?.team ?? '—', 48),
       13: compact(chunk(3)?.name ?? '—', 98),
     };
     case 12: return { 1: 'Arquitectura sujeta a validación del líder técnico.',
@@ -461,11 +650,13 @@ function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Re
       13: 'Condiciones de equipamiento según acuerdo comercial firmado.',
       16: compact(ass[1] ?? 'Garantía y soporte sujetos al contrato aplicable.', 135),
     };
-    case 18: return { 2: 'Exclusiones registradas para esta versión comercial:',
-      3: compact(draft.exclusions[0] ?? 'No se registraron exclusiones específicas.', 95),
-      4: compact(draft.exclusions[1] ?? '—', 95),
-      5: compact(draft.exclusions[2] ?? '—', 95),
-      6: compact(draft.exclusions[3] ?? '—', 95) };
+    case 18: return {
+      2: 'Fuera de alcance · decisiones registradas en cotización, análisis y cuestionario:',
+      3: compact(visibleExclusions[0] ?? 'No se registraron exclusiones explícitas.', 125),
+      4: compact(visibleExclusions[1] ?? '', 125),
+      5: compact(visibleExclusions[2] ?? '', 125),
+      6: compact(visibleExclusions[3] ?? '', 125),
+    };
     default: return {};
   }
 }

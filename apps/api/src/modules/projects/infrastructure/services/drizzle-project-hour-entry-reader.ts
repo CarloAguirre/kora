@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gte, hourEntries, inArray, lt, lte, projectModuleSegments, projectModuleTasks, projectModules, projectQuotations, quotationEvents, quotationVersions, sql, users, type Database } from '@kora/db';
+import { and, or, asc, desc, eq, gte, hourEntries, inArray, lt, lte, projectModuleSegments, projectModuleTasks, projectModules, projectQuotations, quotationEvents, quotationVersions, sql, users, type Database } from '@kora/db';
 import type { ProjectHourEntryReader } from '../../application/ports/project-hour-entry-reader.port';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 
@@ -24,7 +24,7 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
     return rows.flatMap((row) => row.projectId ? [{ projectId: row.projectId, hours: Number(row.hours) }] : []);
   }
 
-  async approvedProjectEvents(projectId: string, limit: number) {
+  async projectBitacoraEvents(projectId: string, limit: number) {
     const rows = await this.database
       .select({
         id: hourEntries.id, date: hourEntries.date, createdAt: hourEntries.createdAt,
@@ -32,12 +32,17 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
         moduleName: projectModules.name, activity: hourEntries.category,
         description: hourEntries.description, hours: hourEntries.hours,
         hasBlocker: hourEntries.hasBlocker, blockerDescription: hourEntries.blockerDescription,
+        status: hourEntries.status,
       })
       .from(hourEntries)
       .leftJoin(users, eq(users.id, hourEntries.userId))
       .leftJoin(projectModules, eq(projectModules.id, hourEntries.moduleId))
-      .where(and(eq(hourEntries.projectId, projectId), eq(hourEntries.status, 'approved')))
-      .orderBy(desc(hourEntries.date), desc(hourEntries.createdAt))
+      // Incidentes pendientes deben mostrarse desde que se registran.
+      // El evento pasa a aprobado sin generar otra fila en la bitácora.
+      .where(and(eq(hourEntries.projectId, projectId),
+        or(eq(hourEntries.status, 'approved'),
+          and(eq(hourEntries.status, 'pending'), eq(hourEntries.hasBlocker, true)))))
+      .orderBy(desc(hourEntries.createdAt), desc(hourEntries.date))
       .limit(limit + 1);
     return {
       truncated: rows.length > limit,
@@ -46,6 +51,7 @@ export class DrizzleProjectHourEntryReader implements ProjectHourEntryReader {
         userName: [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Colaborador',
         moduleName: row.moduleName, activity: row.activity, description: row.description,
         hours: Number(row.hours), hasBlocker: row.hasBlocker, blockerDescription: row.blockerDescription,
+        status: row.status as 'approved' | 'pending',
       })),
     };
   }

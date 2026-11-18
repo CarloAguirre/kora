@@ -230,7 +230,7 @@ export class ProjectsController {
     const project = unwrapOrThrow(await this.getProject.execute({
       projectId: id, actorUserId: actor.id, actorPermissions: [],
     }));
-    const activity = await this.collaboratorActivity.approvedEvents(project.id);
+    const activity = await this.collaboratorActivity.bitacoraEvents(project.id);
     const { weekHours: _ignored, ...summary } = toCollaboratorSummary(project);
     return {
       ...summary,

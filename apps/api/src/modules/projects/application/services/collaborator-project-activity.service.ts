@@ -21,10 +21,10 @@ export class CollaboratorProjectActivityService {
     return new Map(rows.map((row) => [row.projectId, row.hours]));
   }
 
-  async approvedEvents(projectId: string): Promise<{
+  async bitacoraEvents(projectId: string): Promise<{
     entries: CollaboratorProjectEvent[]; truncated: boolean;
   }> {
-    const found = await this.entries.approvedProjectEvents(projectId, 500);
+    const found = await this.entries.projectBitacoraEvents(projectId, 500);
     return {
       truncated: found.truncated,
       entries: found.entries.map((entry) => ({
@@ -38,6 +38,7 @@ export class CollaboratorProjectActivityService {
         hours: entry.hours,
         hasBlocker: entry.hasBlocker,
         blockerDescription: entry.blockerDescription,
+        status: entry.status,
       })),
     };
   }
