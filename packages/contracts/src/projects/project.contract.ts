@@ -951,6 +951,8 @@ export const collaboratorProjectEventSchema = z.object({
   userName: z.string(), moduleName: z.string().nullable(),
   activity: z.string(), description: z.string(), hours: z.number().nonnegative(),
   hasBlocker: z.boolean(), blockerDescription: z.string().nullable(),
+  /** Solo aprobados o bloqueos pendientes de aprobación; nunca rechazados. */
+  status: z.enum(['approved', 'pending']),
 });
 export type CollaboratorProjectEvent = z.infer<typeof collaboratorProjectEventSchema>;
 
