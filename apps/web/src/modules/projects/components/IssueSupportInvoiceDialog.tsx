@@ -60,14 +60,14 @@ export function IssueSupportInvoiceDialog({ open, description, totalAmount, curr
       open={open}
       title={`${split.isSplit ? 'Registrar facturas' : 'Registrar factura'}${periodLabel ? ` · ${periodLabel}` : ''}`}
       description={description}
-      headerExtra={historyPath && !running ? (
-        <Link className={styles.historyLink} to={historyPath}>Ver todos los períodos</Link>
-      ) : undefined}
       onClose={onClose}
       wide={split.isSplit}
       dismissible={!running}
       footer={
         <>
+          {historyPath && !running && (
+            <Link className={styles.historyLink} to={historyPath}>Ver todos los períodos</Link>
+          )}
           <Button variant="outline" onClick={onClose} disabled={running}>
             Cancelar
           </Button>
