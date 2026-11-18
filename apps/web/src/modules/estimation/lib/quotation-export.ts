@@ -413,6 +413,25 @@ export function quotationClientBrief(model: ReturnType<typeof quotationExportMod
   const lower = (value: string) => value.charAt(0).toLocaleLowerCase('es') + value.slice(1);
   const nominal = (value: string): string => {
     const item = lower(value);
+    const actionNominals: Array<[RegExp, string]> = [
+      [/^alinear\s+/iu, 'la alineación de '],
+      [/^facilitar\s+/iu, 'la facilitación de '],
+      [/^analizar\s+/iu, 'el análisis de '],
+      [/^resolver\s+/iu, 'la resolución de '],
+      [/^diseñar\s+/iu, 'el diseño de '],
+      [/^preparar\s+/iu, 'la preparación de '],
+      [/^definir\s+/iu, 'la definición de '],
+      [/^implementar\s+/iu, 'la implementación de '],
+      [/^desarrollar\s+/iu, 'el desarrollo de '],
+      [/^validar\s+/iu, 'la validación de '],
+      [/^coordinar\s+/iu, 'la coordinación de '],
+      [/^generar\s+/iu, 'la generación de '],
+      [/^crear\s+/iu, 'la creación de '],
+      [/^documentar\s+/iu, 'la documentación de '],
+    ];
+    for (const [pattern, replacement] of actionNominals) {
+      if (pattern.test(item)) return item.replace(pattern, replacement);
+    }
     if (/^(?:diseño|control|levantamiento)\b/iu.test(value)) return 'el ' + item;
     if (/^inspecciones y chequeos$/iu.test(value)) return 'la realización de inspecciones y chequeos';
     if (/^reportes e indicadores$/iu.test(value)) return 'la generación de reportes e indicadores';
