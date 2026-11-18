@@ -23,10 +23,19 @@ interface Row {
 function rowsFromProject(project: CollaboratorProjectDetail): Row[] {
   const events: Row[] = project.events.map((e) => ({
     id: 'h-' + e.id, date: e.date, createdAt: e.createdAt,
-    title: e.userName + ' registró ' + e.hours + ' HH · ' + (e.description || e.activity),
+    // Priorizar el problema reportado: es el contenido de la categoría Incidentes.
+    title: e.hasBlocker
+      ? (e.blockerDescription?.trim() || 'Bloqueo reportado en el registro de horas')
+      : e.userName + ' registró ' + e.hours + ' HH · ' + (e.description || e.activity),
     type: e.hasBlocker ? 'Incidente' : 'Evento', phase: e.moduleName ?? '—',
-    person: e.userName, status: 'Aprobado', tone: (e.hasBlocker ? 'danger' : 'success') as BadgeTone,
-    detail: [e.activity, e.description, e.blockerDescription ? 'Bloqueo: ' + e.blockerDescription : ''].filter(Boolean).join(' · '),
+    person: e.userName,
+    status: e.hasBlocker ? (e.status === 'pending' ? 'HH pendientes de aprobación' : 'Reportado') : 'Aprobado',
+    tone: (e.hasBlocker ? 'danger' : 'success') as BadgeTone,
+    detail: [
+      e.hasBlocker ? 'Bloqueo: ' + (e.blockerDescription?.trim() || 'Sin descripción') : null,
+      e.activity, e.description,
+      e.hours + ' HH · ' + (e.status === 'pending' ? 'Pendientes de aprobación' : 'Aprobadas'),
+    ].filter(Boolean).join(' · '),
     incident: e.hasBlocker, work: false, milestone: false,
   }));
   const obs: Row[] = project.observations.map((o) => ({
@@ -105,7 +114,7 @@ export function MyProjectBitacora({ project }: { project: CollaboratorProjectDet
       </Button>
     </div>
     {project.activityTruncated && <p className={styles.notice}>
-      Se muestran las últimas 500 horas aprobadas; los registros anteriores no están incluidos.
+      Se muestran los últimos 500 registros aprobados o incidentes pendientes; los anteriores no están incluidos.
     </p>}
     <DataTable caption="Bitácora de mi proyecto" columns={columns} items={visible}
       getRowKey={(r) => r.id} emptyMessage="No hay registros para los filtros seleccionados." />
