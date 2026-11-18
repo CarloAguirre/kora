@@ -23,7 +23,7 @@ function storageRoot(): string {
   if (configured && !isAbsolute(configured)) {
     throw new Error('INVOICE_STORAGE_DIR debe ser una ruta absoluta.');
   }
-  return resolve(configured ?? join(process.cwd(), 'apps', 'api', 'uploads', 'invoices'));
+  return resolve(configured ?? join(process.cwd(), 'uploads', 'invoices'));
 }
 
 function extension(kind: InvoiceDocumentKind, mimeType?: string): string {
@@ -54,7 +54,13 @@ export async function saveInvoiceDocument(
   const filenamePath = join(folder, filename);
   // Se escribe con un nombre aleatorio y creación exclusiva para evitar
   // colisiones y no aceptar rutas proporcionadas por el cliente.
-  await writeFile(filenamePath, Buffer.from(base64, 'base64'), { flag: 'wx', mode: 0o600 });
+  try {
+    await writeFile(filenamePath, Buffer.from(base64, 'base64'), { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    // Puede haberse creado un archivo parcial antes del error de escritura.
+    try { await unlink(filenamePath); } catch { /* fallo original tiene prioridad */ }
+    throw error;
+  }
   return PREFIX + kind + '/' + filename;
 }
 
