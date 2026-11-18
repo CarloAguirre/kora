@@ -114,6 +114,11 @@
 }
 
 .ticketLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
   color: var(--kora-navy);
   font-weight: var(--kora-weight-semibold);
   text-decoration: underline;
