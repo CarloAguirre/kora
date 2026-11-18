@@ -44,6 +44,27 @@ describe('CollaboratorProjectActivityService', () => {
     expect(result.truncated).toBe(false);
   });
 
+  it('devuelve el bloqueo reportado en HH pendientes como un único incidente con su texto y estado', async () => {
+    const { service, reader } = setup();
+    vi.mocked(reader.projectBitacoraEvents).mockResolvedValueOnce({
+      truncated: false,
+      entries: [{
+        id: 'hour-blocker', date: new Date('2026-11-18T00:00:00Z'),
+        createdAt: new Date('2026-11-18T14:15:00Z'),
+        userName: 'Leslie Galaz', moduleName: 'T02 Diseño',
+        activity: 'Diseñar prototipos', description: 'Diseñar prototipos de ambos módulos',
+        hours: 8, hasBlocker: true, blockerDescription: 'Prueba bitácora',
+        status: 'pending',
+      }],
+    });
+    const result = await service.bitacoraEvents('project-a');
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]).toMatchObject({
+      userName: 'Leslie Galaz', hasBlocker: true, blockerDescription: 'Prueba bitácora',
+      status: 'pending', hours: 8, date: '2026-11-18',
+    });
+  });
+
   it('evita consultar base cuando no hay proyectos', async () => {
     const { service, reader } = setup();
     expect((await service.weeklyHours('actor-1', [])).size).toBe(0);
