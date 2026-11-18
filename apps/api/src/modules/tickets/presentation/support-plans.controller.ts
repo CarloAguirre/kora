@@ -16,7 +16,7 @@ import {
   type SupportProjectDetailSummary,
   type UpdateSupportPlanInput,
 } from '@kora/contracts';
-import { RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
+import { RequireAnyPermission, RequirePermissions } from '../../../shared/presentation/decorators/require-permissions.decorator';
 import { CurrentUser, type RequestUser } from '../../../shared/presentation/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-validation.pipe';
 import { unwrapOrThrow } from '../../../shared/presentation/unwrap-result';
@@ -44,9 +44,12 @@ export class SupportPlansController {
   ) {}
 
   @Get('project/:projectId')
-  @RequirePermissions('projects:read')
-  async summaryForProject(@Param('projectId') projectId: string): Promise<SupportProjectDetailSummary | null> {
-    return unwrapOrThrow(await this.getSummary.execute({ projectId }));
+  @RequireAnyPermission('projects:read', 'projects:read_assigned')
+  async summaryForProject(
+    @Param('projectId') projectId: string,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<SupportProjectDetailSummary | null> {
+    return unwrapOrThrow(await this.getSummary.execute({ projectId, actorUserId: actor.id, actorPermissions: actor.permissions }));
   }
 
   /** Alimenta la tabla "Contratos" de la ficha de cliente — declarada ANTES de `:id` para no chocar con esa ruta. */
