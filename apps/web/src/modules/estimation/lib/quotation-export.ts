@@ -65,6 +65,107 @@ export function quotationExportModel({ version, project, teamNames }: QuotationE
   };
 }
 
+
+/** Exclusiones expresamente registradas; no convierte supuestos ni respuestas ambiguas en exclusiones. */
+export function quotationClientExclusions(draft: QuotationVersion['draft']): string[] {
+  const found = [
+    ...draft.exclusions,
+    ...(draft.analysis?.scope.excluded ?? []),
+  ];
+  const questions = new Map((draft.aiPoc?.dynamicQuestions ?? []).map((q) => [q.id, q]));
+  for (const answer of draft.aiPoc?.answers ?? []) {
+    if (answer.usedAssumption || answer.value == null) continue;
+    if (answer.questionId === 'F04' && Array.isArray(answer.value) &&
+        answer.value.includes('none')) {
+      found.push('Actividades posteriores al desarrollo: UAT, estabilización, marcha blanca y soporte inicial.');
+      continue;
+    }
+    if (answer.questionId === 'F05') {
+      const note = Array.isArray(answer.value) ? answer.value.join('; ') : String(answer.value);
+      if (/\b(?:exclu(?:ir|ido|ida|siones?)|fuera\s+de\s+alcance|no\s+(?:se\s+)?(?:incluye|incluyen|contempla|contemplan|considera|consideran|abarca|abarcan))\b/iu.test(note)) {
+        found.push(note);
+      }
+      continue;
+    }
+    const question = questions.get(answer.questionId);
+    if (!question || question.kind !== 'dynamic') continue;
+    const raw = Array.isArray(answer.value) ? answer.value : [answer.value];
+    const labels = raw.map((value) => {
+      const token = String(value);
+      return question.options.find((option) => option.value === token)?.label ?? token;
+    }).filter(Boolean);
+    if (!labels.length) continue;
+    // Preguntas sobre EXCLUSIONES: la respuesta se refiere a elementos excluidos.
+    if (/\b(?:qu[eé]\s+(?:queda|quedan)\s+fuera|qu[eé]\s+(?:se\s+)?exclu|fuera\s+de\s+alcance|exclusiones?\s+(?:del|de))\b/iu.test(question.question)) {
+      found.push(...labels.filter((label) => !/^(?:ningun[ao]s?|no|sin\s+exclusiones?|no\s+aplica)$/iu.test(label)));
+      continue;
+    }
+    // Si se pregunta expresamente por INCLUIR un componente, «Excluir/No incluir»
+    // es una decisión; «No definido» u opciones sin respuesta no lo son.
+    if (/\b(?:incluir|incluye|contemplar|considerar|dentro\s+del\s+alcance)\b/iu.test(question.question) &&
+        labels.some((label) => /^(?:no|excluir|no\s+incluir|fuera\s+de\s+alcance|no\s+se\s+incluye)$/iu.test(label))) {
+      found.push('No incluido según cuestionario: ' + question.question.replace(/[¿?]+/gu, '').trim());
+    }
+  }
+  const seen = new Set<string>();
+  return found.map((item) => item.replace(/\s+/gu, ' ').trim())
+    .filter((item) => item.length > 2 && !/^(?:—|-|ninguna?|no se registraron)/iu.test(item))
+    .filter((item) => {
+      const key = item.normalize('NFD').replace(/[\u0300-\u036f]/gu, '').toLowerCase()
+        .replace(/[.!,;:\s]+$/gu, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+/** Cuatro filas de la plantilla: cubrir TODOS los equipos con HH, no las cuatro primeras WBS.
+ * Si hay >4 equipos se agrupan filas, dejando al menos una actividad propia por equipo.
+ */
+export function quotationRepresentativeTeamActivities(
+  model: ReturnType<typeof quotationExportModel>,
+): Array<{ team: string; name: string }> {
+  type Candidate = { name: string; hours: number };
+  const byId = new Map<string, { label: string; candidates: Candidate[]; hours: number }>();
+  const add = (id: string, label: string, name: string, hours: number) => {
+    if (!(hours > 0)) return;
+    const group = byId.get(id) ?? { label, candidates: [], hours: 0 };
+    group.hours += hours;
+    if (name.trim()) group.candidates.push({ name: name.trim(), hours });
+    byId.set(id, group);
+  };
+  if (model.details.length) {
+    for (const row of model.details) {
+      const id = row.teamId ?? 'unmapped';
+      add(id, model.team(row.teamId), row.name, row.hours);
+    }
+  } else if (model.draft.mode === 'phases') {
+    for (const phase of model.draft.phases) for (const item of phase.teamHours) {
+      add(item.teamId, model.team(item.teamId), phase.name, item.hours);
+    }
+  } else {
+    for (const row of model.draft.teams) {
+      const hours = row.collaborators * (row.unit === 'day' ? row.duration / 5 : row.duration) *
+        row.hoursPerWeek * row.dedicationPercent / 100;
+      add(row.teamId, model.team(row.teamId), 'Actividades por definir en EDT', hours);
+    }
+  }
+  const order = new Map(model.draft.teams.map((row, i) => [row.teamId, i]));
+  const teams = [...byId.entries()]
+    .sort(([a], [b]) => (order.get(a) ?? 999) - (order.get(b) ?? 999))
+    .map(([, group]) => ({
+      team: group.label,
+      name: [...group.candidates].sort((a, b) => b.hours - a.hours)[0]?.name ??
+        'Actividad pendiente de desglose',
+    }));
+  const rows: typeof teams[] = Array.from({ length: Math.min(4, teams.length) }, () => []);
+  teams.forEach((team, index) => { rows[index % rows.length]!.push(team); });
+  return rows.map((group) => ({
+    team: group.map((entry) => entry.team).join(' / '),
+    name: group.map((entry) => entry.name).join(' · '),
+  }));
+}
+
 const sheet = (book: XLSX.WorkBook, name: string, data: Cell[][], widths?: number[]) => {
   const rows = data.map((row) => row.map((v) => typeof v === 'string' ? s(v) : v ?? ''));
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -174,7 +275,7 @@ export function buildQuotationWorkbook(context: QuotationExportContext): XLSX.Wo
     ]), [25, 55, 24, 38]);
   const notes = [
     ...draft.assumptions.map((note) => ['Supuesto', note]),
-    ...draft.exclusions.map((note) => ['Fuera de alcance', note]),
+    ...quotationClientExclusions(draft).map((note) => ['Fuera de alcance', note]),
   ];
   if (notes.length) sheet(book, 'Supuestos', rows('Declaraciones explícitas de la cotización',
     ['Tipo', 'Descripción'], notes), [24, 100]);
