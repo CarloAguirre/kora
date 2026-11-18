@@ -466,7 +466,7 @@ const PPT_MIME = 'application/vnd.openxmlformats-officedocument.presentationml.p
 /** Orden de párrafos NO VACÍOS del archivo Kabeli_Cotizaciones_DS.pptx adjunto.
  * Los números se validan antes de editar para evitar sustituir otra plantilla. */
 function slideChanges(i: number, m: ReturnType<typeof quotationExportModel>): Record<number, string> {
-  const { draft, version, details, phases } = m;
+  const { draft, version, phases } = m;
   const isRpa = draft.teams.length > 0 && draft.teams.every((row) =>
     /rpa|robot/i.test(m.team(row.teamId)));
 
