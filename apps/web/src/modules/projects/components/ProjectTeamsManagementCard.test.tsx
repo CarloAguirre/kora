@@ -146,7 +146,7 @@ describe('Equipos del PM/PMO', () => {
     } as ProjectDetail['teams'][number]);
     mount(false, detail);
     fireEvent.click(screen.getByRole('button', { name: 'Gestionar equipos' }));
-    const firstInput = screen.getAllByLabelText('Horas asignadas')[0];
+    const firstInput = screen.getAllByLabelText('Horas asignadas')[0]!;
     fireEvent.change(firstInput, { target: { value: '301' } });
     fireEvent.blur(firstInput);
     expect(screen.getByRole('alert')).toHaveTextContent('Se superan las HH vendidas por 1 HH');
