@@ -149,9 +149,9 @@ export function SupportBillingSection() {
           <Link
             to={supportPlanPath({ id: r.planId })}
             className={styles.planHistoryLink}
-            aria-label={`Ver historial de facturación de ${r.planName}`}
+            aria-label={`Ver facturas de ${r.planName}`}
           >
-            Ver historial
+            Ver facturas
           </Link>
         </span>
       ),
@@ -210,7 +210,7 @@ export function SupportBillingSection() {
     <div className={styles.section}>
       <div className={styles.sectionHead}>
         <div>
-          <p className={styles.sectionTitle}>Soporte</p>
+          <h2 className={styles.sectionTitle}>Facturación mes de {selectedPeriodLabel}</h2>
           <p className={styles.sectionSubtitle}>Qué corresponde cobrar este período, por cliente y tipo de contrato.</p>
         </div>
         <PeriodSelector
@@ -268,8 +268,6 @@ export function SupportBillingSection() {
           className={styles.clientSelect}
         />
       </div>
-
-      <h2 className={styles.tableTitle}>Facturación mes de {selectedPeriodLabel}</h2>
 
       <DataTable
         caption={`Facturación de soporte de ${selectedPeriodLabel}`}
