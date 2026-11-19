@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { projectInvoiceAttachments, projectPaymentReceipts, type Database } from '@kora/db';
 import { DrizzleProjectPaymentMilestoneRepository } from './drizzle-project-payment-milestone.repository';
+import { saveInvoiceDocument, discardNewInvoiceDocument } from '../../../../shared/infrastructure/storage/invoice-document.storage';
+
+vi.mock('../../../../shared/infrastructure/storage/invoice-document.storage', () => ({
+  saveInvoiceDocument: vi.fn(async (kind: string) => 'kora-file:v1:' + kind + '/00000000-0000-4000-8000-000000000001.pdf'),
+  readInvoiceDocument: vi.fn(async (value: string) => value),
+  discardNewInvoiceDocument: vi.fn().mockResolvedValue(undefined),
+}));
+
 
 function setup(inserted = true) {
   const where = vi.fn().mockResolvedValue(undefined);
@@ -38,7 +46,7 @@ describe('Persistencia del PDF del tramo de proyecto', () => {
     expect(db.transaction).toHaveBeenCalledOnce();
     expect(set).toHaveBeenCalledWith({ status: 'paid', paidAt, updatedAt: expect.any(Date) });
     expect(db.insert).toHaveBeenCalledWith(projectPaymentReceipts);
-    expect(values).toHaveBeenCalledWith({ milestoneId: 'milestone-1', ...receipt });
+    expect(values).toHaveBeenCalledWith({ milestoneId: 'milestone-1', ...receipt, content: expect.stringMatching(/^kora-file:v1:project-receipt\//) });
   });
 
   it('propaga errores del comprobante para revertir el registro del pago', async () => {
@@ -74,14 +82,15 @@ describe('Persistencia del PDF del tramo de proyecto', () => {
       invoiceNumber: '4444', issuedAt: new Date('2026-11-10'), dueAt: new Date('2026-12-10'), attachment,
     }, { _brand: 'TransactionContext', tx } as unknown as import('@kora/core').TransactionContext);
     expect(tx.insert).toHaveBeenCalledWith(projectInvoiceAttachments);
-    expect(txValues).toHaveBeenCalledWith({ milestoneId: 'milestone-1', ...attachment });
+    expect(txValues).toHaveBeenCalledWith({ milestoneId: 'milestone-1', name: attachment.name, content: expect.stringMatching(/^kora-file:v1:project-invoice\//) });
     expect(db.insert).not.toHaveBeenCalled();
+    expect(saveInvoiceDocument).toHaveBeenCalledWith('project-invoice', attachment.content);
   });
 
   it('agrega el PDF sin modificar montos, folio, pago ni fechas', async () => {
     const { repository, db, values } = setup();
     expect(await repository.attachDocument('milestone-1', { name: 'factura.pdf', content: 'JVBERi0=' })).toBe(true);
-    expect(values).toHaveBeenCalledWith({ milestoneId: 'milestone-1', name: 'factura.pdf', content: 'JVBERi0=' });
+    expect(values).toHaveBeenCalledWith({ milestoneId: 'milestone-1', name: 'factura.pdf', content: expect.stringMatching(/^kora-file:v1:project-invoice\//) });
     expect(db.update).not.toHaveBeenCalled();
   });
 
@@ -89,6 +98,7 @@ describe('Persistencia del PDF del tramo de proyecto', () => {
     const { repository, onConflictDoNothing } = setup(false);
     expect(await repository.attachDocument('milestone-1', { name: 'otro.pdf', content: 'JVBERi0=' })).toBe(false);
     expect(onConflictDoNothing).toHaveBeenCalled();
+    expect(discardNewInvoiceDocument).toHaveBeenCalled();
   });
 
   it.each(['pending', 'to_invoice'] as const)('limpia el adjunto al devolver el tramo a %s', async (status) => {

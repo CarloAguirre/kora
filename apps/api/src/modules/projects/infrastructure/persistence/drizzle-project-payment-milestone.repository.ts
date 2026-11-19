@@ -13,6 +13,7 @@ import type {
 } from '../../domain/repositories/project-payment-milestone.repository';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { resolveDb } from '../../../../shared/infrastructure/database/unit-of-work';
+import { saveInvoiceDocument, readInvoiceDocument, discardNewInvoiceDocument } from '../../../../shared/infrastructure/storage/invoice-document.storage';
 
 const SELECTION = {
   hasPaymentReceipt: sql<boolean>`exists(select 1 from ${projectPaymentReceipts} where ${projectPaymentReceipts.milestoneId} = ${projectPaymentMilestones.id})`,
@@ -87,29 +88,43 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
     if (!row) return null;
     const mimeType = PAYMENT_RECEIPT_MIME_TYPES.find((value) => value === row.mimeType);
     if (!mimeType) throw new Error('Tipo de comprobante almacenado no valido.');
-    return { ...row, mimeType };
+    return { ...row, content: await readInvoiceDocument(row.content), mimeType };
   }
 
   async attachPaymentReceipt(id: string, receipt: ProjectPaymentReceipt): Promise<boolean> {
-    const inserted = await this.database.insert(projectPaymentReceipts)
-      .values({ milestoneId: id, ...receipt }).onConflictDoNothing()
-      .returning({ id: projectPaymentReceipts.milestoneId });
-    return inserted.length > 0;
+    const reference = await saveInvoiceDocument('project-receipt', receipt.content, receipt.mimeType);
+    try {
+      const inserted = await this.database.insert(projectPaymentReceipts)
+        .values({ milestoneId: id, ...receipt, content: reference }).onConflictDoNothing()
+        .returning({ id: projectPaymentReceipts.milestoneId });
+      if (!inserted.length) await discardNewInvoiceDocument(reference);
+      return inserted.length > 0;
+    } catch (error) {
+      await discardNewInvoiceDocument(reference);
+      throw error;
+    }
   }
 
   async getAttachment(id: string): Promise<{ name: string; content: string } | null> {
     const [row] = await this.database.select({ name: projectInvoiceAttachments.name, content: projectInvoiceAttachments.content })
       .from(projectInvoiceAttachments)
       .where(eq(projectInvoiceAttachments.milestoneId, id));
-    return row ?? null;
+    return row ? { ...row, content: await readInvoiceDocument(row.content) } : null;
   }
 
   async attachDocument(id: string, attachment: { name: string; content: string }): Promise<boolean> {
-    const inserted = await this.database.insert(projectInvoiceAttachments)
-      .values({ milestoneId: id, ...attachment })
-      .onConflictDoNothing()
-      .returning({ id: projectInvoiceAttachments.milestoneId });
-    return inserted.length > 0;
+    const reference = await saveInvoiceDocument('project-invoice', attachment.content);
+    try {
+      const inserted = await this.database.insert(projectInvoiceAttachments)
+        .values({ milestoneId: id, ...attachment, content: reference })
+        .onConflictDoNothing()
+        .returning({ id: projectInvoiceAttachments.milestoneId });
+      if (!inserted.length) await discardNewInvoiceDocument(reference);
+      return inserted.length > 0;
+    } catch (error) {
+      await discardNewInvoiceDocument(reference);
+      throw error;
+    }
   }
 
   async listForProject(
@@ -273,7 +288,15 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
       })
       .where(eq(projectPaymentMilestones.id, id));
     if (input.attachment) {
-      await db.insert(projectInvoiceAttachments).values({ milestoneId: id, ...input.attachment });
+      const reference = await saveInvoiceDocument('project-invoice', input.attachment.content);
+      try {
+        await db.insert(projectInvoiceAttachments).values({
+          milestoneId: id, name: input.attachment.name, content: reference,
+        });
+      } catch (error) {
+        await discardNewInvoiceDocument(reference);
+        throw error;
+      }
     }
   }
 
@@ -284,7 +307,17 @@ export class DrizzleProjectPaymentMilestoneRepository implements ProjectPaymentM
       await tx.update(projectPaymentMilestones)
         .set({ status: 'paid', paidAt, updatedAt: new Date() })
         .where(eq(projectPaymentMilestones.id, id));
-      if (receipt) await tx.insert(projectPaymentReceipts).values({ milestoneId: id, ...receipt });
+      if (receipt) {
+        const reference = await saveInvoiceDocument('project-receipt', receipt.content, receipt.mimeType);
+        try {
+          await tx.insert(projectPaymentReceipts).values({
+            milestoneId: id, ...receipt, content: reference,
+          });
+        } catch (error) {
+          await discardNewInvoiceDocument(reference);
+          throw error;
+        }
+      }
     });
   }
 }

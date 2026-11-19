@@ -108,6 +108,10 @@ export function SupportBillingSection() {
   };
 
   const period = `${year}-${String(month).padStart(2, '0')}`;
+  // El título y la consulta usan exactamente el mismo período seleccionado.
+  const selectedPeriodLabel = new Intl.DateTimeFormat('es-CL', {
+    month: 'long', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
   const { data: overview, isLoading } = useSupportBillingOverview(period);
 
   const rowsQuery = useMemo<ListSupportBillingRowsQuery>(
@@ -137,10 +141,19 @@ export function SupportBillingSection() {
       header: 'Contrato',
       sortable: true,
       render: (r) => (
-        <Link to={supportPlanPath({ id: r.planId })} className={styles.planCell}>
-          {r.planName}
-          {r.scope === 'consolidated' && <SupportPlanScopeBadge scope={r.scope} />}
-        </Link>
+        <span className={styles.planCellGroup}>
+          <span className={styles.planCell}>
+            {r.planName}
+            {r.scope === 'consolidated' && <SupportPlanScopeBadge scope={r.scope} />}
+          </span>
+          <Link
+            to={supportPlanPath({ id: r.planId })}
+            className={styles.planHistoryLink}
+            aria-label={`Ver facturas de ${r.planName}`}
+          >
+            Ver facturas
+          </Link>
+        </span>
       ),
     },
     { key: 'type', header: 'Tipo', sortable: true, render: (r) => <SupportPlanTypeBadge planType={r.planType} /> },
@@ -197,7 +210,7 @@ export function SupportBillingSection() {
     <div className={styles.section}>
       <div className={styles.sectionHead}>
         <div>
-          <p className={styles.sectionTitle}>Soporte</p>
+          <h2 className={styles.sectionTitle}>Facturación mes de {selectedPeriodLabel}</h2>
           <p className={styles.sectionSubtitle}>Qué corresponde cobrar este período, por cliente y tipo de contrato.</p>
         </div>
         <PeriodSelector
@@ -257,7 +270,7 @@ export function SupportBillingSection() {
       </div>
 
       <DataTable
-        caption="Contratos por facturar en el período"
+        caption={`Facturación de soporte de ${selectedPeriodLabel}`}
         columns={columns}
         items={rowsPage?.items ?? []}
         getRowKey={(r) => r.planId}
@@ -276,6 +289,8 @@ export function SupportBillingSection() {
         description={issueRow ? `${issueRow.planName} · ${formatMoney(issueRow.amountUf ?? 0, issueRow.currency)}` : ''}
         totalAmount={issueRow?.amountUf ?? 0}
         currency={issueRow?.currency ?? 'UF'}
+        periodLabel={selectedPeriodLabel}
+        historyPath={issueRow ? supportPlanPath({ id: issueRow.planId }) : undefined}
         onClose={() => setIssueRow(null)}
         onConfirm={async (input) => {
           if (!issueRow) return;

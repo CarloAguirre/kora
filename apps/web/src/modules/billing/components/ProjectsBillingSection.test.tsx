@@ -37,6 +37,13 @@ function show() {
 }
 
 describe('Facturacion > Proyectos: documentos en la tabla', () => {
+  it('evita repetir el título Proyectos bajo las pestañas y conserva la explicación de cobros', () => {
+    show();
+    expect(screen.queryByText('Proyectos', { selector: 'p' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Cobro por tramos de proyecto:/)).toBeInTheDocument();
+  });
+
+
   it('muestra la factura y el comprobante como documentos independientes de un pago', () => {
     entries = [{ ...row, status: 'pagado', hasAttachment: true, hasPaymentReceipt: true }];
     show();
