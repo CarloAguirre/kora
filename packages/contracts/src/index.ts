@@ -30,3 +30,4 @@ export * from './estimation/quotation-edt-task-planning';
 export * from './estimation/quotation-phase-capacity';
 export * from './estimation/quotation-reference-edt.contract';
 export * from './language/language.contract';
+export * from './export/kora-export.contract';
