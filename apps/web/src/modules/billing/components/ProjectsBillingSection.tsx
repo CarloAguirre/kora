@@ -464,7 +464,6 @@ export function ProjectsBillingSection() {
     <div className={styles.section}>
       <div className={styles.sectionHead}>
         <div>
-          <p className={styles.sectionTitle}>Proyectos</p>
           <p className={styles.sectionSubtitle}>
             Cobro por tramos de proyecto: cada tramo queda por facturar al
             cumplirse su hito (aprobación, fase o fecha).
