@@ -32,7 +32,7 @@ describe('Registrar factura desde Facturación: período e historial', () => {
     renderDialog({ periodLabel: 'noviembre de 2026', historyPath: planPath });
     const dialog = screen.getByRole('dialog', { name: 'Registrar factura · noviembre de 2026' });
     expect(within(dialog).getByText('Soporte Amicar · 7,10 UF')).toBeInTheDocument();
-    const link = within(dialog).getByRole('link', { name: 'Ver todos los períodos' });
+    const link = within(dialog).getByRole('link', { name: 'Ver facturas' });
     expect(link).toHaveAttribute('href', planPath);
     expect(link.closest('footer')).toBe(dialog.querySelector('footer'));
     expect(dialog.querySelector('header')).not.toContainElement(link);
@@ -48,7 +48,7 @@ describe('Registrar factura desde Facturación: período e historial', () => {
     renderDialog({ periodLabel: 'marzo de 2027', historyPath: planPath });
     fireEvent.click(screen.getByRole('button', { name: 'Dividir en varias facturas' }));
     const dialog = screen.getByRole('dialog', { name: 'Registrar facturas · marzo de 2027' });
-    const link = within(dialog).getByRole('link', { name: 'Ver todos los períodos' });
+    const link = within(dialog).getByRole('link', { name: 'Ver facturas' });
     expect(link).toHaveAttribute('href', planPath);
     expect(link.closest('footer')).toBe(dialog.querySelector('footer'));
   });
@@ -56,6 +56,6 @@ describe('Registrar factura desde Facturación: período e historial', () => {
   it('conserva el título original sin enlace en invocaciones que no pasan el período ni el destino', () => {
     renderDialog();
     const dialog = screen.getByRole('dialog', { name: 'Registrar factura' });
-    expect(within(dialog).queryByRole('link', { name: 'Ver todos los períodos' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'Ver facturas' })).not.toBeInTheDocument();
   });
 });
