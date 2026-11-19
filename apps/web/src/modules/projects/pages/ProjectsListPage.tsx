@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   PROJECT_KINDS,
@@ -14,6 +14,7 @@ import {
   type ProjectSortField,
   type ProjectStatus,
   type ProjectSummary,
+  type SupportProjectUsage,
 } from '@kora/contracts';
 import styles from './ProjectsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
@@ -42,6 +43,9 @@ import {
   type SupportSubTab,
 } from '../lib/projects-list-search';
 import { useDeleteProject, useProjectsList } from '../api/projects.queries';
+import { useSupportProjectUsage } from '../api/support-plan.queries';
+import { supportPlanApi } from '../api/support-plan.api';
+import { supportHoursOf } from '../lib/support-hours-display';
 import { projectsApi } from '../api/projects.api';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
@@ -71,7 +75,6 @@ const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFr
 // y el exceso se muestra como desviación (nunca un número negativo).
 const remainingHoursOf = (sold: number, used: number) => Math.max(sold - used, 0);
 const deviationHoursOf = (sold: number, used: number) => Math.max(used - sold, 0);
-const isOnDemand = (project: ProjectSummary) => project.supportPlanType === 'on_demand';
 // Fechas `YYYY-MM-DD` (sin hora): con `T00:00:00` se leen en hora local — `new Date('2026-09-01')` es medianoche
 // UTC y en Chile se mostraba como el día anterior.
 const formatDate = (value: string | null) =>
@@ -131,6 +134,17 @@ export function ProjectsListPage() {
     sortField: sort.field,
     sortDirection: sort.direction,
   });
+  // Las columnas de horas de Soporte salen del contrato (mismo cálculo que la ficha), no de sold/used del proyecto.
+  const pageProjectIds = useMemo(() => (data?.items ?? []).map((project) => project.id), [data]);
+  const { data: supportUsage, isLoading: supportUsageLoading } = useSupportProjectUsage(pageProjectIds, {
+    enabled: tab === 'support',
+  });
+  const usageByProject = useMemo(
+    () => new Map<string, SupportProjectUsage>((supportUsage ?? []).map((usage) => [usage.projectId, usage])),
+    [supportUsage],
+  );
+  const supportHours = (project: ProjectSummary) => supportHoursOf(project, usageByProject.get(project.id));
+
   // Totales de Activos/Terminados/Inactivos de Soporte: solo interesa
   // `total`, así que basta con una página de 1. Respetan el Buscar para que
   // coincidan con lo que muestra la tabla al cambiar de pestaña.
@@ -215,6 +229,11 @@ export function ProjectsListPage() {
   const renderDeviation = (deviation: number) =>
     deviation > 0 ? <span className={styles.deviated}>{formatHours(deviation)}</span> : <span className={styles.empty}>{formatHours(deviation)}</span>;
 
+  // Mientras llega el consumo del contrato no se muestran las cifras del proyecto (podían ser muy distintas).
+  const renderSupportHours = (render: () => ReactNode) =>
+    supportUsageLoading ? <span className={styles.empty}>…</span> : render();
+  const renderEmptyHours = () => <span className={styles.empty}>—</span>;
+
   const developmentColumns: Column<ProjectSummary>[] = [
     {
       key: 'name',
@@ -298,26 +317,68 @@ export function ProjectsListPage() {
     },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
-    // Igual que en desarrollo, las vendidas son `soldHours` (fijas; solo avanzan las consumidas).
-    // En "A demanda" no hay tope de horas: vendidas, restantes y desviadas no aplican, solo las consumidas.
+    // Mismo cálculo que "Estado del proyecto" de la ficha (ver `supportHoursOf`): en planes mensuales, el MES en
+    // curso; en bolsa / a demanda, la vigencia del contrato. "A demanda" no tiene tope: solo aplican las consumidas.
+    // No son ordenables: el orden del servidor usa sold/used del proyecto y no calzaría con lo que se ve.
     {
       key: 'soldHours',
       header: 'HH Vendidas',
-      sortable: true,
-      render: (p) => (isOnDemand(p) ? renderNotApplicable() : formatHours(p.soldHours)),
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          if (hours.notApplicable) return renderNotApplicable();
+          if (hours.sold === null) return renderEmptyHours();
+          return (
+            <div className={styles.hoursCell}>
+              <span>
+                {formatHours(hours.sold)}
+                {hours.soldUnit && <span className={styles.hoursUnit}> {hours.soldUnit}</span>}
+              </span>
+              {hours.priorSurplus > 0 && (
+                <span className={styles.hoursHint}>+{formatHours(hours.priorSurplus)} acumuladas</span>
+              )}
+            </div>
+          );
+        }),
     },
-    { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
+    {
+      key: 'usedHours',
+      header: 'HH Consumidas',
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          return (
+            <div className={styles.hoursCell}>
+              <span>{formatHours(hours.used)}</span>
+              {/* Dato informativo: en mensual la cifra principal es el mes; en bolsa, todo el contrato. */}
+              {hours.usedBreakdown && (
+                <span className={styles.hoursHint}>
+                  Mes {formatHours(hours.usedBreakdown.month)} · Total {formatHours(hours.usedBreakdown.total)}
+                </span>
+              )}
+            </div>
+          );
+        }),
+    },
     {
       key: 'remainingHours',
       header: 'HH Restantes',
-      sortable: true,
-      render: (p) => (isOnDemand(p) ? renderNotApplicable() : formatHours(remainingHoursOf(p.soldHours, p.usedHours))),
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          if (hours.notApplicable) return renderNotApplicable();
+          return hours.remaining === null ? renderEmptyHours() : formatHours(hours.remaining);
+        }),
     },
     {
       key: 'deviationHours',
       header: 'HH desviadas',
-      sortable: true,
-      render: (p) => (isOnDemand(p) ? renderNotApplicable() : renderDeviation(deviationHoursOf(p.soldHours, p.usedHours))),
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          if (hours.notApplicable) return renderNotApplicable();
+          return hours.deviation === null ? renderEmptyHours() : renderDeviation(hours.deviation);
+        }),
     },
     ...managementColumns,
   ];
@@ -336,7 +397,7 @@ export function ProjectsListPage() {
         new Promise((resolve) => setTimeout(resolve, 1000)),
       ]);
       if (tab === 'development') exportDevelopmentProjects(items);
-      else exportSupportProjects(items);
+      else exportSupportProjects(items, await supportPlanApi.listUsage(items.map((project) => project.id)));
     } finally {
       setExporting(false);
     }

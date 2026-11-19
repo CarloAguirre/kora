@@ -23,6 +23,9 @@ vi.mock('../api/projects.queries', () => ({
   useProjectsList: () => ({ data: undefined, isLoading: false, error: null }),
   useDeleteProject: () => ({ mutateAsync: vi.fn() }),
 }));
+vi.mock('../api/support-plan.queries', () => ({
+  useSupportProjectUsage: () => ({ data: undefined, isLoading: false }),
+}));
 vi.mock('@/modules/clients/api/clients.queries', () => ({
   useClientsList: () => ({ data: { items: [] } }),
 }));

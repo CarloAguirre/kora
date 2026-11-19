@@ -61,6 +61,9 @@ const MONTH_LABEL = new Intl.DateTimeFormat('es-CL', { month: 'long', year: 'num
  * contrato (`resolveSupportPlanHourProjectIds`, el mismo criterio que el cobro)
  * desde el inicio del contrato si empezó a mitad de mes. Las pendientes se
  * informan aparte: todavía no se cobran.
+ *
+ * Se omiten los contratos que terminaron antes del mes y los "a demanda" sin
+ * HH en el mes (ni aprobadas ni por aprobar): no tienen nada que cobrar.
  */
 @Injectable()
 export class SendSupportBillingDigestUseCase
@@ -87,11 +90,17 @@ export class SendSupportBillingDigestUseCase
       return ok({ ...base, skippedNotLastBusinessDay: true });
     }
 
-    const records = (await this.plans.listAllActive()).filter((plan) => toIsoDate(plan.startDate) <= monthEnd);
+    // Vigentes en el mes: un contrato con fin anterior al mes puede seguir en estado "activo" si nadie lo cerró.
+    const records = (await this.plans.listAllActive()).filter(
+      (plan) => toIsoDate(plan.startDate) <= monthEnd && (!plan.endDate || toIsoDate(plan.endDate) >= monthStart),
+    );
     const clientNames = await this.clients.findCompanyNames(records.map((plan) => plan.clientId));
     const items: SupportBillingDigestItem[] = [];
     for (const plan of records) {
-      items.push(await this.toItem(plan, clientNames.get(plan.clientId) ?? '', monthStart, monthEnd));
+      const item = await this.toItem(plan, clientNames.get(plan.clientId) ?? '', monthStart, monthEnd);
+      // "A demanda" solo cobra HH usadas: sin horas en el mes (ni por aprobar) no hay nada que cobrar.
+      if (plan.planType === 'on_demand' && item.usedHours === 0 && item.pendingHours === 0) continue;
+      items.push(item);
     }
     items.sort((a, b) => a.clientName.localeCompare(b.clientName, 'es') || a.planName.localeCompare(b.planName, 'es'));
 
@@ -142,8 +151,9 @@ export class SendSupportBillingDigestUseCase
   ): Promise<SupportBillingDigestItem> {
     const projectIds = await resolveSupportPlanHourProjectIds(this.plans, plan);
     const planStart = toIsoDate(plan.startDate);
+    const planEnd = plan.endDate ? toIsoDate(plan.endDate) : monthEnd;
     const dateFrom = new Date(`${planStart > monthStart ? planStart : monthStart}T00:00:00Z`);
-    const dateTo = new Date(`${monthEnd}T00:00:00Z`);
+    const dateTo = new Date(`${planEnd < monthEnd ? planEnd : monthEnd}T00:00:00Z`);
 
     const [usedHours, pending] =
       projectIds.length === 0
