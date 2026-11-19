@@ -48,12 +48,17 @@ export function ProjectTeamsManagementCard({ project, catalog, startManaging = f
   const [removing, setRemoving] = useState<string | null>(null);
   const [adding, setAdding] = useState('');
   const [busy, setBusy] = useState(false);
+  // Último estado confirmado en API: sirve para descartar cambios al cancelar un excedente.
+  const confirmedRef = useRef<TeamDraft[]>(drafts);
+  const [pendingOverage, setPendingOverage] = useState<TeamDraft[] | null>(null);
+  const [overageStep, setOverageStep] = useState<1 | 2>(1);
   const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' }, { enabled: managing });
   const { data: pmoUsers } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'pmo' }, { enabled: managing });
   useEffect(() => {
     if (!managing) {
       const next = draftFromProject(project);
       draftsRef.current = next;
+      confirmedRef.current = next;
       setDrafts(next);
     }
   }, [project, managing]);
@@ -75,17 +80,29 @@ export function ProjectTeamsManagementCard({ project, catalog, startManaging = f
     .reduce((sum, segment) => sum + (segment.estimatedHours ?? 0), 0);
   const blockCount = (teamId: string) => project.modules.flatMap((module) => module.segments)
     .filter((segment) => segment.teamId === teamId).length;
-  const totalAssigned = project.teams.reduce((sum, team) => sum + (team.assignedHours ?? 0), 0);
+  // Mostrar inmediatamente el total editado, sin esperar la respuesta de la API.
+  const totalAssigned = drafts.reduce((sum, team) => sum + team.assignedHours, 0);
+  const overageHours = Math.max(0, totalAssigned - project.soldHours);
+  const overBudget = overageHours > 0;
   const plannedHours = project.modules.flatMap((module) => module.segments)
     .reduce((sum, segment) => sum + (segment.estimatedHours ?? 0), 0);
   const unassigned = Math.max(0, project.soldHours - totalAssigned);
   const teamMembers = (id: string) => project.members.filter((member) => member.teamId === id && !member.blockedAt);
-  const updateAvailable = !busy && !updateProject.isPending;
+  const updateAvailable = !busy && !updateProject.isPending && pendingOverage === null;
 
-  const persist = async (next = draftsRef.current) => {
+  const persist = async (next = draftsRef.current, overageConfirmed = false) => {
     if (next.some((row) => !Number.isFinite(row.assignedHours) || row.assignedHours < 0 ||
         (row.memberCount !== null && (!Number.isInteger(row.memberCount) || row.memberCount < 1)))) {
       toast.error('Las HH deben ser positivas y los cupos deben ser al menos 1.');
+      return false;
+    }
+    const nextTotal = next.reduce((sum, row) => sum + row.assignedHours, 0);
+    const confirmedTotal = confirmedRef.current.reduce((sum, row) => sum + row.assignedHours, 0);
+    // Solo pedir aprobación al aumentar el total asignado POR ENCIMA de lo vendido.
+    // Cambiar el líder o los cupos de un proyecto ya excedido no debe disparar otro aviso.
+    if (!overageConfirmed && nextTotal > project.soldHours && nextTotal > confirmedTotal) {
+      setPendingOverage(next.map((row) => ({ ...row })));
+      setOverageStep(1);
       return false;
     }
     const input: CreateProjectTeamAssignmentInput[] = next.map((row) => ({
@@ -97,6 +114,10 @@ export function ProjectTeamsManagementCard({ project, catalog, startManaging = f
     setBusy(true);
     try {
       await updateProject.mutateAsync({ projectId: project.id, input: { teams: input } });
+      const saved = next.map((row) => ({ ...row }));
+      confirmedRef.current = saved;
+      draftsRef.current = saved;
+      setDrafts(saved);
       toast.success('Equipos del proyecto actualizados.');
       return true;
     } catch (error) {
@@ -104,6 +125,23 @@ export function ProjectTeamsManagementCard({ project, catalog, startManaging = f
       return false;
     } finally {
       setBusy(false);
+    }
+  };
+
+  const cancelOverage = () => {
+    if (busy || updateProject.isPending) return;
+    const saved = confirmedRef.current.map((row) => ({ ...row }));
+    draftsRef.current = saved;
+    setDrafts(saved);
+    setPendingOverage(null);
+    setOverageStep(1);
+  };
+
+  const confirmOverage = async () => {
+    if (!pendingOverage || busy || updateProject.isPending) return;
+    if (await persist(pendingOverage, true)) {
+      setPendingOverage(null);
+      setOverageStep(1);
     }
   };
 
@@ -148,10 +186,14 @@ export function ProjectTeamsManagementCard({ project, catalog, startManaging = f
 
       <div className={styles.summary}>
         <div><span>HH vendidas</span><strong>{hours(project.soldHours)}</strong></div>
-        <div><span>Asignadas a equipos</span><strong>{hours(totalAssigned)}</strong></div>
+        <div><span>Asignadas a equipos</span><strong className={overBudget ? styles.overBudgetValue : undefined}>{hours(totalAssigned)}</strong></div>
         <div><span>Por asignar</span><strong>{hours(unassigned)}</strong></div>
         <div><span>Planificadas en bloques</span><strong>{hours(plannedHours)}</strong></div>
-        <div className={styles.track}><span style={{ width: `${Math.min(100, project.soldHours > 0 ? totalAssigned / project.soldHours * 100 : 0)}%` }} /></div>
+        <div className={`${styles.track} ${overBudget ? styles.trackOverBudget : ''}`}><span style={{ width: `${Math.min(100, project.soldHours > 0 ? totalAssigned / project.soldHours * 100 : 0)}%` }} /></div>
+        {overBudget && <p role="alert" className={styles.overBudgetWarning}>
+          Se superan las HH vendidas por {hours(overageHours)} HH.
+          {pendingOverage ? ' Esta asignación requiere doble confirmación para guardarse.' : ''}
+        </p>}
       </div>
 
       <div className={styles.grid}>
@@ -251,6 +293,29 @@ export function ProjectTeamsManagementCard({ project, catalog, startManaging = f
       </div>
       {!managing && <p className={styles.footer}>Haz clic en un equipo para ver y gestionar sus colaboradores, tareas y entregas.</p>}
       {drafts.length === 0 && !managing && <p>Este proyecto no tiene equipos asignados.</p>}
+
+      <Modal open={pendingOverage !== null}
+        title={overageStep === 1 ? 'Asignación superior a HH vendidas' : 'Confirmación final'}
+        onClose={cancelOverage} dismissible={!busy && !updateProject.isPending}
+        footer={<>
+          <Button variant="outline" disabled={busy || updateProject.isPending} onClick={cancelOverage}>Cancelar</Button>
+          {overageStep === 1 ? (
+            <Button size="sm" onClick={() => setOverageStep(2)}>Sí, continuar</Button>
+          ) : (
+            <Button size="sm" disabled={busy || updateProject.isPending}
+              onClick={() => void confirmOverage()}>Confirmar asignación</Button>
+          )}
+        </>}>
+        <p>{overageStep === 1
+          ? '¿Estás segura de asignar más horas?'
+          : '¿Confirmas definitivamente que deseas asignar más horas de las vendidas?'}</p>
+        <dl className={styles.overageDetail}>
+          <div><dt>HH vendidas</dt><dd>{hours(project.soldHours)}</dd></div>
+          <div><dt>HH a asignar</dt><dd>{hours(pendingOverage?.reduce((sum, row) => sum + row.assignedHours, 0) ?? 0)}</dd></div>
+          <div><dt>Excedente</dt><dd className={styles.overBudgetValue}>{hours(Math.max(0, (pendingOverage?.reduce((sum, row) => sum + row.assignedHours, 0) ?? 0) - project.soldHours))} HH</dd></div>
+        </dl>
+        <p className={styles.confirmHint}>Los cambios no se guardarán hasta completar ambas confirmaciones.</p>
+      </Modal>
 
       <Modal open={removing !== null} title={blockingCount > 0 ? 'No se puede quitar el equipo' : 'Quitar equipo'}
         onClose={() => setRemoving(null)}
