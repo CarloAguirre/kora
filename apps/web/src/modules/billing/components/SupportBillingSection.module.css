@@ -44,13 +44,6 @@
   min-width: 200px;
 }
 
-.tableTitle {
-  margin: var(--kora-space-2) 0 0;
-  font-size: var(--kora-text-lg);
-  font-weight: var(--kora-weight-bold);
-  color: var(--kora-navy);
-}
-
 .planCellGroup {
   display: inline-flex;
   align-items: baseline;
