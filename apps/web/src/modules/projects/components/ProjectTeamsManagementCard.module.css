@@ -7,6 +7,14 @@
 .summary strong { color:#10213d; font-size:17px; }
 .track { grid-column:1/-1; background:#d0def5; height:6px; border-radius:8px; overflow:hidden; }
 .track span { height:100%; display:block; background:#264d85; transition:width .2s; }
+.summary .overBudgetValue, .overBudgetValue { color:var(--kora-danger, #c3382a); }
+.trackOverBudget span { background:var(--kora-danger, #c3382a); }
+.overBudgetWarning { grid-column:1/-1; margin:0; color:var(--kora-danger, #c3382a); font-size:12px; font-weight:600; }
+.overageDetail { display:grid; gap:8px; margin:16px 0; }
+.overageDetail div { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.overageDetail dt { color:#62718a; }
+.overageDetail dd { margin:0; font-weight:700; font-variant-numeric:tabular-nums; }
+.confirmHint { color:#62718a; font-size:12px; }
 .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .teamCard,.manageCard { display:block; min-width:0; border-radius:10px; padding:16px; text-decoration:none; color:#15243e; }
 .teamCard { transition:box-shadow .16s, transform .16s; border:1px solid transparent; }
