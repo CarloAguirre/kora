@@ -66,7 +66,7 @@ export function IssueSupportInvoiceDialog({ open, description, totalAmount, curr
       footer={
         <>
           {historyPath && !running && (
-            <Link className={styles.historyLink} to={historyPath}>Ver todos los períodos</Link>
+            <Link className={styles.historyLink} to={historyPath}>Ver facturas</Link>
           )}
           <Button variant="outline" onClick={onClose} disabled={running}>
             Cancelar
