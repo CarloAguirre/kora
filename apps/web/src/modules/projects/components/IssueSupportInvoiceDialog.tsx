@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { MarkSupportInvoiceIssuedInput, SupportPlanCurrency } from '@kora/contracts';
 import styles from './SupportPlanActionDialog.module.css';
 import { Modal } from '@/shared/components/ui/Modal';
@@ -14,12 +15,16 @@ export interface IssueSupportInvoiceDialogProps {
   /** Monto a facturar del período — al dividirlo, las facturas tienen que sumar exactamente esto. */
   totalAmount: number;
   currency: SupportPlanCurrency;
+  /** Período seleccionado en Facturación (por ejemplo, noviembre de 2026). */
+  periodLabel?: string;
+  /** Ruta al historial de meses del contrato, usada desde /facturacion. */
+  historyPath?: string;
   onClose: () => void;
   onConfirm: (input: Omit<MarkSupportInvoiceIssuedInput, 'monthlyPeriodId'>) => Promise<void>;
 }
 
 /** Registrar la(s) factura(s) de un período — mismos campos que el formulario de `SupportPlanBillingAction`. */
-export function IssueSupportInvoiceDialog({ open, description, totalAmount, currency, onClose, onConfirm }: IssueSupportInvoiceDialogProps) {
+export function IssueSupportInvoiceDialog({ open, description, totalAmount, currency, periodLabel, historyPath, onClose, onConfirm }: IssueSupportInvoiceDialogProps) {
   const split = useSupportInvoiceSplit(totalAmount);
   const { reset } = split;
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +58,16 @@ export function IssueSupportInvoiceDialog({ open, description, totalAmount, curr
   return (
     <Modal
       open={open}
-      title={split.isSplit ? 'Registrar facturas' : 'Registrar factura'}
+      title={`${split.isSplit ? 'Registrar facturas' : 'Registrar factura'}${periodLabel ? ` · ${periodLabel}` : ''}`}
       description={description}
       onClose={onClose}
       wide={split.isSplit}
       dismissible={!running}
       footer={
         <>
+          {historyPath && !running && (
+            <Link className={styles.historyLink} to={historyPath}>Ver facturas</Link>
+          )}
           <Button variant="outline" onClick={onClose} disabled={running}>
             Cancelar
           </Button>
