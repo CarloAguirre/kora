@@ -72,14 +72,17 @@ function show() {
 }
 
 describe('Facturación de Soporte: período visible e historial por contrato', () => {
-  it('muestra el período seleccionado sobre la tabla y cambia con mes y año', () => {
+  it('muestra un único título dinámico en el encabezado, no sobre la tabla, y cambia con mes y año', () => {
     show();
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Mes' }), { target: { value: '3' } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Año' }), { target: { value: '2027' } });
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Facturación mes de marzo de 2027' }))
-      .toBeInTheDocument();
+    const periodHeading = screen.getByRole('heading', { level: 2, name: 'Facturación mes de marzo de 2027' });
+    expect(periodHeading).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: /Facturación mes de/ })).toHaveLength(1);
+    expect(periodHeading.closest('table')).toBeNull();
+    expect(screen.queryByText('Soporte', { selector: 'p' })).not.toBeInTheDocument();
     expect(screen.getByRole('table', { name: 'Facturación de soporte de marzo de 2027' }))
       .toBeInTheDocument();
     expect(mockUseSupportBillingOverview).toHaveBeenLastCalledWith('2027-03');
@@ -113,16 +116,16 @@ describe('Facturación de Soporte: período visible e historial por contrato', (
     });
   });
 
-  it('mantiene el nombre y agrega Ver historial junto al contrato enlazando su ficha', () => {
+  it('mantiene el nombre sin enlace y agrega Ver facturas junto al contrato', () => {
     show();
     const table = screen.getByRole('table');
     expect(within(table).getByText('Soporte Amicar')).toBeInTheDocument();
     expect(within(table).queryByRole('link', { name: 'Soporte Amicar' })).not.toBeInTheDocument();
     const history = within(table).getByRole('link', {
-      name: 'Ver historial de facturación de Soporte Amicar',
+      name: 'Ver facturas de Soporte Amicar',
     });
     expect(history).toHaveAttribute('href', '/soporte/b5b1c217-8585-43f4-b491-8ac94346ef93');
-    expect(history).toHaveTextContent('Ver historial');
+    expect(history).toHaveTextContent('Ver facturas');
     expect(within(table).getAllByRole('link')).toHaveLength(1);
   });
 });
