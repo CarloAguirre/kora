@@ -49,7 +49,7 @@ describe('Equipos del PM/PMO', () => {
 
   it('resumen y enlace al detalle del equipo ya existente', () => {
     mount(true);
-    expect(screen.getByText('HH vendidas')).toBeInTheDocument();
+    expect(screen.getByText('HH vendidas', { selector: 'span' })).toBeInTheDocument();
     expect(screen.getByText('Asignadas a equipos')).toBeInTheDocument();
     expect(screen.getByText('Planificadas en bloques')).toBeInTheDocument();
     expect(screen.getByText('Equipo Desarrollo').closest('a')).toHaveAttribute(
