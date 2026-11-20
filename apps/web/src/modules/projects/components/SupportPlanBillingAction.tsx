@@ -67,7 +67,7 @@ export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: Su
     setError(null);
     setRunning(true);
     try {
-      await onIssue({ invoices: split.toInput() });
+      await onIssue({ invoices: split.toInput(), closePeriod: split.closePeriodInput });
       setFormOpen(false);
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar la factura. Inténtalo de nuevo.');
@@ -111,6 +111,12 @@ export function SupportPlanBillingAction({ plan, canManageBilling, onIssue }: Su
           <p className={styles.hint}>
             Ya se registró la factura de este período — para marcarla como pagada (o cada una, si se dividió en varias), usa el historial de arriba.
             {nextPeriod && ` La del mes siguiente se registra desde el ${formatDate(nextPeriod.startDate)}, en "Meses del contrato".`}
+          </p>
+        )}
+        {plan.currentBillingStatus === 'partially_invoiced' && (
+          <p className={styles.hint}>
+            Este período quedó facturado parcial: faltan {formatMoney(plan.currentPendingAmountUf, plan.currency)} por facturar. Registra las facturas que
+            faltan (o cierra el mes) en "Saldo por facturar".
           </p>
         )}
         {plan.currentBillingStatus === null && <p className={styles.hint}>No hay nada por facturar en el período en curso.</p>}

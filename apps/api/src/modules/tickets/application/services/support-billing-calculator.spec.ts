@@ -186,6 +186,7 @@ describe('SupportBillingCalculator — monthly', () => {
     currency: 'UF',
     hoursBilled: null,
     position: 0,
+    targetAmountUf: null,
     folio: '1',
     invoicedAt: new Date('2026-01-01T00:00:00Z'),
     dueAt: null,

@@ -40,6 +40,7 @@ const sampleRow = {
   scope: 'single',
   planType: 'monthly',
   amountUf: 7.1,
+  pendingAmountUf: 0,
   currency: 'UF',
   billingStatus: null,
   paymentStatus: null,

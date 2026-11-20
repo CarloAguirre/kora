@@ -3,11 +3,15 @@ import type { SupportInvoiceBillingStatus } from '@kora/contracts';
 import type { SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
 import { SUPPORT_INVOICE_REPOSITORY, type SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
 import { SupportBillingCalculator } from './support-billing-calculator';
-import { sumInvoiceAmounts } from './support-invoice-payment-status';
+import { periodBillingOf } from './support-invoice-payment-status';
+import type { SupportInvoiceRecord } from '../../domain/repositories/support-invoice.repository';
 
 export interface CurrentBillingStatus {
   readonly billingStatus: SupportInvoiceBillingStatus | null;
+  /** Facturado parcial: el total esperado del período. */
   readonly amountUf: number;
+  /** Saldo por facturar — solo > 0 en "facturado parcial". */
+  readonly pendingAmountUf: number;
 }
 
 /**
@@ -16,8 +20,9 @@ export interface CurrentBillingStatus {
  * que vive en un solo lugar en vez de triplicarse.
  *
  * Si el período ya tiene facturas (`support_invoices`), el monto mostrado es
- * el CONGELADO (la suma de sus facturas), no el recalculado en vivo — una vez
- * facturado, el monto no cambia aunque se sigan registrando horas.
+ * el CONGELADO (la suma de sus facturas, o el total esperado si quedó
+ * "facturado parcial"), no el recalculado en vivo — una vez facturado, el
+ * monto no cambia aunque se sigan registrando horas.
  */
 @Injectable()
 export class SupportPlanCurrentBillingResolver {
@@ -31,16 +36,17 @@ export class SupportPlanCurrentBillingResolver {
     if (!calculation) {
       /** Sin monto nuevo no significa "sin movimiento": una bolsa cuyo excedente ya se facturó este mes calcula 0, pero su factura del mes existe y debe seguir viéndose. */
       const invoicedThisMonth = await this.invoices.listByPlanAndPeriod(plan.id, periodKeyOf(now));
-      return invoicedThisMonth.length > 0
-        ? { billingStatus: 'invoiced', amountUf: sumInvoiceAmounts(invoicedThisMonth) }
-        : { billingStatus: null, amountUf: 0 };
+      return statusFromInvoices(invoicedThisMonth) ?? { billingStatus: null, amountUf: 0, pendingAmountUf: 0 };
     }
 
     const existing = await this.invoices.listByPlanAndPeriod(plan.id, calculation.periodKey);
-    if (existing.length > 0) return { billingStatus: 'invoiced', amountUf: sumInvoiceAmounts(existing) };
-
-    return { billingStatus: 'to_invoice', amountUf: calculation.amountUf };
+    return statusFromInvoices(existing) ?? { billingStatus: 'to_invoice', amountUf: calculation.amountUf, pendingAmountUf: 0 };
   }
+}
+
+function statusFromInvoices(invoices: readonly SupportInvoiceRecord[]): CurrentBillingStatus | null {
+  const billing = periodBillingOf(invoices);
+  return billing ? { billingStatus: billing.status, amountUf: billing.totalAmountUf, pendingAmountUf: billing.pendingAmountUf } : null;
 }
 
 function periodKeyOf(date: Date): string {

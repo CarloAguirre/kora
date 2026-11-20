@@ -6,26 +6,28 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { AlertIcon } from '@/shared/components/icons/Icons';
 import { ApiRequestError } from '@/shared/lib/api-client';
-import { SupportInvoiceSplitFields, useSupportInvoiceSplit } from './SupportInvoiceSplitFields';
+import { SupportInvoiceSplitFields, useSupportInvoiceSplit, type SupportInvoiceSplitReference } from './SupportInvoiceSplitFields';
 
 export interface IssueSupportInvoiceDialogProps {
   open: boolean;
   /** Ej. "Octubre 2026 · USD 250,00" — qué mes se está facturando. */
   description: string;
-  /** Monto a facturar del período — al dividirlo, las facturas tienen que sumar exactamente esto. */
+  /** Monto a facturar: el calculado del período, o el saldo pendiente si se agregan facturas a uno "facturado parcial". */
   totalAmount: number;
+  /** `pending` al agregar facturas a un período "facturado parcial" — cambia los textos de la referencia. */
+  reference?: SupportInvoiceSplitReference;
   currency: SupportPlanCurrency;
   /** Período seleccionado en Facturación (por ejemplo, noviembre de 2026). */
   periodLabel?: string;
   /** Ruta al historial de meses del contrato, usada desde /facturacion. */
   historyPath?: string;
   onClose: () => void;
-  onConfirm: (input: Omit<MarkSupportInvoiceIssuedInput, 'monthlyPeriodId'>) => Promise<void>;
+  onConfirm: (input: Pick<MarkSupportInvoiceIssuedInput, 'invoices' | 'closePeriod'>) => Promise<void>;
 }
 
 /** Registrar la(s) factura(s) de un período — mismos campos que el formulario de `SupportPlanBillingAction`. */
-export function IssueSupportInvoiceDialog({ open, description, totalAmount, currency, periodLabel, historyPath, onClose, onConfirm }: IssueSupportInvoiceDialogProps) {
-  const split = useSupportInvoiceSplit(totalAmount);
+export function IssueSupportInvoiceDialog({ open, description, totalAmount, reference, currency, periodLabel, historyPath, onClose, onConfirm }: IssueSupportInvoiceDialogProps) {
+  const split = useSupportInvoiceSplit(totalAmount, reference);
   const { reset } = split;
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -46,7 +48,7 @@ export function IssueSupportInvoiceDialog({ open, description, totalAmount, curr
     setError(null);
     setRunning(true);
     try {
-      await onConfirm({ invoices: split.toInput() });
+      await onConfirm({ invoices: split.toInput(), closePeriod: split.closePeriodInput });
       onClose();
     } catch (caught) {
       setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar la factura. Inténtalo de nuevo.');

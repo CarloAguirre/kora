@@ -15,7 +15,7 @@ import { SupportPlanCurrentBillingResolver } from '../services/support-plan-curr
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import type { UseCase } from '../../../../shared/application/use-case';
-import { paymentStatusOf } from '../services/support-invoice-payment-status';
+import { listPendingPeriods, paymentStatusOf } from '../services/support-invoice-payment-status';
 
 export interface GetSupportPlanQuery {
   readonly planId: string;
@@ -82,6 +82,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
       currency: record.currency,
       currentBillingStatus: current.billingStatus,
       currentAmountUf: current.amountUf,
+      currentPendingAmountUf: current.pendingAmountUf,
       alerts,
       clientId: record.clientId,
       clientName: client?.companyName ?? '',
@@ -111,6 +112,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
         currency: invoice.currency,
         hoursBilled: invoice.hoursBilled,
         position: invoice.position,
+        targetAmountUf: invoice.targetAmountUf,
         folio: invoice.folio,
         invoicedAt: toIsoDate(invoice.invoicedAt),
         dueAt: invoice.dueAt ? toIsoDate(invoice.dueAt) : null,
@@ -120,6 +122,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
         paymentStatus: paymentStatusOf(invoice, now),
       })),
       billingPeriods: buildMonthlyBillingSchedule(record, periods, invoiceRows, now),
+      pendingPeriods: listPendingPeriods(invoiceRows, now),
     });
   }
 

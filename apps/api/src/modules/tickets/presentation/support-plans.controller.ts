@@ -2,12 +2,14 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Req } 
 import type { FastifyRequest } from 'fastify';
 import { readSupportInvoiceUpload } from './support-invoice-upload';
 import {
+  closeSupportInvoicePeriodSchema,
   closeSupportPlanSchema,
   createProjectSchema,
   createSupportPlanSchema,
   listSupportProjectUsageSchema,
   markSupportInvoiceIssuedSchema,
   updateSupportPlanSchema,
+  type CloseSupportInvoicePeriodInput,
   type CloseSupportPlanInput,
   type CreateProjectInput,
   type CreateSupportPlanInput,
@@ -32,6 +34,7 @@ import { CloseSupportPlanUseCase } from '../application/use-cases/close-support-
 import { GetSupportPlanUseCase } from '../application/use-cases/get-support-plan.use-case';
 import { ListSupportPlansForClientUseCase } from '../application/use-cases/list-support-plans-for-client.use-case';
 import { MarkSupportInvoiceIssuedUseCase } from '../application/use-cases/mark-support-invoice-issued.use-case';
+import { CloseSupportInvoicePeriodUseCase } from '../application/use-cases/close-support-invoice-period.use-case';
 import { ListSupportProjectUsageUseCase } from '../application/use-cases/list-support-project-usage.use-case';
 
 @Controller('support-plans')
@@ -46,6 +49,7 @@ export class SupportPlansController {
     private readonly markInvoiceIssued: MarkSupportInvoiceIssuedUseCase,
     private readonly createProjectWithPlan: CreateSupportProjectUseCase,
     private readonly listUsage: ListSupportProjectUsageUseCase,
+    private readonly closeInvoicePeriod: CloseSupportInvoicePeriodUseCase,
   ) {}
 
   @Get('project/:projectId')
@@ -156,6 +160,18 @@ export class SupportPlansController {
   ): Promise<{ ids: string[] }> {
     const { data, attachments } = await readSupportInvoiceUpload(request);
     return unwrapOrThrow(await this.markInvoiceIssued.execute({ planId: id, data, attachments, actor: toActorContext(actor) }));
+  }
+
+  /** "Cerrar mes por lo facturado" — el saldo de un período "facturado parcial" deja de cobrarse. */
+  @Post(':id/invoices/close-period')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async closeInvoicePeriodForPlan(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(closeSupportInvoicePeriodSchema)) body: CloseSupportInvoicePeriodInput,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    unwrapOrThrow(await this.closeInvoicePeriod.execute({ planId: id, data: body, actor: toActorContext(actor) }));
   }
 }
 

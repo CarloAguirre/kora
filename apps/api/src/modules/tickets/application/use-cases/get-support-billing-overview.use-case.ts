@@ -56,9 +56,14 @@ export class GetSupportBillingOverviewUseCase implements UseCase<GetSupportBilli
         group.toInvoiceAmount += amountUf;
         // Una fila "Por facturar" con monto 0 es solo un contrato sin nada pendiente — no suma al conteo de la tarjeta.
         if (amountUf > 0) group.toInvoiceCount++;
-      } else if (row.billingStatus === 'invoiced') {
+      } else if (row.billingStatus === 'invoiced' || row.billingStatus === 'partially_invoiced') {
         const group = kpiGroupFor(row.currency);
-        group.invoicedAmount += amountUf;
+        // Lo efectivamente facturado — en "facturado parcial", `amountUf` es el total esperado y el saldo va a "Por facturar".
+        group.invoicedAmount += row.invoices.reduce((total, invoice) => total + invoice.amountUf, 0);
+        if (row.pendingAmountUf > 0) {
+          group.toInvoiceAmount += row.pendingAmountUf;
+          group.toInvoiceCount++;
+        }
         // Con el total dividido en varias facturas, cada una se paga por separado — solo suman las ya pagadas.
         group.paidAmount += row.invoices.filter((invoice) => invoice.paymentStatus === 'paid').reduce((total, invoice) => total + invoice.amountUf, 0);
       }

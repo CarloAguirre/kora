@@ -59,7 +59,13 @@ export function toClientProjectRow(project: ProjectSummary): ClientProjectRow {
 
 export function toClientSupportContractRow(plan: SupportPlanListItem): ClientSupportContractRow {
   const billingLabel =
-    plan.currentBillingStatus === 'invoiced' ? 'Facturada' : plan.currentBillingStatus === 'to_invoice' ? 'Por Facturar' : '--';
+    plan.currentBillingStatus === 'invoiced'
+      ? 'Facturada'
+      : plan.currentBillingStatus === 'partially_invoiced'
+        ? 'Facturada parcial'
+        : plan.currentBillingStatus === 'to_invoice'
+          ? 'Por Facturar'
+          : '--';
   return {
     id: plan.id,
     slug: plan.slug,

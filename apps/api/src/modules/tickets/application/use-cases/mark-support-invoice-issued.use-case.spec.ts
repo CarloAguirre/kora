@@ -13,8 +13,9 @@ import type { SupportBillingCalculation, SupportBillingCalculator } from '../ser
 import type { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import { MarkSupportInvoiceIssuedUseCase } from './mark-support-invoice-issued.use-case';
 
-class FakeInvoices implements Pick<SupportInvoiceRepository, 'listByPlanAndPeriod' | 'createMany'> {
+class FakeInvoices implements Pick<SupportInvoiceRepository, 'listByPlanAndPeriod' | 'createMany' | 'setPeriodTarget'> {
   created: CreateSupportInvoiceInput[] = [];
+  periodTarget: { periodKey: string; targetAmountUf: number | null } | null = null;
   constructor(private readonly existing: SupportInvoiceRecord[] = []) {}
   async listByPlanAndPeriod(): Promise<SupportInvoiceRecord[]> {
     return this.existing;
@@ -22,7 +23,28 @@ class FakeInvoices implements Pick<SupportInvoiceRepository, 'listByPlanAndPerio
   async createMany(inputs: readonly CreateSupportInvoiceInput[]): Promise<void> {
     this.created.push(...inputs);
   }
+  async setPeriodTarget(_planId: string, periodKey: string, targetAmountUf: number | null): Promise<void> {
+    this.periodTarget = { periodKey, targetAmountUf };
+  }
 }
+
+const existingInvoice = (overrides: Partial<SupportInvoiceRecord> = {}): SupportInvoiceRecord => ({
+  id: 'old-1',
+  planId: 'plan-1',
+  periodKey: '2026-10',
+  amountUf: 100,
+  currency: 'UF',
+  hoursBilled: 4,
+  position: 0,
+  targetAmountUf: 134.81,
+  folio: '27846',
+  invoicedAt: new Date('2026-10-05T00:00:00Z'),
+  dueAt: new Date('2026-11-04T00:00:00Z'),
+  paidAt: null,
+  attachmentName: null,
+  monthlyPeriodId: 'period-oct',
+  ...overrides,
+});
 
 class FakeTickets implements Pick<TicketRepository, 'findClosedUnbilledIds' | 'findUnbilledIdsWithHoursBefore' | 'linkToInvoice'> {
   linked: { ticketIds: readonly string[]; invoiceId: string } | null = null;
@@ -111,11 +133,16 @@ describe('MarkSupportInvoiceIssuedUseCase', () => {
     expect(audit.entries).toHaveLength(2);
   });
 
-  it('registra lo facturado aunque no sume el monto calculado (cuota fija sin cobrar el excedente)', async () => {
+  it('al cerrar el mes, registra lo facturado aunque no sume el monto calculado (cuota fija sin cobrar el excedente)', async () => {
     const { useCase, invoices, audit } = build();
-    const result = await useCase.execute({ planId: 'plan-1', data: input([doc('1527', 7.5), doc('1528', 7.5), doc('1529', 22.5)]), actor });
+    const result = await useCase.execute({
+      planId: 'plan-1',
+      data: { ...input([doc('1527', 7.5), doc('1528', 7.5), doc('1529', 22.5)]), closePeriod: true },
+      actor,
+    });
     expect(result.isOk()).toBe(true);
     expect(invoices.created.map((row) => row.amountUf)).toEqual([7.5, 7.5, 22.5]);
+    expect(invoices.created.map((row) => row.targetAmountUf)).toEqual([null, null, null]);
     // Las horas calculadas quedan como facturadas: el excedente no cobrado no se arrastra al mes siguiente.
     expect(invoices.created[0]).toMatchObject({ hoursBilled: 4 });
     expect(audit.entries[0]!.metadata).toMatchObject({ calculatedAmountUf: 134.81 });
@@ -128,11 +155,75 @@ describe('MarkSupportInvoiceIssuedUseCase', () => {
     expect(invoices.created.map((row) => row.amountUf)).toEqual([44.27, 44.27, 46.27]);
   });
 
-  it('no registra si el período ya tiene facturas', async () => {
-    const { useCase, invoices } = build({ existing: [{ id: 'old' } as SupportInvoiceRecord] });
-    const result = await useCase.execute({ planId: 'plan-1', data: input([doc('27846', 134.81)]), actor });
+  it('si lo registrado no alcanza el calculado, deja el período facturado parcial con el calculado como total', async () => {
+    const { useCase, invoices } = build();
+    const result = await useCase.execute({ planId: 'plan-1', data: input([doc('27846', 100)]), actor });
+    expect(result.isOk()).toBe(true);
+    expect(invoices.created).toMatchObject([{ amountUf: 100, hoursBilled: 4, targetAmountUf: 134.81 }]);
+  });
+
+  it('si lo registrado cubre el calculado, el período queda cerrado', async () => {
+    const { useCase, invoices } = build();
+    await useCase.execute({ planId: 'plan-1', data: input([doc('27846', 140)]), actor });
+    expect(invoices.created).toMatchObject([{ amountUf: 140, targetAmountUf: null }]);
+  });
+
+  it('no registra si el período ya está facturado por completo', async () => {
+    const { useCase, invoices } = build({ existing: [existingInvoice({ amountUf: 134.81, targetAmountUf: null })] });
+    const result = await useCase.execute({ planId: 'plan-1', data: input([doc('27847', 10)]), actor });
     expect(result.isErr()).toBe(true);
     expect(invoices.created).toEqual([]);
+  });
+
+  describe('agregar facturas a un período facturado parcial', () => {
+    it('agrega la que falta a continuación de las existentes, sin horas ni tickets, y cierra el período al completar el total', async () => {
+      const { useCase, invoices, tickets } = build({ existing: [existingInvoice()] });
+      const result = await useCase.execute({
+        planId: 'plan-1',
+        data: { ...input([doc('27900', 34.81, '2026-10-20')]), periodKey: '2026-10' },
+        actor,
+      });
+      expect(result.isOk()).toBe(true);
+      expect(invoices.created).toMatchObject([
+        { folio: '27900', amountUf: 34.81, position: 1, hoursBilled: null, monthlyPeriodId: 'period-oct', periodKey: '2026-10', targetAmountUf: null },
+      ]);
+      expect(invoices.periodTarget).toEqual({ periodKey: '2026-10', targetAmountUf: null });
+      expect(tickets.linked).toBeNull();
+    });
+
+    it('si todavía no alcanza el total, el saldo sigue por facturar', async () => {
+      const { useCase, invoices } = build({ existing: [existingInvoice()] });
+      await useCase.execute({ planId: 'plan-1', data: { ...input([doc('27900', 10)]), periodKey: '2026-10' }, actor });
+      expect(invoices.created).toMatchObject([{ targetAmountUf: 134.81 }]);
+      expect(invoices.periodTarget).toEqual({ periodKey: '2026-10', targetAmountUf: 134.81 });
+    });
+
+    it('con closePeriod cierra el mes por lo registrado aunque falte saldo', async () => {
+      const { useCase, invoices } = build({ existing: [existingInvoice()] });
+      await useCase.execute({ planId: 'plan-1', data: { ...input([doc('27900', 10)]), periodKey: '2026-10', closePeriod: true }, actor });
+      expect(invoices.periodTarget).toEqual({ periodKey: '2026-10', targetAmountUf: null });
+    });
+
+    it('también agrega cuando se registra el período del cálculo sin indicar periodKey', async () => {
+      const { useCase, invoices } = build({ existing: [existingInvoice()] });
+      const result = await useCase.execute({ planId: 'plan-1', data: input([doc('27900', 34.81)]), actor });
+      expect(result.isOk()).toBe(true);
+      expect(invoices.created).toMatchObject([{ position: 1, hoursBilled: null }]);
+    });
+
+    it('no acepta un folio ya registrado en el período', async () => {
+      const { useCase, invoices } = build({ existing: [existingInvoice()] });
+      const result = await useCase.execute({ planId: 'plan-1', data: { ...input([doc('27846', 34.81)]), periodKey: '2026-10' }, actor });
+      expect(result.isErr()).toBe(true);
+      expect(invoices.created).toEqual([]);
+    });
+
+    it('no agrega a un período sin saldo por facturar', async () => {
+      const { useCase, invoices } = build({ existing: [existingInvoice({ targetAmountUf: null })] });
+      const result = await useCase.execute({ planId: 'plan-1', data: { ...input([doc('27900', 34.81)]), periodKey: '2026-10' }, actor });
+      expect(result.isErr()).toBe(true);
+      expect(invoices.created).toEqual([]);
+    });
   });
 
   it('en un contrato a demanda enlaza los tickets a la primera factura', async () => {

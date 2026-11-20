@@ -93,6 +93,8 @@ export interface TicketRepository {
   findUnbilledIdsWithHoursBefore(projectIds: readonly string[], before: Date, context?: TransactionContext): Promise<string[]>;
   /** Enlaza estos tickets a la factura recién emitida — evita facturar dos veces las mismas horas. Operación administrativa, no un cambio de estado del ticket: no pasa por el agregado `Ticket`. */
   linkToInvoice(ticketIds: readonly string[], invoiceId: string, context?: TransactionContext): Promise<void>;
+  /** Los tickets enlazados a una factura pasan a otra — al anular la factura que los tenía, si su período conserva otras. */
+  moveInvoiceLinks(fromInvoiceId: string, toInvoiceId: string, context?: TransactionContext): Promise<void>;
 }
 
 export const TICKET_REPOSITORY = Symbol('TicketRepository');

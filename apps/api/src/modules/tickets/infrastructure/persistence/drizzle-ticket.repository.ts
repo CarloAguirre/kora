@@ -246,6 +246,11 @@ export class DrizzleTicketRepository implements TicketRepository {
     await db.update(tickets).set({ invoiceId, updatedAt: new Date() }).where(inArray(tickets.id, [...ticketIds]));
   }
 
+  async moveInvoiceLinks(fromInvoiceId: string, toInvoiceId: string, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.update(tickets).set({ invoiceId: toInvoiceId, updatedAt: new Date() }).where(eq(tickets.invoiceId, fromInvoiceId));
+  }
+
   private buildWhere(filters: TicketFilters) {
     const conditions = [];
     if (!filters.includeDeleted) conditions.push(isNull(tickets.deletedAt));

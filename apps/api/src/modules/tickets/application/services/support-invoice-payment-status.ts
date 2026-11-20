@@ -1,4 +1,4 @@
-import type { SupportInvoicePaymentStatus, SupportInvoiceRef } from '@kora/contracts';
+import type { SupportInvoicePaymentStatus, SupportInvoicePendingPeriod, SupportInvoiceRef } from '@kora/contracts';
 import type { SupportInvoiceRecord } from '../../domain/repositories/support-invoice.repository';
 
 /**
@@ -39,4 +39,63 @@ export function toInvoiceRefs(invoices: readonly SupportInvoiceRecord[], now: Da
 /** Suma de montos de las facturas de un período, redondeada a centavos. */
 export function sumInvoiceAmounts(invoices: readonly Pick<SupportInvoiceRecord, 'amountUf'>[]): number {
   return Math.round(invoices.reduce((total, invoice) => total + invoice.amountUf, 0) * 100) / 100;
+}
+
+export interface SupportInvoicePeriodBilling {
+  readonly status: 'partially_invoiced' | 'invoiced';
+  /** Suma de las facturas registradas. */
+  readonly invoicedAmountUf: number;
+  /** Total esperado del período — igual a lo facturado si quedó cerrado. */
+  readonly totalAmountUf: number;
+  /** Lo que falta por facturar — 0 si quedó cerrado. */
+  readonly pendingAmountUf: number;
+}
+
+/**
+ * Estado de facturación de un período a partir de sus facturas: "facturado
+ * parcial" mientras la suma no alcance el total esperado (`targetAmountUf`,
+ * que se repite en todas sus filas); si no, "facturado". `null` si el período
+ * no tiene facturas ("por facturar").
+ */
+export function periodBillingOf(
+  invoices: readonly Pick<SupportInvoiceRecord, 'amountUf' | 'targetAmountUf'>[],
+): SupportInvoicePeriodBilling | null {
+  if (invoices.length === 0) return null;
+  const invoicedAmountUf = sumInvoiceAmounts(invoices);
+  const target = invoices.reduce((max, invoice) => Math.max(max, invoice.targetAmountUf ?? 0), 0);
+  const totalAmountUf = round2(Math.max(invoicedAmountUf, target));
+  const pendingAmountUf = round2(totalAmountUf - invoicedAmountUf);
+  return { status: pendingAmountUf > 0 ? 'partially_invoiced' : 'invoiced', invoicedAmountUf, totalAmountUf, pendingAmountUf };
+}
+
+/**
+ * Los períodos "facturado parcial" de un conjunto de facturas (de un mismo
+ * plan), del más antiguo al más nuevo — para registrar las que faltan o
+ * cerrarlos.
+ */
+export function listPendingPeriods(invoices: readonly SupportInvoiceRecord[], now: Date): SupportInvoicePendingPeriod[] {
+  const byPeriod = new Map<string, SupportInvoiceRecord[]>();
+  for (const invoice of invoices) {
+    const group = byPeriod.get(invoice.periodKey);
+    if (group) group.push(invoice);
+    else byPeriod.set(invoice.periodKey, [invoice]);
+  }
+  const pending: SupportInvoicePendingPeriod[] = [];
+  for (const [periodKey, periodInvoices] of byPeriod) {
+    const billing = periodBillingOf(periodInvoices);
+    if (billing?.status !== 'partially_invoiced') continue;
+    pending.push({
+      periodKey,
+      monthlyPeriodId: periodInvoices.find((invoice) => invoice.monthlyPeriodId !== null)?.monthlyPeriodId ?? null,
+      totalAmountUf: billing.totalAmountUf,
+      invoicedAmountUf: billing.invoicedAmountUf,
+      pendingAmountUf: billing.pendingAmountUf,
+      invoices: toInvoiceRefs(periodInvoices, now),
+    });
+  }
+  return pending.sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

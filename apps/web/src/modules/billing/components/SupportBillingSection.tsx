@@ -157,7 +157,21 @@ export function SupportBillingSection() {
       ),
     },
     { key: 'type', header: 'Tipo', sortable: true, render: (r) => <SupportPlanTypeBadge planType={r.planType} /> },
-    { key: 'amount', header: 'Monto', align: 'right', sortable: true, render: (r) => formatMoney(r.amountUf ?? 0, r.currency) },
+    {
+      key: 'amount',
+      header: 'Monto',
+      align: 'right',
+      sortable: true,
+      render: (r) =>
+        r.pendingAmountUf > 0 ? (
+          <span className={styles.amountCell}>
+            {formatMoney(r.amountUf ?? 0, r.currency)}
+            <span className={styles.amountSub}>Saldo {formatMoney(r.pendingAmountUf, r.currency)}</span>
+          </span>
+        ) : (
+          formatMoney(r.amountUf ?? 0, r.currency)
+        ),
+    },
     { key: 'billing', header: 'Estado facturación', sortable: true, render: (r) => <SupportInvoiceBillingStatusBadge status={r.billingStatus} /> },
     { key: 'payment', header: 'Estado de pago', sortable: true, render: (r) => <SupportInvoicePaymentStatusBadge status={r.paymentStatus} /> },
     {
@@ -166,21 +180,22 @@ export function SupportBillingSection() {
       align: 'right',
       render: (r) => {
         if (!canManageBilling) return null;
-        if (r.canInvoice) {
-          return (
-            <Button size="sm" onClick={() => setIssueRow(r)}>
-              Registrar factura
-            </Button>
-          );
-        }
-        if (r.invoices.some((invoice) => invoice.paymentStatus !== 'paid')) {
-          return (
-            <Button size="sm" onClick={() => setPayRow(r)}>
-              Marcar como pagado
-            </Button>
-          );
-        }
-        return null;
+        const hasUnpaid = r.invoices.some((invoice) => invoice.paymentStatus !== 'paid');
+        // Un mes "facturado parcial" admite las dos cosas: registrar las facturas que faltan y pagar las ya emitidas.
+        return (
+          <span className={styles.rowActions}>
+            {r.canInvoice && (
+              <Button size="sm" onClick={() => setIssueRow(r)}>
+                Registrar factura
+              </Button>
+            )}
+            {hasUnpaid && (
+              <Button size="sm" variant={r.canInvoice ? 'outline' : 'primary'} onClick={() => setPayRow(r)}>
+                Marcar como pagado
+              </Button>
+            )}
+          </span>
+        );
       },
     },
     {
@@ -286,15 +301,24 @@ export function SupportBillingSection() {
 
       <IssueSupportInvoiceDialog
         open={issueRow !== null}
-        description={issueRow ? `${issueRow.planName} · ${formatMoney(issueRow.amountUf ?? 0, issueRow.currency)}` : ''}
-        totalAmount={issueRow?.amountUf ?? 0}
+        description={
+          issueRow
+            ? issueRow.billingStatus === 'partially_invoiced'
+              ? `${issueRow.planName} · saldo por facturar ${formatMoney(issueRow.pendingAmountUf, issueRow.currency)}`
+              : `${issueRow.planName} · ${formatMoney(issueRow.amountUf ?? 0, issueRow.currency)}`
+            : ''
+        }
+        totalAmount={issueRow ? (issueRow.billingStatus === 'partially_invoiced' ? issueRow.pendingAmountUf : (issueRow.amountUf ?? 0)) : 0}
+        reference={issueRow?.billingStatus === 'partially_invoiced' ? 'pending' : 'calculated'}
         currency={issueRow?.currency ?? 'UF'}
         periodLabel={selectedPeriodLabel}
         historyPath={issueRow ? supportPlanPath({ id: issueRow.planId }) : undefined}
         onClose={() => setIssueRow(null)}
         onConfirm={async (input) => {
           if (!issueRow) return;
-          await issueInvoice.mutateAsync({ planId: issueRow.planId, input });
+          // Las que faltan de un mes "facturado parcial" van a ese mes (el consultado), no al período del cálculo.
+          const target = issueRow.billingStatus === 'partially_invoiced' ? { ...input, periodKey: period } : input;
+          await issueInvoice.mutateAsync({ planId: issueRow.planId, input: target });
           toast.success('Se registró la factura.');
         }}
       />

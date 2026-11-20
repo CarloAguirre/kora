@@ -5,6 +5,7 @@ import styles from './SupportInvoiceSplitFields.module.css';
 import { Button } from '@/shared/components/ui/Button';
 import { TextField } from '@/shared/components/ui/TextField';
 import { FileField } from '@/shared/components/ui/FileField';
+import { SegmentedControl } from '@/shared/components/ui/SegmentedControl';
 import { CircleCheckIcon, PlusIcon, TrashIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import { formatMoney } from '@/shared/lib/format-money';
 
@@ -34,22 +35,36 @@ function draftCents(draft: InvoiceDraft): number | null {
 
 export type SupportInvoiceSplit = ReturnType<typeof useSupportInvoiceSplit>;
 
+/** Contra qué se compara lo registrado: el monto que calculó Kora, o el saldo que le falta a un período "facturado parcial". */
+export type SupportInvoiceSplitReference = 'calculated' | 'pending';
+
 /**
  * Estado del formulario de registro de facturas de un período: una o varias
- * facturas, cada una con su monto. `totalAmount` (lo que calculó Kora) es la
- * referencia — la primera factura arranca con ese monto, al dividir se
+ * facturas, cada una con su monto. `totalAmount` (lo que calculó Kora, o el
+ * saldo pendiente si se agregan facturas a un período "facturado parcial") es
+ * la referencia — la primera factura arranca con ese monto, al dividir se
  * reparte en dos mitades y cada factura que se agrega después arranca con lo
- * que falta por asignar. La suma puede diferir del calculado (p. ej. una
- * cuota fija que no cobra el excedente): no bloquea, solo se avisa.
+ * que falta por asignar.
+ *
+ * Si la suma queda bajo la referencia, se elige qué pasa con la diferencia:
+ * por defecto queda por facturar (las facturas que faltan se emiten después);
+ * o se cierra el mes por lo registrado y no se cobra (p. ej. una cuota fija
+ * que no cobra el excedente). Si la supera, solo se avisa.
  */
-export function useSupportInvoiceSplit(totalAmount: number) {
+export function useSupportInvoiceSplit(totalAmount: number, reference: SupportInvoiceSplitReference = 'calculated') {
   const totalCents = toCents(totalAmount);
   const [drafts, setDrafts] = useState<InvoiceDraft[]>(() => [newDraft(totalCents)]);
+  const [closePeriod, setClosePeriod] = useState(false);
 
   const isSplit = drafts.length > 1;
   const assignedCents = useMemo(() => drafts.reduce((total, draft) => total + (draftCents(draft) ?? 0), 0), [drafts]);
+  /** Solo viaja si lo registrado queda bajo la referencia — es lo único que decide. */
+  const closePeriodInput = assignedCents < totalCents ? closePeriod : undefined;
 
-  const reset = useCallback(() => setDrafts([newDraft(totalCents)]), [totalCents]);
+  const reset = useCallback(() => {
+    setDrafts([newDraft(totalCents)]);
+    setClosePeriod(false);
+  }, [totalCents]);
 
   const add = () =>
     setDrafts((current) => {
@@ -95,7 +110,7 @@ export function useSupportInvoiceSplit(totalAmount: number) {
       file: draft.file,
     }));
 
-  return { drafts, isSplit, totalCents, assignedCents, reset, add, remove, update, validate, toInput };
+  return { drafts, isSplit, totalCents, assignedCents, reference, closePeriod, setClosePeriod, closePeriodInput, reset, add, remove, update, validate, toInput };
 }
 
 export interface SupportInvoiceSplitFieldsProps {
@@ -240,9 +255,15 @@ export function SupportInvoiceSplitFields({ split, currency, disabled }: Support
   );
 }
 
-/** Total registrado contra el monto calculado — verde cuando cuadra; si no, ámbar con el calculado (no bloquea). */
+const REFERENCE_LABELS: Readonly<Record<SupportInvoiceSplitReference, { name: string; goal: string; short: string }>> = {
+  calculated: { name: 'el monto calculado', goal: 'llegar al monto calculado', short: 'Calculado' },
+  pending: { name: 'el saldo pendiente', goal: 'completar el saldo pendiente', short: 'Saldo pendiente' },
+};
+
+/** Total registrado contra la referencia — verde cuando cuadra; si no, ámbar con la referencia (no bloquea). */
 function SplitTotalRow({ split, currency }: { split: SupportInvoiceSplit; currency: SupportPlanCurrency }) {
   const remainingCents = split.totalCents - split.assignedCents;
+  const label = REFERENCE_LABELS[split.reference];
   return (
     <div className={[styles.gridRow, styles.totalRow].join(' ')}>
       <span className={styles.totalLabel}>Total a facturar</span>
@@ -251,36 +272,65 @@ function SplitTotalRow({ split, currency }: { split: SupportInvoiceSplit; curren
         {remainingCents === 0 ? (
           <>
             <CircleCheckIcon size={15} />
-            Cuadra con el monto calculado
+            Cuadra con {label.name}
           </>
         ) : (
-          `Calculado: ${formatMoney(split.totalCents / 100, currency)}`
+          `${label.short}: ${formatMoney(split.totalCents / 100, currency)}`
         )}
       </span>
     </div>
   );
 }
 
+const PENDING_CHOICES = [
+  { value: 'pending', label: 'Quedan facturas por emitir' },
+  { value: 'close', label: 'Cerrar el mes con este monto' },
+] as const;
+
 /**
- * Aviso cuando lo que se va a facturar no coincide con lo que calculó Kora.
- * No bloquea el guardado (ver `MarkSupportInvoiceIssuedUseCase`): el mes
- * queda facturado por lo registrado y la diferencia no se cobra después.
+ * Aviso cuando lo que se va a facturar no coincide con la referencia. Si
+ * falta, se elige qué pasa con la diferencia (ver
+ * `MarkSupportInvoiceIssuedUseCase`): queda por facturar — el mes queda
+ * "facturado parcial" — o se cierra el mes por lo registrado. Si sobra, solo
+ * se avisa.
  */
 function DifferenceNotice({ split, currency }: { split: SupportInvoiceSplit; currency: SupportPlanCurrency }) {
   const remainingCents = split.totalCents - split.assignedCents;
   if (remainingCents === 0 || split.assignedCents <= 0) return null;
   const difference = formatMoney(Math.abs(remainingCents) / 100, currency);
-  const calculated = formatMoney(split.totalCents / 100, currency);
-  const billed = formatMoney(split.assignedCents / 100, currency);
+  const reference = formatMoney(split.totalCents / 100, currency);
+  const { name: referenceName, goal } = REFERENCE_LABELS[split.reference];
+
+  if (remainingCents < 0) {
+    return (
+      <div className={styles.notice} role="status">
+        <TriangleAlertIcon size={16} className={styles.noticeIcon} />
+        <span>
+          <strong>Sobran {difference}</strong> sobre {referenceName} ({reference}). Puedes guardar igual: el mes queda facturado por lo registrado.
+        </span>
+      </div>
+    );
+  }
+
   return (
-    <div className={styles.notice} role="status">
-      <TriangleAlertIcon size={16} className={styles.noticeIcon} />
-      <span>
-        <strong>
-          {remainingCents > 0 ? `Faltan ${difference}` : `Sobran ${difference}`}
-        </strong>
-        {remainingCents > 0 ? ` para llegar al monto calculado (${calculated}). ` : ` sobre el monto calculado (${calculated}). `}
-        Puedes guardar igual: el mes queda facturado por {billed} y la diferencia no se cobra después.
+    <div className={[styles.notice, styles.noticeStacked].join(' ')} role="status">
+      <span className={styles.noticeLine}>
+        <TriangleAlertIcon size={16} className={styles.noticeIcon} />
+        <span>
+          <strong>Faltan {difference}</strong> para {goal} ({reference}). ¿Qué pasa con la diferencia?
+        </span>
+      </span>
+      <SegmentedControl
+        aria-label="Qué pasa con la diferencia"
+        options={PENDING_CHOICES}
+        value={split.closePeriod ? 'close' : 'pending'}
+        onChange={(value) => split.setClosePeriod(value === 'close')}
+        fullWidth
+      />
+      <span className={styles.noticeHint}>
+        {split.closePeriod
+          ? 'El mes queda facturado por lo registrado y la diferencia no se cobra después.'
+          : `El mes queda "Facturado parcial": el saldo de ${difference} sigue por facturar y registras las facturas que faltan cuando se emitan.`}
       </span>
     </div>
   );
