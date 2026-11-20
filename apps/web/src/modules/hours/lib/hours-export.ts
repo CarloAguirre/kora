@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { CapacityReportRow, HourEntrySummary, ProjectStatus } from '@kora/contracts';
 import { HOUR_ENTRY_STATUS_LABELS, PROJECT_STATUS_LABELS } from '@kora/contracts';
 import { resolvedApprover } from './approver';
+import { hourEntryAssignmentLabel } from './assignment-label';
 
 const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -53,7 +54,7 @@ const HOUR_ENTRY_COLUMNS: ReadonlyArray<{ label: string; getValue: (row: HourEnt
   { label: 'Autor', getValue: (r) => r.user.fullName },
   { label: 'Equipo', getValue: (r) => r.team?.name ?? '' },
   { label: 'Proyecto', getValue: (r) => r.project?.name ?? '' },
-  { label: 'Asignación', getValue: (r) => r.assignment ?? '' },
+  { label: 'Asignación', getValue: (r) => hourEntryAssignmentLabel(r, '') },
   { label: 'Actividad', getValue: (r) => r.category },
   { label: 'Horas', getValue: (r) => r.hours },
   { label: 'Horas extra', getValue: (r) => (r.isOvertime ? 'Sí' : 'No') },

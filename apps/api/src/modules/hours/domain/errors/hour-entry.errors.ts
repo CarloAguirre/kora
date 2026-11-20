@@ -130,6 +130,22 @@ export class ProjectClosedError extends ConflictError {
 }
 
 /** El proyecto no tiene autorizadas horas extra — el líder del proyecto/equipo debe habilitarlo primero. */
+/**
+ * La asignación no calza con la etapa comercial del proyecto: "Prospecto" es
+ * solo para proyectos en prospecto o cotización y "Proyecto" para aprobados o
+ * de soporte (ver `expectedAssignmentForProject`).
+ */
+export class AssignmentMismatchesProjectStageError extends ValidationError {
+  constructor(expected: 'Proyecto' | 'Prospecto') {
+    super(
+      expected === 'Proyecto'
+        ? 'Este proyecto ya está aprobado: registra las horas con la asignación "Proyecto".'
+        : 'Este proyecto está en prospecto o cotización: registra las horas con la asignación "Prospecto".',
+      'HOUR_ENTRY_ASSIGNMENT_MISMATCHES_PROJECT_STAGE',
+    );
+  }
+}
+
 export class ProjectOvertimeNotAllowedError extends ConflictError {
   constructor() {
     super('Este proyecto no tiene autorizadas horas extra.', 'HOUR_ENTRY_PROJECT_OVERTIME_NOT_ALLOWED');

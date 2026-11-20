@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { hourEntryRequiresApproval, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
+import { expectedAssignmentForProject, hourEntryRequiresApproval, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
+  AssignmentMismatchesProjectStageError,
   InvalidDesignatedApproverError,
   ModuleNotInProjectError,
   SegmentNotInModuleError,
@@ -77,6 +78,11 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
       if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
       if (data.isOvertime && !project.allowsOvertime) return err(new ProjectOvertimeNotAllowedError());
+      // "Prospecto" solo en prospectos/cotizaciones; "Proyecto" en aprobados y soporte.
+      if (project.type !== undefined) {
+        const expected = expectedAssignmentForProject(project);
+        if (data.assignment !== expected) return err(new AssignmentMismatchesProjectStageError(expected));
+      }
       projectAllowsOvertime = project.allowsOvertime;
       projectStageAtEntry = project.status;
     }

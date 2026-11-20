@@ -46,6 +46,38 @@ export type HourEntryAssignment = z.infer<typeof hourEntryAssignmentSchema>;
 /** Asignaciones que requieren seleccionar un proyecto. */
 export const PROJECT_REQUIRING_ASSIGNMENTS: ReadonlySet<string> = new Set(['Proyecto', 'Prospecto']);
 
+/**
+ * Tipo de trabajo de una hora con proyecto según la etapa comercial ACTUAL del
+ * proyecto (no la que eligió la persona al registrar): misma regla que el
+ * reporte de Capacity (`getCapacityHHType` en la v1). Los soportes no tienen
+ * etapa comercial.
+ */
+export type HourEntryProjectWorkType = 'Prospecto' | 'Cotización' | 'Soporte' | 'Proyecto';
+
+export function resolveHourEntryProjectWorkType(project: {
+  salesStage?: string | null;
+  type?: string | null;
+}): HourEntryProjectWorkType {
+  if (project.type === 'support') return 'Soporte';
+  if (project.salesStage === 'prospect') return 'Prospecto';
+  if (project.salesStage === 'quoted') return 'Cotización';
+  return 'Proyecto';
+}
+
+/**
+ * Asignación ("Proyecto"/"Prospecto") que corresponde a un proyecto según su
+ * etapa comercial: los soportes y los desarrollos aprobados van como
+ * "Proyecto"; los prospectos y cotizaciones como "Prospecto". Misma regla que
+ * el filtro de proyectos del formulario de horas.
+ */
+export function expectedAssignmentForProject(project: {
+  salesStage?: string | null;
+  type?: string | null;
+}): 'Proyecto' | 'Prospecto' {
+  if (project.type === 'support' || project.salesStage === 'approved') return 'Proyecto';
+  return 'Prospecto';
+}
+
 /** Fecha inclusiva en que comienzan las imputaciones con vínculo operativo. */
 export const HOUR_ENTRY_PLAN_LINK_START_DATE = '2026-11-11';
 
@@ -67,7 +99,16 @@ export function isLegacyHourEntryProject(project: {
 export const hourEntrySummarySchema = z.object({
   id: uuidSchema,
   user: z.object({ id: uuidSchema, fullName: z.string() }),
-  project: z.object({ id: uuidSchema, name: z.string() }).nullable(),
+  project: z
+    .object({
+      id: uuidSchema,
+      name: z.string(),
+      /** Etapa comercial ACTUAL del proyecto (prospect/quoted/approved; null en soporte) — ver `resolveHourEntryProjectWorkType`. */
+      salesStage: z.string().nullable().optional(),
+      /** Tipo del proyecto (development/support). */
+      type: z.string().nullable().optional(),
+    })
+    .nullable(),
   /** Equipo activo del autor del registro al momento de listarlo (no se guarda histórico). */
   team: z.object({ id: uuidSchema, name: z.string() }).nullable(),
   /** Fase/módulo contra la que se imputó la hora, si se eligió una. */

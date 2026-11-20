@@ -221,8 +221,45 @@ function buildUseCase(projectStatus: ProjectStatus, regularHoursForDate = 0, own
     new FixedClock(NOW),
     new SequentialIdGenerator(),
   );
-  return { useCase, entries };
+  return { useCase, entries, projects };
 }
+
+describe('CreateHourEntryUseCase — asignación según etapa comercial', () => {
+  const project = (type: 'development' | 'support', salesStage: 'prospect' | 'quoted' | 'approved' | null) => ({
+    id: 'project-1', name: 'Proyecto', status: 'active' as const, leaderUserId: null, allowsOvertime: false, type, salesStage,
+  });
+
+  it.each([
+    ['Prospecto', 'development', 'approved', 'Proyecto'],
+    ['Prospecto', 'support', null, 'Proyecto'],
+    ['Proyecto', 'development', 'prospect', 'Prospecto'],
+    ['Proyecto', 'development', 'quoted', 'Prospecto'],
+  ] as const)('rechaza "%s" en un proyecto %s/%s (corresponde "%s")', async (assignment, type, salesStage, expected) => {
+    const { useCase, entries, projects } = buildUseCase('active');
+    vi.mocked(projects.findById).mockResolvedValue(project(type, salesStage));
+
+    const result = await useCase.execute({ data: { ...INPUT, assignment }, actor: ACTOR, actorRole: 'collaborator' });
+
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_ASSIGNMENT_MISMATCHES_PROJECT_STAGE');
+    expect(result.isErr() && result.error.message).toContain(`"${expected}"`);
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Proyecto', 'development', 'approved'],
+    ['Proyecto', 'support', null],
+    ['Prospecto', 'development', 'prospect'],
+    ['Prospecto', 'development', 'quoted'],
+  ] as const)('acepta "%s" en un proyecto %s/%s', async (assignment, type, salesStage) => {
+    const { useCase, entries, projects } = buildUseCase('active');
+    vi.mocked(projects.findById).mockResolvedValue(project(type, salesStage));
+
+    const result = await useCase.execute({ data: { ...INPUT, assignment }, actor: ACTOR, actorRole: 'collaborator' });
+
+    expect(result.isOk()).toBe(true);
+    expect(entries.save).toHaveBeenCalled();
+  });
+});
 
 describe('CreateHourEntryUseCase', () => {
   it.each(['finished', 'cancelled'] as const)('no permite cargar horas en un proyecto %s', async (status) => {

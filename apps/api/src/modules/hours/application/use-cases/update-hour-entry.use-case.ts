@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { hourEntryRequiresApproval, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
+import { expectedAssignmentForProject, hourEntryRequiresApproval, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { splitByDailyCap, type HoursTranche } from '../../domain/services/daily-cap';
 import {
+  AssignmentMismatchesProjectStageError,
   HourEntryNotFoundError,
   HourEntryOutsideCurrentMonthError,
   InvalidDesignatedApproverError,
@@ -90,6 +91,16 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
     if (project && projectId !== previousProjectId) {
       if (project.status === 'on_hold') return err(new ProjectStoppedError());
       if (project.status === 'finished' || project.status === 'cancelled') return err(new ProjectClosedError());
+    }
+    // Misma regla que el alta, pero solo si cambia la asignación o el
+    // proyecto: un registro histórico (p.ej. horas de preventa de un proyecto
+    // que después se aprobó) se puede seguir corrigiendo en horas/comentario.
+    const previousAssignment = entry.toSnapshot().assignment;
+    const assignment = data.assignment ?? previousAssignment;
+    if (project && project.type !== undefined &&
+        (assignment !== previousAssignment || projectId !== previousProjectId)) {
+      const expected = expectedAssignmentForProject(project);
+      if (assignment !== expected) return err(new AssignmentMismatchesProjectStageError(expected));
     }
 
     if (data.designatedApproverUserId) {

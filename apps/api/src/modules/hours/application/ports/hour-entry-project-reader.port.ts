@@ -1,9 +1,12 @@
-import type { ProjectStatus } from '@kora/contracts';
+import type { ProjectSalesStage, ProjectStatus, ProjectType } from '@kora/contracts';
 
 export interface HourEntryProjectReference {
   readonly id: string;
   readonly name: string;
   readonly status: ProjectStatus;
+  /** Tipo y etapa comercial: deciden si la hora va como "Proyecto" o "Prospecto" (ver `expectedAssignmentForProject`). */
+  readonly type?: ProjectType;
+  readonly salesStage?: ProjectSalesStage | null;
   readonly startDate?: Date | null;
   readonly hito0At?: Date | null;
   readonly createdAt?: Date;

@@ -8,7 +8,9 @@ export function toHourEntrySummary(item: HourEntryListItem): HourEntrySummary {
   return {
     id: item.id,
     user: { id: item.userId, fullName: item.userFullName },
-    project: item.projectId ? { id: item.projectId, name: item.projectName ?? '' } : null,
+    project: item.projectId
+      ? { id: item.projectId, name: item.projectName ?? '', salesStage: item.projectSalesStage, type: item.projectType }
+      : null,
     module: item.moduleId ? { id: item.moduleId, name: item.moduleName ?? '' } : null,
     segment: item.segmentId ? { id: item.segmentId, name: item.segmentName ?? '' } : null,
     taskId: item.taskId ?? null,
