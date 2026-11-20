@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { err, ok, type ApplicationError, type Result } from '@kora/core';
 import type { CreateProjectPaymentMilestoneInput, Permission } from '@kora/contracts';
-import { CannotManageProjectError, ProjectNotFoundError } from '../../domain/errors/project.errors';
+import { CannotManageProjectError, ProjectIsInternalError, ProjectNotFoundError } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_PAYMENT_MILESTONE_REPOSITORY,
@@ -44,6 +44,7 @@ export class CreateProjectPaymentMilestoneUseCase
     if (!command.actorPermissions.includes('projects:manage') && project.leaderUserId !== command.actor.userId) {
       return err(new CannotManageProjectError());
     }
+    if (project.isInternal) return err(new ProjectIsInternalError());
 
     const id = await this.milestones.create({ projectId: project.id, ...toPaymentMilestoneSchedule(command.data, 0) });
 

@@ -1,0 +1,69 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--kora-space-3);
+}
+.kpiCard, .planningCard {
+  /* Card centraliza elevación, borde, radio y padding, como en Kora. */
+  min-width: 0;
+}
+.kpis .kpiCard {
+  min-height: 110px;
+  gap: var(--kora-space-2);
+}
+.muted { color: var(--kora-blue-400); font-size: var(--kora-text-xs); }
+.donut { flex: 0 0 70px; }
+.donutRow { display: flex; align-items: center; gap: 13px; }
+.donutValues { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.donutText { font: var(--kora-weight-semibold) 12px var(--kora-font); fill: var(--kora-navy); }
+.weeklyGroup { display: flex; flex-direction: column; gap: var(--kora-space-2); width: 100%; }
+.weeklyNumber, .donutNumber { font-size: var(--kora-text-2xl); font-weight: var(--kora-weight-bold); color: var(--kora-navy); }
+.progressTrack {
+  width: 100%;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--kora-border-soft);
+  overflow: hidden;
+}
+.progressFill { display: block; height: 100%; background: var(--kora-lime-dark); border-radius: 99px; }
+.attention { display: flex; flex-direction: column; gap: 5px; line-height: 1.45; }
+.attention strong { color: #a96510; font-size: 12px; font-weight: 650; }
+.attention span { color: #805f85; font-size: 11px; }
+.allClear { color: #197647; font-size: 13px; font-weight: 650; margin-top: 6px; }
+.planningGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--kora-space-4);
+  min-width: 0;
+}
+.planningGrid .planningCard {
+  gap: 0;
+}
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.sectionHeading h2 { font-size: var(--kora-text-lg); margin: 0; font-weight: var(--kora-weight-bold); }
+.sectionHeading > span:not(.count) { color: #8d9ab0; font-size: 11px; white-space: nowrap; }
+.count {
+  background: #eef0f5;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  color: #61718d;
+  font-weight: 600;
+}
+.totalRow td { background: var(--kora-lime-surface); font-weight: var(--kora-weight-bold); }
+.caption { margin: 11px 2px 0; color: #8795a9; font-size: 10.5px; line-height: 1.4; }
+@media (max-width: 1050px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .planningGrid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 540px) {
+  .kpis { grid-template-columns: minmax(0, 1fr); }
+}

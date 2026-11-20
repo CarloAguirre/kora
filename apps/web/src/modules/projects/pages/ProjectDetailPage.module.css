@@ -288,3 +288,7 @@ button.editIconButton:not(:disabled):hover {
     border-top: none;
   }
 }
+
+
+/* El acceso desde el Roadmap lleva al bloque real de asignación, no solo al tab. */
+.assignedTeamsAnchor { scroll-margin-top: var(--kora-space-6); min-width: 0; }

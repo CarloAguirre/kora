@@ -1,5 +1,5 @@
 import type { Page, PageRequest, SortRequest, TransactionContext } from '@kora/core';
-import type { ProjectPhase, ProjectStatus, ProjectType, ProjectSalesStage, ProjectQuotationListStatus } from '@kora/contracts';
+import type { ProjectKind, ProjectPhase, ProjectStatus, ProjectType, ProjectSalesStage, ProjectQuotationListStatus } from '@kora/contracts';
 import type { Project } from '../entities/project.entity';
 
 export interface ProjectFilters {
@@ -11,6 +11,8 @@ export interface ProjectFilters {
   readonly quotationStatus?: readonly ProjectQuotationListStatus[] | undefined;
   /** Acota filtros comerciales para el líder asignado; nunca revela el estado de otro proyecto. */
   readonly quotationViewerUserId?: string | undefined;
+  /** "Tipo de proyecto" — ver `PROJECT_KINDS`. */
+  readonly kind?: readonly ProjectKind[] | undefined;
   readonly clientId?: string | undefined;
   readonly clientIds?: readonly string[] | undefined;
   /** Proyectos cuyo rango Inicio–Fin se cruza con alguno de estos períodos (`YYYY-MM-DD`, ambos extremos incluidos). */
@@ -28,6 +30,8 @@ export type ProjectSortableField =
   | 'status'
   | 'salesStage'
   | 'quotationStatus'
+  | 'stage'
+  | 'kind'
   | 'priority'
   | 'createdAt'
   | 'client'
@@ -67,8 +71,11 @@ export interface ProjectListItem {
   /** Ver `projectDetailSchema.stopsClock` — el avance (`calculateProjectProgress`) no evalúa Retraso con el reloj pausado. */
   readonly stopsClock: boolean;
   readonly supportPlanDescription: string | null;
+  /** Ver `projectSummarySchema.supportPlanType`. */
+  readonly supportPlanType: 'monthly' | 'bundle' | 'on_demand' | null;
   readonly supportHours: number;
   readonly allowsOvertime: boolean;
+  readonly isInternal: boolean;
   readonly createdAt: Date;
 }
 

@@ -27,6 +27,19 @@ describe('InventoryEstimationDriveUseCase', () => {
     expect(result.items[0]?.analyzable).toBe(true);
   });
 
+  it('no ofrece un PDF de demostración como archivo de una carpeta real', async () => {
+    const drive: DriveFolderClient = {
+      isConfigured: () => false, listFiles: async () => [], listChildren: async () => [],
+      searchFolders: async () => [], getMetadata: async () => null, readAnalysisContent: async () => null,
+    };
+    const result = await new InventoryEstimationDriveUseCase(drive).execute({
+      driveFolderUrl: 'https://drive.google.com/drive/folders/real-folder-123', maxDepth: 3,
+    });
+    expect(result.connection).toBe('not_configured');
+    expect(result.items).toEqual([]);
+    expect(result.summary.files).toBe(0);
+  });
+
   it('prioriza levantamientos y excluye credenciales', async () => {
     const drive: DriveFolderClient = {
       isConfigured: () => true,

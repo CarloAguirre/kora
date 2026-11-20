@@ -6,7 +6,7 @@ import {
   withQuotationTaskSetting, withQuotationEdtStageSetting,
   withQuotationCommercialStage, withQuotationCommercialTask,
   patchQuotationCommercialTask, withoutQuotationCommercialTask,
-  withQuotationTaskDisplayName,
+  withQuotationTaskDisplayName, withoutQuotationEdtTask, withoutQuotationEdtStage,
 } from './quotation-edt-task-planning';
 import {
   projectPocRolesToQuotationDraft, reconcilePocCommercialDraft,
@@ -73,6 +73,79 @@ const source = () => quotationDraftDataSchema.parse({
 });
 
 describe('EDT comercial: equipos, tareas Fija y redistribución por centésimos', () => {
+
+  it('excluye WBS multiperfil del presupuesto sin modificar la EDT original', () => {
+    const base = source();
+    const edited = withQuotationTaskSetting(base, 'T01.01', 'QA', { fixed: true });
+    const excluded = withoutQuotationEdtTask(edited, 'T01.01');
+    expect(excluded.aiPoc?.edt).toEqual(base.aiPoc?.edt);
+    expect(excluded.edtTaskSettings).toEqual([]);
+    expect(excluded.edtExcludedWbs).toEqual(['T01.01']);
+    expect(quotationEdtAssignments(excluded).every((row) => row.wbs !== 'T01.01'))
+      .toBe(true);
+    expect(effectiveQuotationEdt(excluded)?.totalHours).toBe(40);
+    const projected = projectPocRolesToQuotationDraft(excluded, { Desarrollo: dev, QA: qa });
+    expect(projected.phases.reduce((sum, phase) => sum +
+      phase.teamHours.reduce((total, team) => total + team.hours, 0), 0)).toBe(40);
+  });
+
+  it('excluye una fase IA completa, limpia todas sus tareas y conserva otras etapas', () => {
+    const base = source();
+    const excluded = withoutQuotationEdtStage(base, 'T01');
+    expect(excluded.edtExcludedWbs).toEqual(['T01.01', 'T01.02']);
+    expect(effectiveQuotationEdt(excluded)?.stages?.map((stage) => stage.code))
+      .toEqual(['T02']);
+    expect(effectiveQuotationEdt(excluded)?.totalHours).toBe(20);
+    expect(excluded.aiPoc?.edt).toEqual(base.aiPoc?.edt);
+    expect(() => withoutQuotationEdtStage(excluded, 'T02'))
+      .toThrow(/al menos una actividad/);
+  });
+
+  it('no permite excluir WBS ajenos, duplicados ni dejar una EDT sin tareas', () => {
+    const base = source();
+    expect(() => quotationEdtAssignments({ ...base,
+      edtExcludedWbs: ['inexistente'] })).toThrow(/inexistentes/);
+    expect(() => quotationEdtAssignments({ ...base,
+      edtExcludedWbs: ['T01.01', 'T01.01'] })).toThrow(/repetidas/);
+    expect(() => withoutQuotationEdtTask(
+      withoutQuotationEdtStage(base, 'T01'), 'T02.01')).not.toThrow();
+  });
+
+  it('en un mismo WBS, renombrar un perfil no modifica el otro ni las HH', () => {
+    const sourceDraft = source();
+    const withRoles = quotationDraftDataSchema.parse({
+      ...sourceDraft,
+      aiPoc: {
+        ...sourceDraft.aiPoc!,
+        edt: {
+          ...sourceDraft.aiPoc!.edt!,
+          modules: sourceDraft.aiPoc!.edt!.modules.map((m) => ({
+            ...m,
+            tasks: m.tasks.map((task) => task.wbs === 'T01.01' ? {
+              ...task, roleEffort: [
+                { role: 'Desarrollo', hours: 10,
+                  taskName: 'Construir API', taskDescription: 'Implementar endpoint REST.' },
+                { role: 'QA', hours: 10,
+                  taskName: 'Probar API', taskDescription: 'Verificar endpoint REST.' },
+              ],
+            } : task),
+          })),
+        },
+      },
+    });
+    const edited = withQuotationTaskDisplayName(withRoles,
+      'T01.01', 'Implementar API revisada', 'Desarrollo');
+    const rows = quotationEdtAssignments(edited).filter((row) => row.wbs === 'T01.01');
+    expect(rows.map((row) => [row.role, row.name, row.description, row.hours]))
+      .toEqual([
+        ['Desarrollo', 'Implementar API revisada', 'Implementar endpoint REST.', 10],
+        ['QA', 'Probar API', 'Verificar endpoint REST.', 10],
+      ]);
+    expect(edited.aiPoc?.edt).toEqual(withRoles.aiPoc?.edt);
+    expect(() => withQuotationTaskDisplayName(withRoles,
+      'T01.01', 'Tarea imposible', 'Arquitectura')).toThrow(/WBS\/perfil/);
+  });
+
   it('redistribuye la diferencia exacta entre tareas no fijas, preservando Fija y otros tramos', () => {
     const draft = withQuotationTaskSetting(source(), 'T01.01', 'Desarrollo', { fixed: true });
     const updated = redistributeQuotationEdtHours(draft, {

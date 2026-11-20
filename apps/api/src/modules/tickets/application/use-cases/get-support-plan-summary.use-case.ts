@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CLOCK, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
-import type { SupportProjectSummary } from '@kora/contracts';
+import { CLOCK, ForbiddenError, err, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
+import type { Permission, SupportProjectDetailSummary } from '@kora/contracts';
 import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
@@ -8,11 +8,13 @@ import type { UseCase } from '../../../../shared/application/use-case';
 
 export interface GetSupportPlanSummaryCommand {
   readonly projectId: string;
+  readonly actorUserId: string;
+  readonly actorPermissions: readonly Permission[];
 }
 
 /** Ficha de UN proyecto (`SupportProjectDetailView`, navegación directa ticket→proyecto). El armado del resumen vive en `SupportPlanSummaryBuilder` — lo comparte con `GetSupportPlanUseCase` (ficha del contrato completo). */
 @Injectable()
-export class GetSupportPlanSummaryUseCase implements UseCase<GetSupportPlanSummaryCommand, SupportProjectSummary | null, ApplicationError> {
+export class GetSupportPlanSummaryUseCase implements UseCase<GetSupportPlanSummaryCommand, SupportProjectDetailSummary | null, ApplicationError> {
   constructor(
     @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
@@ -20,14 +22,20 @@ export class GetSupportPlanSummaryUseCase implements UseCase<GetSupportPlanSumma
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
-  async execute(command: GetSupportPlanSummaryCommand): Promise<Result<SupportProjectSummary | null, ApplicationError>> {
+  async execute(command: GetSupportPlanSummaryCommand): Promise<Result<SupportProjectDetailSummary | null, ApplicationError>> {
     const project = await this.projects.findById(command.projectId);
     if (!project) return ok(null);
+
+    // Solo lectura de horas/consumo: quien tiene `projects:read_assigned` (líder) la ve si participa en el proyecto, igual que la ficha.
+    if (!command.actorPermissions.includes('projects:read') && !(await this.projects.isParticipant(project.id, command.actorUserId))) {
+      return err(new ForbiddenError('No tienes acceso a este proyecto.', 'PROJECT_NOT_ASSIGNED'));
+    }
 
     const plan = await this.plans.findActiveForProjectOrLinked(project.id);
     if (!plan) return ok(null);
 
     const linkedProjectIds = await this.summaryBuilder.resolveLinkedProjectIds(plan);
-    return ok(await this.summaryBuilder.build(plan, linkedProjectIds, this.clock.now()));
+    const summary = await this.summaryBuilder.build(plan, linkedProjectIds, this.clock.now());
+    return ok({ ...summary, planId: plan.id });
   }
 }

@@ -34,6 +34,12 @@ pueda registrar horas (`leader`, `pmo`) nace `approved`. `admin` y `commercial`
 no registran horas propias en absoluto (`rls_can_register_hh` los excluye
 explícitamente).
 
+Excepción posterior: las horas extra (marcadas o por pasar la jornada de 8h)
+nacen `pending` también para PMO — pero **todas las horas de un líder se
+autoaprueban**, extra incluidas. La regla vive en `hourEntryRequiresApproval`
+(`@kora/contracts`) y la comparten Horas, las solicitudes de HH de ticket y
+los formularios.
+
 ## Aprobador designado: solo horas sin proyecto de un colaborador
 
 - Con proyecto (`Proyecto`/`Prospecto`): sin aprobador designado — se aprueba

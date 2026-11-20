@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './presentation/auth.controller';
+import { ClientPortalLoginAccessService } from './infrastructure/client-portal-login-access.service';
 
 import { LoginUseCase } from './application/use-cases/login.use-case';
 import { GoogleLoginUseCase } from './application/use-cases/google-login.use-case';
@@ -32,6 +33,7 @@ import { AssignmentLeaderProfileResolver } from '../users/infrastructure/service
   controllers: [AuthController],
   providers: [
     SessionIssuerService,
+    ClientPortalLoginAccessService,
     LoginUseCase,
     GoogleLoginUseCase,
     RefreshSessionUseCase,

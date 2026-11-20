@@ -44,6 +44,31 @@
   min-width: 200px;
 }
 
+.planCellGroup {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
+.planHistoryLink {
+  color: var(--kora-navy);
+  font-size: var(--kora-text-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.planHistoryLink:hover {
+  color: var(--kora-primary);
+}
+
+.planHistoryLink:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .planCell {
   display: inline-flex;
   align-items: center;
@@ -51,10 +76,6 @@
   color: var(--kora-navy);
   font-weight: var(--kora-weight-semibold);
   text-decoration: none;
-}
-
-.planCell:hover {
-  text-decoration: underline;
 }
 
 .alertIcons {
@@ -73,6 +94,37 @@
 
 .overdueIcon {
   color: var(--kora-danger);
+}
+
+.alertTooltipWrapper {
+  position: relative;
+  display: inline-flex;
+  cursor: help;
+}
+
+/* Abre hacia la izquierda: el ícono está en la última columna y un tooltip centrado se cortaría contra el borde de la tabla. */
+.alertTooltip {
+  position: absolute;
+  bottom: calc(100% + var(--kora-space-2));
+  right: 0;
+  z-index: var(--kora-z-dropdown);
+  display: none;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+  width: max-content;
+  max-width: 240px;
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: var(--kora-navy);
+  color: var(--kora-surface);
+  font-size: var(--kora-text-xs);
+  box-shadow: var(--kora-shadow-lg);
+  white-space: normal;
+}
+
+.alertTooltipWrapper:hover .alertTooltip,
+.alertTooltipWrapper:focus-visible .alertTooltip {
+  display: flex;
 }
 
 @media (max-width: 900px) {

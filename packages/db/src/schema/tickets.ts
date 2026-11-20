@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { boolean, date, integer, jsonb, numeric, pgEnum, pgSequence, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, date, integer, jsonb, numeric, pgEnum, pgSequence, pgTable, smallint, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { primaryId, softDelete, timestamps } from './columns';
 import { clients } from './clients';
 import { users } from './identity';
@@ -265,12 +265,19 @@ export const supportPlanProjects = pgTable(
 );
 
 /**
- * Una factura de soporte es un hecho consumado, no un estado. Que exista una
- * fila para `(plan_id, period_key)` YA significa "facturado" ese período; que
- * no exista significa "por facturar" — el monto de un período sin facturar se
- * calcula en vivo (`SupportBillingCalculator`), nunca se guarda de antemano.
+ * Una factura de soporte es un hecho consumado, no un estado. Que exista
+ * alguna fila para `(plan_id, period_key)` YA significa "facturado" ese
+ * período; que no exista ninguna significa "por facturar" — el monto de un
+ * período sin facturar se calcula en vivo (`SupportBillingCalculator`), nunca
+ * se guarda de antemano.
  *
- * El estado de PAGO tampoco se guarda, se deriva al leer: `paid_at` no nulo →
+ * El total de un período se puede dividir en varias facturas: una fila por
+ * factura, numeradas con `position` (0, 1, …), registradas todas juntas. Su
+ * suma es lo facturado del período, aunque difiera del monto calculado. El índice único
+ * `(plan_id, period_key, position)` impide que dos registros simultáneos del
+ * mismo período queden ambos guardados (los dos intentan la `position` 0).
+ *
+ * El estado de PAGO tampoco se guarda (y es de cada factura), se deriva al leer: `paid_at` no nulo →
  * pagado; si no, `due_at` vencido → atrasado; si no, pendiente. Un estado
  * guardado se desincroniza del tiempo real; uno derivado, por definición, no.
  *
@@ -291,14 +298,17 @@ export const supportInvoices = pgTable(
     amountUf: numeric('amount_uf', { precision: 12, scale: 2 }).notNull(),
     /** Moneda congelada junto con el monto — la del contrato al momento de facturar, sin default: se pasa siempre explícita. */
     currency: supportPlanCurrencyEnum('currency').notNull(),
+    /** Horas del período facturado. Si el total se dividió en varias facturas, van solo en la primera (`position` 0) — así sumar `hours_billed` sigue dando lo facturado, sin repartir horas entre documentos. */
     hoursBilled: numeric('hours_billed', { precision: 10, scale: 2 }),
+    /** Orden de la factura dentro del período (0 = la primera) — ver el comentario de la tabla. */
+    position: smallint('position').notNull().default(0),
 
     folio: varchar('folio', { length: 50 }).notNull(),
     invoicedAt: date('invoiced_at', { mode: 'date' }).notNull(),
     /** Vencimiento del pago — hoy se calcula como `invoicedAt + 30 días` al crear la factura, pero se guarda (no se recalcula) para poder hacerlo configurable sin migrar datos. */
     dueAt: date('due_at', { mode: 'date' }),
     paidAt: date('paid_at', { mode: 'date' }),
-    /** Solo el nombre del archivo adjunto — la v2 todavía no tiene almacenamiento de archivos (tarea transversal pendiente en docs/PLAN-MODULOS.md). */
+    /** Nombre visible; el contenido, cuando existe, vive en support_invoice_attachments. */
     attachmentName: text('attachment_name'),
 
     /** Trazabilidad hacia el período mensual facturado — solo `plan_type='monthly'`. */
@@ -306,5 +316,11 @@ export const supportInvoices = pgTable(
 
     ...timestamps,
   },
-  (table) => [uniqueIndex('support_invoices_plan_period_key').on(table.planId, table.periodKey)],
+  (table) => [uniqueIndex('support_invoices_plan_period_position_key').on(table.planId, table.periodKey, table.position)],
 );
+
+export const supportInvoiceAttachments = pgTable('support_invoice_attachments', {
+  invoiceId: uuid('invoice_id').primaryKey().references(() => supportInvoices.id, { onDelete: 'cascade' }),
+  /** PDF en base64, separado de las consultas del libro de facturas. */
+  content: text('content').notNull(),
+});

@@ -1,4 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { AttachSupportInvoiceDocumentUseCase } from '../application/use-cases/attach-support-invoice-document.use-case';
+import { readSupportInvoiceAttachmentUpload } from './support-invoice-upload';
+import { GetSupportInvoiceAttachmentUseCase } from '../application/use-cases/get-support-invoice-attachment.use-case';
 import {
   listSupportBillingRowsQuerySchema,
   markSupportInvoicePaidSchema,
@@ -16,6 +20,7 @@ import { ZodValidationPipe } from '../../../shared/presentation/pipes/zod-valida
 import { unwrapOrThrow } from '../../../shared/presentation/unwrap-result';
 import type { ActorContext } from '../../../shared/application/use-case';
 import { MarkSupportInvoicePaidUseCase } from '../application/use-cases/mark-support-invoice-paid.use-case';
+import { VoidSupportInvoiceUseCase } from '../application/use-cases/void-support-invoice.use-case';
 import { GetSupportBillingOverviewUseCase } from '../application/use-cases/get-support-billing-overview.use-case';
 import { ListBillingLedgerEntriesUseCase } from '../application/use-cases/list-billing-ledger-entries.use-case';
 import { ListSupportBillingRowsUseCase } from '../application/use-cases/list-support-billing-rows.use-case';
@@ -24,9 +29,12 @@ import { ListSupportBillingRowsUseCase } from '../application/use-cases/list-sup
 export class SupportInvoicesController {
   constructor(
     private readonly markPaid: MarkSupportInvoicePaidUseCase,
+    private readonly voidInvoice: VoidSupportInvoiceUseCase,
     private readonly getOverview: GetSupportBillingOverviewUseCase,
     private readonly getLedger: ListBillingLedgerEntriesUseCase,
     private readonly listRows: ListSupportBillingRowsUseCase,
+    private readonly getAttachment: GetSupportInvoiceAttachmentUseCase,
+    private readonly attachDocument: AttachSupportInvoiceDocumentUseCase,
   ) {}
 
   /** Panel de Facturación de Soporte — declarado ANTES de `:id/paid` no aplica aquí (`overview` no colisiona con `:id`), pero se mantiene el mismo orden defensivo que en `SupportPlansController`. */
@@ -64,6 +72,40 @@ export class SupportInvoicesController {
     @CurrentUser() actor: RequestUser,
   ): Promise<void> {
     unwrapOrThrow(await this.markPaid.execute({ invoiceId: id, data: body, actor: toActorContext(actor) }));
+  }
+
+  @Get(':id/attachment')
+  @RequirePermissions('billing:read')
+  async attachment(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<StreamableFile> {
+    const file = unwrapOrThrow(await this.getAttachment.execute({ invoiceId: id }));
+    reply.header('Cache-Control', 'private, no-store');
+    return new StreamableFile(Buffer.from(file.content, 'base64'), {
+      type: 'application/pdf',
+      disposition: `inline; filename="factura.pdf"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+    });
+  }
+
+  @Post(':id/attachment')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async uploadAttachment(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Req() request: FastifyRequest,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<void> {
+    const attachment = await readSupportInvoiceAttachmentUpload(request);
+    unwrapOrThrow(await this.attachDocument.execute({ invoiceId: id, attachment, actor: toActorContext(actor) }));
+  }
+
+  /** "Anular factura" — solo pendientes de pago; el período vuelve a quedar por facturar. */
+  @Delete(':id')
+  @RequirePermissions('billing:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async void(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<void> {
+    unwrapOrThrow(await this.voidInvoice.execute({ invoiceId: id, actor: toActorContext(actor) }));
   }
 }
 

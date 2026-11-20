@@ -9,6 +9,7 @@ const EMPTY_PAGE: Page<TicketListItem> = buildPage([], 0, { page: 1, pageSize: 2
 
 class FakeTicketRepository implements Partial<TicketRepository> {
   search = vi.fn().mockResolvedValue(EMPTY_PAGE);
+  sumHours = vi.fn().mockResolvedValue(0);
 }
 
 class FakeProjectReader implements Partial<TicketProjectReader> {

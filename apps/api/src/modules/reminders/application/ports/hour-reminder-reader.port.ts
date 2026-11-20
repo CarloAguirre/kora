@@ -43,6 +43,9 @@ export interface HourReminderReader {
   /** Usuarios activos cuyo rol tiene `hours:register` (mismo criterio que Disponibilidad). */
   findHoursRegistrants(): Promise<HoursRegistrant[]>;
 
+  /** Fecha (`YYYY-MM-DD`) del primer registro de horas de una persona — mismo cálculo que `firstEntryDate`. */
+  findFirstEntryDate(userId: string): Promise<string | null>;
+
   /**
    * Horas registradas por usuario y día entre `from` y `to` (incluidos), en
    * cualquier estado — una hora rechazada igual es tiempo registrado, como en
@@ -66,6 +69,9 @@ export interface HourReminderReader {
 
   /** Solo los activos y no borrados: a una cuenta deshabilitada no se le escribe. */
   findActiveUsersByIds(userIds: readonly string[]): Promise<ReminderRecipient[]>;
+
+  /** Usuarios activos de rol admin o PMO (`roles.is_admin_tier`) — destinatarios del resumen de soportes por cobrar. */
+  findActiveAdminTierUsers(): Promise<ReminderRecipient[]>;
 }
 
 export const HOUR_REMINDER_READER = Symbol('HourReminderReader');

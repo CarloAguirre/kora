@@ -83,6 +83,6 @@ import { DrizzleTicketHistoryRepository } from '../tickets/infrastructure/persis
     { provide: TICKET_HH_REQUEST_SYNC, useClass: TicketsModuleTicketHhRequestSync },
   ],
   /** `HOUR_ENTRY_TEAM_READER` se exporta además para que el panel (M7) resuelva el alcance de `hours:read_team` sin encadenar casos de uso. */
-  exports: [HOUR_ENTRY_REPOSITORY, HOUR_ENTRY_TEAM_READER],
+  exports: [HOUR_ENTRY_REPOSITORY, HOUR_ENTRY_TEAM_READER, HOUR_ENTRY_PROJECT_READER],
 })
 export class HoursModule {}

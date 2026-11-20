@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { BadRequestException } from '@nestjs/common';
+import { validateCommercial } from '../infrastructure/persistence/drizzle-quotation.repository';
 import { assertQuotationReadyForClient, assertAiProposalReadyToAccept, assertDirectClientApprovalAcknowledged } from './quotation-commercial-eligibility';
 import type { QuotationVersion } from '@kora/contracts';
 const base = () => ({
@@ -16,6 +18,20 @@ const base = () => ({
   },
 }) as unknown as QuotationVersion;
 describe('Transiciones comerciales', () => {
+  it('convierte validaciones comerciales a HTTP 400, nunca a error inesperado', () => {
+    const incomplete = {
+      ...base(), draft: { ...base().draft, paymentPlan: [] },
+    };
+    let response: unknown;
+    try {
+      validateCommercial(() => assertQuotationReadyForClient(incomplete));
+    } catch (error) {
+      response = error;
+    }
+    expect(response).toBeInstanceOf(BadRequestException);
+    expect((response as BadRequestException).getStatus()).toBe(400);
+    expect((response as BadRequestException).message).toContain('plan de pagos');
+  });
   it('requiere confirmación adicional al aprobar un borrador sin marcarlo enviado', () => {
     expect(() => assertDirectClientApprovalAcknowledged('draft', undefined))
       .toThrow(/confirmar explícitamente/);

@@ -27,6 +27,12 @@
   flex-wrap: wrap;
 }
 
+.invoiceActions {
+  display: inline-flex;
+  gap: var(--kora-space-2);
+  flex-wrap: wrap;
+}
+
 .titleRow {
   display: flex;
   align-items: center;
@@ -151,6 +157,8 @@
 .folioCell {
   display: flex;
   flex-direction: column;
+  /* Sin esto el badge ("Próximo", "Facturado") se estira a todo el ancho de la celda. */
+  align-items: flex-start;
   gap: 2px;
 }
 
@@ -171,4 +179,24 @@
   flex-direction: column;
   gap: var(--kora-space-4);
   width: 100%;
+}
+
+/* Título de "Tickets del proyecto" con el selector de mes a la derecha. */
+.ticketsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kora-space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--kora-space-3);
+}
+
+.ticketsHead .sectionTitle {
+  margin: 0;
+}
+
+.ticketsMonth {
+  display: flex;
+  align-items: center;
+  gap: var(--kora-space-2);
 }

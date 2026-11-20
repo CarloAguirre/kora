@@ -4,9 +4,10 @@ import { PaperclipIcon } from '../icons/Icons';
 
 export interface FileFieldProps {
   label?: string;
-  /** Nombre del archivo ya elegido — Kora todavía no sube el archivo en sí, solo guarda este nombre. */
+  /** Nombre del archivo ya elegido. */
   fileName: string | null;
-  onChange: (fileName: string | null) => void;
+  /** Entrega el nombre y, para quien necesite leer el contenido (p. ej. el logo del cliente), el archivo en sí. */
+  onChange: (fileName: string | null, file: File | null) => void;
   accept?: string;
   disabled?: boolean;
 }
@@ -48,7 +49,12 @@ export function FileField({ label, fileName, onChange, accept, disabled }: FileF
           type="file"
           accept={accept}
           disabled={disabled}
-          onChange={(e) => onChange(e.target.files?.[0]?.name ?? null)}
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null;
+            onChange(file?.name ?? null, file);
+            // Sin esto, volver a elegir el mismo archivo no dispara `change`.
+            e.target.value = '';
+          }}
         />
       </div>
     </div>

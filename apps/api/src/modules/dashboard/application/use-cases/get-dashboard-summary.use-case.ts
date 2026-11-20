@@ -119,6 +119,11 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       moduleId: row.moduleId,
       moduleName: row.moduleName,
       title: row.name,
+      segmentName: row.segmentName ?? null,
+      estimatedHours: row.estimatedHours ?? null,
+      approvedHours: row.approvedHours ?? 0,
+      pendingHours: row.pendingHours ?? 0,
+      reviewerName: row.reviewerName ?? null,
       date: toIsoDate(row.date),
       status: row.status,
       completedAt: row.completedAt?.toISOString() ?? null,
@@ -194,11 +199,20 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     const todayIso = toIsoDate(now);
     const friday = new Date(monday);
     friday.setUTCDate(friday.getUTCDate() + WORKING_DAYS_PER_WEEK - 1);
+    const nextMonday = new Date(monday);
+    nextMonday.setUTCDate(nextMonday.getUTCDate() + 7);
+    const nextMonthStart = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
 
     // Desde el lunes o el día 1, lo que sea antes: una sola consulta alimenta semana y mes.
+    // Hasta el viernes (o hoy, si es fin de semana): el registro semanal permite cargar días
+    // futuros y `WeeklyEntryForm` los cuenta, así que el KPI semanal también debe hacerlo.
     const [rangePage, rejectedPage, weekHolidays] = await Promise.all([
       this.hourEntries.search(
-        { userId: actor.userId, dateFrom: monday < monthStart ? monday : monthStart, dateTo: now },
+        {
+          userId: actor.userId,
+          dateFrom: monday < monthStart ? monday : monthStart,
+          dateTo: now > friday ? now : friday,
+        },
         { page: 1, pageSize: 500 },
         { field: 'date', direction: 'asc' },
       ),
@@ -212,15 +226,17 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     // Un feriado no se puede registrar (ver `DailyEntryForm`/`WeeklyEntryForm`), así que no cuenta como horas faltantes.
     const weekHolidayCount = new Set(weekHolidays.map(toIsoDate)).size;
 
-    const weekItems = rangePage.items.filter((entry) => entry.date >= monday);
+    // Las rechazadas no cuentan como registradas (igual que `WeeklyEntryForm`); se avisan aparte en `rejectedCount`.
+    const validItems = rangePage.items.filter((entry) => entry.status !== 'rejected');
+    const weekItems = validItems.filter((entry) => entry.date >= monday);
     const weekHours = weekItems.reduce((sum, entry) => sum + entry.hours, 0);
     const todayHours = weekItems
       .filter((entry) => toIsoDate(entry.date) === todayIso)
       .reduce((sum, entry) => sum + entry.hours, 0);
 
-    const overtimeHours = (from: Date) =>
-      rangePage.items
-        .filter((entry) => entry.isOvertime && entry.status !== 'rejected' && entry.date >= from)
+    const overtimeHours = (from: Date, to: Date) =>
+      validItems
+        .filter((entry) => entry.isOvertime && entry.date >= from && entry.date < to)
         .reduce((sum, entry) => sum + entry.hours, 0);
 
     return {
@@ -229,8 +245,8 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       weekTargetHours: (WORKING_DAYS_PER_WEEK - weekHolidayCount) * DAILY_TARGET_HOURS,
       weekHolidayCount,
       rejectedCount: rejectedPage.total,
-      weekOvertimeHours: overtimeHours(monday),
-      monthOvertimeHours: overtimeHours(monthStart),
+      weekOvertimeHours: overtimeHours(monday, nextMonday),
+      monthOvertimeHours: overtimeHours(monthStart, nextMonthStart),
     };
   }
 
@@ -253,7 +269,7 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     }
 
     const page = await this.hourEntries.search(
-      { status: 'pending', visibleToUserIds, leaderScopeUserId },
+      { status: 'pending', visibleToUserIds, leaderScopeUserId, ...(leaderScopeUserId ? { excludeUserId: actor.userId } : {}) },
       { page: 1, pageSize: PENDING_APPROVALS_PAGE_SIZE },
       { field: 'date', direction: 'desc' },
     );
@@ -489,7 +505,8 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
     );
 
     const rows = page.items.map((p) => {
-      const contractedHours = isMonthlySupportPlan(p.supportPlanDescription) ? p.soldHours : p.supportHours || p.soldHours;
+      // El tipo sale del contrato (`supportPlanType`), no del texto libre "Plan de soporte".
+      const contractedHours = p.supportPlanType === 'monthly' ? p.soldHours : p.supportHours || p.soldHours;
       const usedHours = p.usedHours;
       return {
         client: p.clientName ?? 'Sin cliente',
@@ -618,19 +635,6 @@ function parseIsoDate(iso: string): Date {
 
 function priorityRank(priority: string | null): number {
   return priority ? (PRIORITY_RANK[priority] ?? 0) : 0;
-}
-
-const DIACRITICS_PATTERN = new RegExp('[\\u0300-\\u036f]', 'g');
-
-function isMonthlySupportPlan(description: string | null): boolean {
-  return (
-    (description ?? '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(DIACRITICS_PATTERN, '')
-      .replace(/\s+/g, '')
-      .trim() === 'mensual'
-  );
 }
 
 function developmentStageLabel(p: ProjectListItem): string {

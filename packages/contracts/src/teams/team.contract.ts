@@ -9,7 +9,7 @@ import {
 } from '../common/primitives';
 import { userStatusSchema } from '../users/user.contract';
 import { roleCodeSchema } from '../users/roles';
-import { projectStatusSchema } from '../projects/project.contract';
+import { projectSalesStageSchema, projectStatusSchema } from '../projects/project.contract';
 
 /**
  * Contrato de equipos.
@@ -208,6 +208,8 @@ export const teamReportProjectSchema = z.object({
   slug: z.string(),
   client: z.object({ id: uuidSchema, companyName: z.string() }).nullable(),
   status: projectStatusSchema,
+  /** `null` en soporte. A un prospecto no se le piden fechas ni HH asignadas. */
+  salesStage: projectSalesStageSchema.nullable(),
   startDate: z.string().nullable(),
   endDate: z.string().nullable(),
   /** `project_teams.assigned_hours` — HH asignadas al equipo. Las carga el Líder PM del proyecto. */

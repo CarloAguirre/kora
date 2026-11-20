@@ -13,9 +13,12 @@ import { ClientProjectPreviewPage } from '@/modules/clients/pages/ClientProjectP
 import { ClientSupportContractPreviewPage } from '@/modules/clients/pages/ClientSupportContractPreviewPage';
 import { TeamsListPage } from '@/modules/teams/pages/TeamsListPage';
 import { TeamDetailPage } from '@/modules/teams/pages/TeamDetailPage';
+import { TeamLeaderPreviewPage } from '@/modules/teams/pages/TeamLeaderPreviewPage';
 import { TeamMemberDetailPage } from '@/modules/teams/pages/TeamMemberDetailPage';
 import { ProjectsListPage } from '@/modules/projects/pages/ProjectsListPage';
 import { ProjectDetailPage } from '@/modules/projects/pages/ProjectDetailPage';
+import { MyProjectsPage } from '@/modules/projects/pages/MyProjectsPage';
+import { MyProjectDetailPage } from '@/modules/projects/pages/MyProjectDetailPage';
 import { ProjectTeamDetailPage } from '@/modules/projects/pages/ProjectTeamDetailPage';
 import { NewProjectPage } from '@/modules/projects/pages/NewProjectPage';
 import { SupportPlanDetailPage } from '@/modules/projects/pages/SupportPlanDetailPage';
@@ -27,9 +30,9 @@ import { TicketHistoryPage } from '@/modules/tickets/pages/TicketHistoryPage';
 import { ForecastPage } from '@/modules/forecast/pages/ForecastPage';
 import { BillingLedgerPage } from '@/modules/billing/pages/BillingLedgerPage';
 import { DashboardPage } from '@/modules/dashboard/pages/DashboardPage';
-import { ClientPortalPage } from '@/modules/client-portal/pages/ClientPortalPage';
-import { ClientProjectDetailPage } from '@/modules/client-portal/pages/ClientProjectDetailPage';
-import { ClientSupportContractDetailPage } from '@/modules/client-portal/pages/ClientSupportContractDetailPage';
+import { ExternalClientPortalPage } from '@/modules/client-portal/pages/ExternalClientPortalPage';
+import { ExternalClientProjectDetailPage } from '@/modules/client-portal/pages/ExternalClientProjectDetailPage';
+import { ExternalClientSupportDetailPage } from '@/modules/client-portal/pages/ExternalClientSupportDetailPage';
 import { ForbiddenPage } from '@/app/pages/ForbiddenPage';
 import { NotFoundPage } from '@/app/pages/NotFoundPage';
 import { CalculatorPage } from '@/modules/estimation/pages/CalculatorPage';
@@ -102,7 +105,17 @@ export const router = createBrowserRouter([
     children: [
       { path: '/equipos', element: <TeamsListPage /> },
       { path: '/equipos/:teamId', element: <TeamDetailPage /> },
+      { path: '/equipos/:teamId/vista-lider', element: <TeamLeaderPreviewPage /> },
       { path: '/equipos/:teamId/miembros/:memberId', element: <TeamMemberDetailPage /> },
+    ],
+  },
+
+  // ── Mis proyectos del colaborador — consulta propia, sin edición ───────
+  {
+    element: <ProtectedRoute permission="hours:read_own" />,
+    children: [
+      { path: '/mis-proyectos', element: <MyProjectsPage /> },
+      { path: '/mis-proyectos/:projectId', element: <MyProjectDetailPage /> },
     ],
   },
 
@@ -188,15 +201,15 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute permission="projects:read_own_client" />,
     children: [
-      { path: '/portal/proyectos', element: <ClientPortalPage /> },
-      { path: '/portal/proyectos/:projectId', element: <ClientProjectDetailPage /> },
+      { path: '/portal/proyectos', element: <ExternalClientPortalPage /> },
+      { path: '/portal/proyectos/:projectId', element: <ExternalClientProjectDetailPage /> },
     ],
   },
   {
     element: <ProtectedRoute permission="tickets:read_own_client" />,
     children: [
-      { path: '/portal/soporte', element: <ClientPortalPage /> },
-      { path: '/portal/soporte/:contractId', element: <ClientSupportContractDetailPage /> },
+      { path: '/portal/soporte', element: <ExternalClientPortalPage /> },
+      { path: '/portal/soporte/:contractId', element: <ExternalClientSupportDetailPage /> },
     ],
   },
 

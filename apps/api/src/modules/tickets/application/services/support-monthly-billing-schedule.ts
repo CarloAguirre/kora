@@ -1,0 +1,104 @@
+import type { SupportMonthlyBillingPeriod } from '@kora/contracts';
+import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
+import type { SupportInvoiceRecord } from '../../domain/repositories/support-invoice.repository';
+import { invoicesOfMonthlyPeriod, monthlyPeriodCharge, unbilledMonthlyOverageHours } from './support-billing-calculator';
+import { sumInvoiceAmounts, toInvoiceRefs } from './support-invoice-payment-status';
+
+/** Tope de meses futuros proyectados — un contrato sin fecha de término solo proyecta el próximo. */
+const MAX_PROJECTED_PERIODS = 120;
+
+/**
+ * Calendario de facturación de un contrato `monthly` para su ficha: cada mes
+ * del contrato con sus facturas (si las tiene), o con lo que corresponde cobrar.
+ *
+ * - Los períodos que ya existen (`support_monthly_periods`) salen tal cual:
+ *   el vigente y los cerrados sin factura quedan `to_invoice` — se pueden
+ *   registrar desde la ficha, así un mes que se cerró sin facturar no queda
+ *   perdido.
+ * - Los meses futuros todavía no existen (el reconciliador los abre recién
+ *   cuando empiezan), así que se proyectan con la misma regla que
+ *   `SupportMonthlyPeriodReconciler` — un mes desde el fin del anterior,
+ *   mientras el contrato siga vigente — y quedan `upcoming`, con su cuota
+ *   estimada.
+ *
+ * Pura: recibe los períodos ya reconciliados.
+ */
+export function buildMonthlyBillingSchedule(
+  plan: SupportPlanRecord,
+  periods: readonly SupportMonthlyPeriodRecord[],
+  invoices: readonly SupportInvoiceRecord[],
+  now: Date,
+): SupportMonthlyBillingPeriod[] {
+  if (plan.planType !== 'monthly') return [];
+
+  const today = toUtcDate(now);
+  const chain = periods.filter((period) => period.status !== 'cancelled').sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+  const schedule = chain.map((period): SupportMonthlyBillingPeriod => {
+    const periodKey = periodKeyOf(period.startDate);
+    const periodInvoices = invoicesOfMonthlyPeriod(invoices, period);
+    const hasStarted = period.startDate.getTime() <= today.getTime();
+    return {
+      monthlyPeriodId: period.id,
+      periodKey,
+      startDate: toIsoDate(period.startDate),
+      endDate: toIsoDate(period.endDate),
+      isCurrent: period.status === 'active' && hasStarted && today.getTime() < period.endDate.getTime(),
+      status: periodInvoices.length > 0 ? 'invoiced' : hasStarted ? 'to_invoice' : 'upcoming',
+      // Mismo monto que cobraría `SupportBillingCalculator`: cuota + excedente aún no facturado.
+      amountUf:
+        periodInvoices.length > 0
+          ? sumInvoiceAmounts(periodInvoices)
+          : round2(period.contractedHours * plan.planValueUf + unbilledMonthlyOverageHours(plan, chain, invoices, period) * plan.extraHourValueUf),
+      invoices: toInvoiceRefs(periodInvoices, now),
+    };
+  });
+
+  if (plan.status !== 'active') return schedule;
+
+  const inForce = (from: Date) => plan.endDate === null || from.getTime() < plan.endDate.getTime();
+  const maxProjected = plan.endDate === null ? 1 : MAX_PROJECTED_PERIODS;
+  let nextStart = chain.at(-1)?.endDate ?? plan.startDate;
+
+  for (let projected = 0; projected < maxProjected && inForce(nextStart); projected += 1) {
+    const endDate = addMonthsUtc(nextStart, 1);
+    const periodKey = periodKeyOf(nextStart);
+    const periodInvoices = invoices.filter((item) => item.periodKey === periodKey);
+    schedule.push({
+      monthlyPeriodId: null,
+      periodKey,
+      startDate: toIsoDate(nextStart),
+      endDate: toIsoDate(endDate),
+      isCurrent: false,
+      status: periodInvoices.length > 0 ? 'invoiced' : 'upcoming',
+      amountUf:
+        periodInvoices.length > 0
+          ? sumInvoiceAmounts(periodInvoices)
+          : monthlyPeriodCharge(plan, { contractedHours: plan.contractedHours, reusedBalanceHours: 0, consumedHoursPeriod: 0 }).amountUf,
+      invoices: toInvoiceRefs(periodInvoices, now),
+    });
+    nextStart = endDate;
+  }
+
+  return schedule;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function toUtcDate(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function addMonthsUtc(date: Date, months: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()));
+}
+
+function periodKeyOf(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function toIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}

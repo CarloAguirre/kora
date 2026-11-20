@@ -30,6 +30,9 @@ class FakeProjectReader implements TicketProjectReader {
   async findLinkableByClient(): Promise<{ id: string; name: string }[]> {
     return [];
   }
+  async isParticipant(): Promise<boolean> {
+    return false;
+  }
 }
 
 const NO_PERMISSIONS: Permission[] = [];

@@ -46,8 +46,12 @@ export class InventoryEstimationDriveUseCase {
       );
     }
 
-    if (!this.drive.isConfigured()) {
+    if (rootFolderId === 'kora-poc-fallback' && !this.drive.isConfigured()) {
       return fallbackInventory(rootFolderId, input.driveFolderUrl);
+    }
+    if (!this.drive.isConfigured()) {
+      return emptyInventory('not_configured', rootFolderId, input.driveFolderUrl,
+        'No hay cuenta de servicio configurada para inventariar esta carpeta. Usa la autorización Google del asistente.');
     }
 
     try {

@@ -76,8 +76,13 @@
   flex-direction: column;
   gap: var(--kora-space-3);
   width: 100%;
-  max-width: 360px;
+  max-width: 420px;
   margin-top: var(--kora-space-1);
+}
+
+/* Al dividir el total, la tabla de facturas usa todo el ancho de la tarjeta. */
+.inlineFormWide {
+  max-width: 860px;
 }
 
 .inlineFormActions {

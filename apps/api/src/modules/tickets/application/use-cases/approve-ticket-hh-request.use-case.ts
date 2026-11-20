@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
 import type { RoleCode } from '@kora/contracts';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../../../hours/application/ports/hour-entry-project-reader.port';
 import type { HourEntry } from '../../../hours/domain/entities/hour-entry.entity';
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { CannotReviewOwnTicketHhRequestError, CannotReviewTicketHhRequestError, TicketHhRequestNotFoundError } from '../../domain/errors/ticket-hh-request.errors';
@@ -37,6 +38,7 @@ export class ApproveTicketHhRequestUseCase implements UseCase<ApproveTicketHhReq
     @Inject(TICKET_HISTORY_REPOSITORY) private readonly history: TicketHistoryRepository,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
+    @Inject(HOUR_ENTRY_PROJECT_READER) private readonly hourProjects: HourEntryProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(ID_GENERATOR) private readonly ids: IdGenerator,
@@ -90,6 +92,9 @@ export class ApproveTicketHhRequestUseCase implements UseCase<ApproveTicketHhReq
 
     ticket.recordUsedHours(ticket.usedHours + request.hours, now);
     await this.tickets.save(ticket);
+
+    const usedHours = await this.hourEntries.sumApprovedHoursForProject(request.projectId);
+    await this.hourProjects.recalculateUsedHours(request.projectId, usedHours);
 
     await this.history.append({
       ticketId,

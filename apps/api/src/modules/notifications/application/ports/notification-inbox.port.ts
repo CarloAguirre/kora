@@ -6,6 +6,8 @@ export interface CreateNotificationInput {
   readonly title: string;
   readonly data: Notification['data'];
   readonly createdByUserId: string | null;
+  /** Evita duplicar un correo inmediato ya enviado en el respaldo de 48h. */
+  readonly emailedAt?: Date | null;
 }
 
 /** Notificación sin abrir que ya cumplió el plazo para el correo de respaldo. */

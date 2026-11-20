@@ -48,27 +48,29 @@ export function rowId(row: BitacoraRow): string {
   if (row.kind === 'entrega') return row.delivery.id;
   return row.observation.id;
 }
-/** Una entrega no trae fecha de creación — se ordena por su fecha estimada, a medianoche, para intercalarse razonablemente con las demás filas (que sí traen hora). */
+/** La fila de una entrega se fecha cuando se agregó al proyecto (`createdAt`), no en su fecha agendada — esa va en el detalle. */
 export function rowSortKey(row: BitacoraRow): string {
   if (row.kind === 'evento') return row.entry.createdAt;
-  if (row.kind === 'entrega') return `${row.delivery.estimatedDate}T00:00:00.000Z`;
+  if (row.kind === 'entrega') return row.delivery.createdAt;
   return row.observation.createdAt;
 }
 export function rowFilterDate(row: BitacoraRow): string {
   if (row.kind === 'evento') return row.entry.date;
-  if (row.kind === 'entrega') return row.delivery.estimatedDate;
+  if (row.kind === 'entrega') return localIsoDate(row.delivery.createdAt);
   return row.observation.date;
 }
 export function rowDateDisplay(row: BitacoraRow): string {
-  if (row.kind === 'entrega') {
-    return new Date(`${row.delivery.estimatedDate}T00:00:00`).toLocaleDateString('es-CL', { dateStyle: 'short' });
-  }
   // El registro de activación muestra la fecha del Hito 0 (corregible), no cuándo se registró.
-  if (row.kind !== 'evento' && row.observation.isHito0) {
+  if (row.kind !== 'evento' && row.kind !== 'entrega' && row.observation.isHito0) {
     return new Date(`${row.observation.date}T00:00:00`).toLocaleDateString('es-CL', { dateStyle: 'short' });
   }
-  const iso = row.kind === 'evento' ? row.entry.createdAt : row.observation.createdAt;
-  return new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+  return new Date(rowSortKey(row)).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+/** `YYYY-MM-DD` del instante en la zona horaria local — para comparar contra los filtros Desde/Hasta. */
+function localIsoDate(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 const OBS_TYPE_TONE: Record<ProjectObservationType, BadgeTone> = {

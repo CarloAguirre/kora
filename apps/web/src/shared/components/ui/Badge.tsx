@@ -16,7 +16,7 @@ import styles from './Badge.module.css';
  * de la modernización del diseño de tablas.
  */
 
-export type BadgeTone = 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'brand';
+export type BadgeTone = 'success' | 'danger' | 'warning' | 'info' | 'neutral' | 'brand' | 'unassigned';
 
 export interface BadgeProps {
   tone?: BadgeTone;

@@ -194,7 +194,7 @@ export class ForecastSourceSyncService {
         ? await this.store.findActiveTeamMemberId(task.assigneeUserId, task.teamId, context)
         : null;
 
-    if (teamMemberId) {
+    if (teamMemberId && !task.cancelledAt) {
       const coveredRanges = coveredRangesFor(module.segments, teamMemberId);
       weeks = planTaskForecast({
         teamMemberId,

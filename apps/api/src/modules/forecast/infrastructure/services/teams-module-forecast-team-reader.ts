@@ -3,6 +3,7 @@ import { isForecastAssignableRole } from '@kora/contracts';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../../teams/domain/repositories/team.repository';
 import {
   TEAM_MEMBER_REPOSITORY,
+  type TeamMemberRecord,
   type TeamMemberRepository,
 } from '../../../teams/domain/repositories/team-member.repository';
 import type {
@@ -10,6 +11,10 @@ import type {
   ForecastTeamReader,
   ForecastTeamReference,
 } from '../../application/ports/forecast-team-reader.port';
+
+/** Sin líderes, PMO ni admin, y sin usuarios deshabilitados o bloqueados. */
+const isForecastMember = (member: TeamMemberRecord) =>
+  member.userStatus === 'active' && isForecastAssignableRole(member.userRole);
 
 @Injectable()
 export class TeamsModuleForecastTeamReader implements ForecastTeamReader {
@@ -45,7 +50,7 @@ export class TeamsModuleForecastTeamReader implements ForecastTeamReader {
     const [team, members] = await Promise.all([this.teams.findById(teamId), this.members.listActiveForTeam(teamId)]);
     const teamName = team?.name ?? '';
 
-    return members.filter((member) => isForecastAssignableRole(member.userRole)).map((member) => ({
+    return members.filter(isForecastMember).map((member) => ({
       id: member.id,
       teamId: member.teamId,
       teamName,
@@ -57,7 +62,7 @@ export class TeamsModuleForecastTeamReader implements ForecastTeamReader {
 
   async listAllActiveMembers(): Promise<ForecastTeamMemberReference[]> {
     const members = await this.members.listAllActive();
-    return members.filter((member) => isForecastAssignableRole(member.userRole)).map((member) => ({
+    return members.filter(isForecastMember).map((member) => ({
       id: member.id,
       teamId: member.teamId,
       teamName: member.teamName,

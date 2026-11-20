@@ -3,6 +3,7 @@ import type { CreateTicketHhRequestInput, RejectTicketHhRequestInput } from '@ko
 import { ticketHhRequestKeys, ticketHhRequestsApi } from './ticket-hh-requests.api';
 import { ticketKeys } from './tickets.api';
 import { hourKeys } from '@/modules/hours/api/hours.api';
+import { notificationKeys } from '@/modules/notifications/api/notifications.api';
 
 export function useTicketHhRequestsList(ticketId: string | null) {
   return useQuery({
@@ -21,6 +22,10 @@ function useInvalidateTicketHhRequests(ticketId: string) {
     void queryClient.invalidateQueries({ queryKey: ticketKeys.all });
     // Aprobar genera un `hour_entries` — refresca Horas y el tope diario del formulario.
     void queryClient.invalidateQueries({ queryKey: hourKeys.all });
+    // La solicitud pendiente cuenta en la campanita del líder y en el Dashboard:
+    // sin esto la alerta seguía ahí hasta el siguiente sondeo.
+    void queryClient.invalidateQueries({ queryKey: notificationKeys.reminders });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   };
 }
 

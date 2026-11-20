@@ -89,9 +89,13 @@ export function QuotationVersionComparison({
           ) : (
             <>
               <div className={styles.stats}>
-                <div><span>HH de origen</span><strong>{hour(first.totalHours)}</strong></div>
-                <div><span>HH de destino</span><strong>{hour(second.totalHours)}</strong></div>
-                <div><span>Diferencia HH</span><strong>{delta(second.totalHours - first.totalHours)}</strong></div>
+                <div><span>HH cobrables origen</span><strong>{hour(first.totalHours +
+                  (first.draft.phaseZeroBillableHours ?? 0))}</strong></div>
+                <div><span>HH cobrables destino</span><strong>{hour(second.totalHours +
+                  (second.draft.phaseZeroBillableHours ?? 0))}</strong></div>
+                <div><span>Diferencia HH cobrables</span><strong>{delta(
+                  second.totalHours + (second.draft.phaseZeroBillableHours ?? 0) -
+                  first.totalHours - (first.draft.phaseZeroBillableHours ?? 0))}</strong></div>
               </div>
               {monetaryComparable ? (
                 <p className={styles.note}>
@@ -101,7 +105,7 @@ export function QuotationVersionComparison({
               ) : (
                 <p className={styles.note}>
                   Los importes no son comparables: monedas diferentes o tarifa aún no definida.
-                  Las HH sí se pueden comparar.
+                  Las HH cobrables sí se pueden comparar; las HH por equipo representan solo trabajo futuro.
                 </p>
               )}
               {first.draft.mode !== second.draft.mode && (

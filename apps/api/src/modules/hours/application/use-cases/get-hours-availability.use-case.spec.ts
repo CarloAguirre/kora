@@ -31,6 +31,8 @@ function buildEntry(overrides: Partial<HourEntryListItem>): HourEntryListItem {
     projectName: null,
     moduleId: null,
     moduleName: null,
+    segmentId: null,
+    segmentName: null,
     teamId: null,
     teamName: null,
     assignment: 'Proyecto',

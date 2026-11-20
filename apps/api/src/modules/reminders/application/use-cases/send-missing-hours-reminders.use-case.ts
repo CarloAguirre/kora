@@ -7,12 +7,8 @@ import {
 } from '../../../../shared/application/ports/notification.port';
 import type { UseCase } from '../../../../shared/application/use-case';
 import { addDays, weekdaysBetween } from '../chile-calendar';
+import { EXPECTED_HOURS_PER_DAY, findMissingHourDays, MISSING_HOURS_LOOKBACK_DAYS } from '../missing-hour-days';
 import { HOUR_REMINDER_READER, type HourReminderReader } from '../ports/hour-reminder-reader.port';
-
-/** Jornada esperada por día hábil. */
-export const EXPECTED_HOURS_PER_DAY = 8;
-/** Cuántos días hacia atrás (contando hoy) se revisan: un hueco viejo deja de recordarse al salir de la ventana. */
-export const MISSING_HOURS_LOOKBACK_DAYS = 30;
 
 export interface SendMissingHoursRemindersCommand {
   /** "Hoy" en Chile (`YYYY-MM-DD`): último día que se revisa. */
@@ -99,10 +95,11 @@ export class SendMissingHoursRemindersUseCase
         continue;
       }
 
-      const days = workingDays
-        .filter((day) => day >= user.firstEntryDate!)
-        .map((date) => ({ date, hoursRegistered: hoursByUserDay.get(`${user.userId}:${date}`) ?? 0 }))
-        .filter((day) => day.hoursRegistered < EXPECTED_HOURS_PER_DAY);
+      const days = findMissingHourDays(
+        workingDays,
+        user.firstEntryDate,
+        (date) => hoursByUserDay.get(`${user.userId}:${date}`) ?? 0,
+      );
 
       if (days.length === 0) {
         skippedComplete += 1;

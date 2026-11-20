@@ -9,7 +9,9 @@ import type {
   ProjectInvoiceBlockedNotification,
   ProjectPaymentMilestoneReadyNotification,
   ProjectReactivatedFromHoldNotification,
+  SupportBillingDigestNotification,
   TeamReportDataRequestEmail,
+  ProjectTaskStatusEmail,
   UserInvitation,
 } from '../../application/ports/notification.port';
 
@@ -109,6 +111,25 @@ export class LogNotificationSender implements NotificationSender {
       to: notification.recipientEmail,
       items: notification.items.length,
       hours: notification.items.reduce((sum, item) => sum + item.hours, 0),
+    });
+  }
+
+  async sendSupportBillingDigest(notification: SupportBillingDigestNotification): Promise<void> {
+    this.logger.info('[notificación] Resumen de soportes por cobrar', {
+      to: notification.recipientEmail,
+      month: notification.monthLabel,
+      items: notification.items.map((item) => `${item.clientName} · ${item.contractType} · ${item.usedHours}h`),
+    });
+  }
+
+  async sendProjectTaskStatus(notification: ProjectTaskStatusEmail): Promise<void> {
+    this.logger.info('[notificación] Revisión de tarea en proyecto', {
+      to: notification.recipientEmail,
+      kind: notification.kind,
+      projectName: notification.projectName,
+      taskName: notification.taskName,
+      reason: notification.reason,
+      link: `${this.webAppUrl}/proyectos/${encodeURIComponent(notification.projectSlug)}`,
     });
   }
 

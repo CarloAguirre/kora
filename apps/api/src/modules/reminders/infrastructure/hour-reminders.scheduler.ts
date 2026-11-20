@@ -9,11 +9,13 @@ import {
 } from '../application/ports/scheduled-job-run-registry.port';
 import { SendMissingHoursRemindersUseCase } from '../application/use-cases/send-missing-hours-reminders.use-case';
 import { SendPendingHoursDigestUseCase } from '../application/use-cases/send-pending-hours-digest.use-case';
+import { SendSupportBillingDigestUseCase } from '../application/use-cases/send-support-billing-digest.use-case';
 
 const CHILE_TIMEZONE = 'America/Santiago';
 
 /**
- * Disparadores de los recordatorios de horas, dentro de la propia API.
+ * Disparadores de los recordatorios de horas (y del resumen de soportes por
+ * cobrar de fin de mes), dentro de la propia API.
  *
  * En la v1 eran dos workflows de GitHub Actions con la hora en UTC fija (había
  * que corregir el cron a mano en cada cambio de horario); aquí la zona es
@@ -29,6 +31,7 @@ export class HourRemindersScheduler {
     private readonly config: AppConfigService,
     private readonly missingHours: SendMissingHoursRemindersUseCase,
     private readonly pendingDigest: SendPendingHoursDigestUseCase,
+    private readonly supportBillingDigest: SendSupportBillingDigestUseCase,
     @Inject(SCHEDULED_JOB_RUN_REGISTRY) private readonly runs: ScheduledJobRunRegistry,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(LOGGER) private readonly logger: Logger,
@@ -47,6 +50,16 @@ export class HourRemindersScheduler {
     return this.runOncePerDay('pending_hours_digest', async (today) => {
       const result = await this.pendingDigest.execute({ today, dryRun: false });
       return { ...result.unwrap() };
+    });
+  }
+
+  /** Corre los últimos días del mes; el caso de uso solo envía el último día hábil (los feriados no los sabe el cron). */
+  @Cron('0 9 22-31 * *', { name: 'support-billing-digest', timeZone: CHILE_TIMEZONE })
+  sendSupportBillingDigest(): Promise<void> {
+    return this.runOncePerDay('support_billing_digest', async (today) => {
+      const result = await this.supportBillingDigest.execute({ today, dryRun: false, onlyOnLastBusinessDay: true });
+      const { preview: _preview, ...summary } = result.unwrap();
+      return summary;
     });
   }
 

@@ -3,6 +3,7 @@ import {
   calculateModuleProgress,
   calculateProjectProgress,
   progressToday,
+  type ProgressDeliveryInput,
   type ProgressModuleInput,
   type ProgressProjectInput,
   type ProgressTaskInput,
@@ -19,10 +20,17 @@ const task = (overrides: Partial<ProgressTaskInput> = {}): ProgressTaskInput => 
   ...overrides,
 });
 
+const delivery = (overrides: Partial<ProgressDeliveryInput> = {}): ProgressDeliveryInput => ({
+  status: 'planned',
+  estimatedDate: d('2026-10-15'),
+  ...overrides,
+});
+
 const module = (overrides: Partial<ProgressModuleInput> = {}): ProgressModuleInput => ({
   estimatedHours: null,
   currentStage: 'development',
   tasks: [],
+  deliveries: [],
   ...overrides,
 });
 
@@ -173,6 +181,62 @@ describe('calculateProjectProgress', () => {
     expect(progress.planCoverage).toBe(100);
   });
 
+  it('una fase con HH y solo entregas no reparte sus HH: aprobar la única entrega no la marca al 100%', () => {
+    const progress = calculateProjectProgress(
+      project({
+        modules: [module({ estimatedHours: 1260, deliveries: [delivery({ status: 'approved' })] })],
+      }),
+      TODAY,
+    );
+
+    // La entrega pesa 1 sobre una base de 1260 HH: la fase todavía no tiene plan de tareas.
+    expect(progress.actual).toBe(0);
+    expect(progress.expected).toBe(0);
+    expect(progress.planCoverage).toBe(0);
+    expect(progress.estimatedByCount).toBe(false);
+  });
+
+  it('una fase sin HH y solo con entregas se calcula por cantidad de entregas', () => {
+    const progress = calculateProjectProgress(
+      project({
+        modules: [
+          module({
+            deliveries: [
+              delivery({ status: 'approved', estimatedDate: d('2026-09-20') }),
+              delivery({ status: 'delivered', estimatedDate: d('2026-09-25') }),
+              delivery({ estimatedDate: d('2026-10-20') }),
+              delivery({ estimatedDate: d('2026-11-01') }),
+            ],
+          }),
+        ],
+      }),
+      TODAY,
+    );
+
+    // Una aprobada (la terminada sin aprobar no suma), dos con fecha ya pasada.
+    expect(progress.actual).toBe(25);
+    expect(progress.expected).toBe(50);
+    expect(progress.estimatedByCount).toBe(true);
+  });
+
+  it('con tareas con HH, cada entrega pesa el promedio de las tareas de su fase', () => {
+    const progress = calculateProjectProgress(
+      project({
+        modules: [
+          module({
+            tasks: [task({ estimatedHours: 10, status: 'done' }), task({ estimatedHours: 30 })],
+            deliveries: [delivery({ status: 'approved' })],
+          }),
+        ],
+      }),
+      TODAY,
+    );
+
+    // Pesos 10 + 30 + 20 (entrega) = 60; aprobadas 10 + 20 = 30.
+    expect(progress.actual).toBe(50);
+    expect(progress.estimatedByCount).toBe(false);
+  });
+
   it('el consumo de HH se calcula aparte y puede superar 100%', () => {
     const progress = calculateProjectProgress(project({ soldHours: 100, usedHours: 120 }), TODAY);
 
@@ -185,6 +249,89 @@ describe('calculateProjectProgress', () => {
 
     expect(calculateProjectProgress(project({ status: 'on_hold', stopsClock: true, modules }), TODAY).delay).toBeNull();
     expect(calculateProjectProgress(project({ status: 'on_hold', stopsClock: false, modules }), TODAY).delay).toBe(100);
+  });
+});
+
+describe('project.progress por bloques operativos — misma regla que Avance del equipo', () => {
+  const segment = (id: string, teamId: string, estimatedHours: number | null,
+    closedAt: Date | null = null) => ({
+    id, teamId, estimatedHours, startDate: d('2026-09-07'),
+    endDate: d('2026-09-30'), closedAt,
+  });
+  it('suma HH por bloque, no el conteo de entregas ni tareas de una fase', () => {
+    const progress = calculateProjectProgress(project({
+      soldHours: 607, usedHours: 273.5,
+      modules: [
+        module({
+          estimatedHours: 464,
+          segments: [segment('pmo', 'pmo', 24, d('2026-09-20')),
+            segment('qa', 'qa', 80), segment('rpa', 'rpa', 360, d('2026-09-20'))],
+          deliveries: [delivery({ segmentId: 'qa', status: 'approved' })],
+          tasks: [task({ teamId: 'pmo', segmentId: 'pmo', estimatedHours: 24 }),
+            task({ teamId: 'qa', segmentId: 'qa', estimatedHours: 80 }),
+            task({ teamId: 'rpa', segmentId: 'rpa', estimatedHours: 360 })],
+        }),
+        module({
+          estimatedHours: 143,
+          segments: [segment('pmo2', 'pmo', 12),
+            segment('qa2', 'qa', 30), segment('rpa2', 'rpa', 101)],
+          tasks: [task({ teamId: 'pmo', segmentId: 'pmo2', estimatedHours: 12 }),
+            task({ teamId: 'qa', segmentId: 'qa2', estimatedHours: 30 }),
+            task({ teamId: 'rpa', segmentId: 'rpa2', estimatedHours: 101 })],
+        }),
+      ],
+    }), TODAY);
+    expect(progress.actual).toBe(76);
+    expect(progress.expected).toBe(100);
+    expect(progress.delay).toBe(24);
+    expect(progress.consumption).toBe(45);
+    expect(progress.planCoverage).toBe(100);
+    expect(progress.estimatedByCount).toBe(false);
+  });
+
+  it('sin HH operativas no confunde las HH comerciales de fase con avance real', () => {
+    const progress = calculateProjectProgress(project({
+      soldHours: 120,
+      modules: [module({ estimatedHours: 120, segments: [] })],
+    }), TODAY);
+    expect(progress.actual).toBeNull();
+    expect(progress.expected).toBeNull();
+    expect(progress.planCoverage).toBe(0);
+  });
+
+  it('hace cierre real con entrega aprobada y no con entregada sin aprobar', () => {
+    const modules = [module({
+      estimatedHours: 80, segments: [segment('s', 'qa', 80)],
+      tasks: [task({ teamId: 'qa', segmentId: 's', status: 'todo', estimatedHours: 80 })],
+      deliveries: [delivery({ segmentId: 's', status: 'delivered' })],
+    })];
+    expect(calculateProjectProgress(project({ modules }), TODAY).actual).toBe(0);
+    const approved = modules.map((m) => ({
+      ...m, deliveries: [delivery({ segmentId: 's', status: 'approved' })],
+    }));
+    expect(calculateProjectProgress(project({ modules: approved }), TODAY).actual).toBe(100);
+  });
+
+  it('usa la fracción temporal del bloque en vez de fecha límite de la tarea', () => {
+    const progress = calculateProjectProgress(project({ modules: [module({
+      estimatedHours: 100,
+      segments: [{ id: 's', teamId: 'desarrollo', estimatedHours: 100,
+        startDate: d('2026-09-27'), endDate: d('2026-10-06') }],
+      tasks: [task({ teamId: 'desarrollo', segmentId: 's', estimatedHours: 100,
+        date: d('2026-12-10') })],
+    })] }), TODAY);
+    expect(progress.actual).toBe(0);
+    expect(progress.expected).toBe(50);
+  });
+
+  it('no duplica tareas históricas entre bloques del mismo equipo', () => {
+    const progress = calculateProjectProgress(project({ modules: [module({
+      estimatedHours: 200,
+      segments: [segment('s1', 'qa', 100), segment('s2', 'qa', 100)],
+      tasks: [task({ teamId: 'qa', estimatedHours: 100, status: 'done',
+        description: null, segmentId: null })],
+    })] }), TODAY);
+    expect(progress.actual).toBe(0);
   });
 });
 

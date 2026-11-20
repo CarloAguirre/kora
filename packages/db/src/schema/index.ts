@@ -18,3 +18,4 @@ export * from './forecast';
 export * from './jobs';
 export * from './notifications';
 export * from './quotations';
+export * from './client-portal';

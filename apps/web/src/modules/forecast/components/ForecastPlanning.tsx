@@ -59,7 +59,8 @@ function OriginIcon({ item }: { item: ForecastCapacityItem }) {
 
 function ProjectChips({ member }: { member: ForecastCapacityMember }) {
   const over = loadTone(member) === 'over';
-  const unassigned = freeHours(member);
+  // Redondeado a un decimal: la resta de horas arrastra ruido de punto flotante (0,28999…).
+  const unassigned = Math.round(freeHours(member) * 10) / 10;
 
   return (
     <div className={styles.chips}>
@@ -85,7 +86,7 @@ function ProjectChips({ member }: { member: ForecastCapacityMember }) {
           Entrega {formatWeekday(delivery.date)}
         </span>
       ))}
-      {unassigned > 0 && <span className={[styles.chip, styles.chipUnassigned].join(' ')}>Sin asignación: {unassigned}hh</span>}
+      {unassigned > 0 && <span className={[styles.chip, styles.chipUnassigned].join(' ')}>Sin asignación: {formatHours(unassigned)}hh</span>}
     </div>
   );
 }
@@ -159,14 +160,14 @@ export function ForecastKpis({ members }: { members: readonly ForecastCapacityMe
         icon={<TriangleAlertIcon size={14} />}
         label="Sin asignación"
         value={kpis.underAssigned}
-        sub={`${kpis.freeHours} hrs. sin asignar en el período`}
+        sub={`${formatHours(kpis.freeHours)} hrs. sin asignar en el período`}
       />
       <KpiCard
         size="lg"
         tone="success"
         label="Disponibilidad"
         value={`${kpis.availability}%`}
-        sub={`De ${kpis.totalCapacity} hrs. de capacidad total`}
+        sub={`De ${formatHours(kpis.totalCapacity)} hrs. de capacidad total`}
       />
     </div>
   );
@@ -241,7 +242,7 @@ export function ForecastPlanningSection({
       <h3 className={styles.sectionTitle}>Capacidad y Planificación</h3>
 
       <div className={styles.banner}>
-        Disponibilidad global del equipo durante el período: <strong>{totalFreeHours} horas libres</strong>
+        Disponibilidad global del equipo durante el período: <strong>{formatHours(totalFreeHours)} horas libres</strong>
       </div>
 
       <div className={styles.searchRow}>

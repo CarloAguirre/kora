@@ -65,6 +65,11 @@
   color: var(--kora-navy);
 }
 
+.date {
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
 .muted {
   color: var(--kora-text-disabled);
 }

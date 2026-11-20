@@ -63,7 +63,7 @@ describe('buildQuotationTransferPreview', () => {
     const result = buildQuotationTransferPreview(version(), before, at);
     expect(quotationTransferPreviewSchema.parse(result)).toEqual(result);
     expect(result.transferEnabled).toBe(false);
-    expect(result.difference.soldHoursDelta).toBe(25);
+    expect(result.difference.soldHoursDelta).toBe(125);
     expect(result.difference.remainingComparedToUsed).toBe(65);
     expect(result.teams).toEqual([
       { teamId: TEAM_DEV, name: 'Desarrollo', currentAssignedHours: 80,
@@ -108,6 +108,18 @@ describe('buildQuotationTransferPreview', () => {
   it('no compara montos de distinta moneda', () => {
     const result = buildQuotationTransferPreview(version(), project({ contractCurrency: 'CLP' }), at);
     expect(result.difference.netAmountDelta).toBeNull();
+  });
+
+  it('previsualiza la venta de Fase 0 separada del calendario', () => {
+    const quoted = version({
+      draft: { ...version().draft, phaseZeroBillableHours: 548.5 },
+    });
+    const result = buildQuotationTransferPreview(quoted, project(), at);
+    expect(result.proposed.totalHours).toBe(125);
+    expect(result.proposed.phaseZeroBillableHours).toBe(548.5);
+    expect(result.proposed.billableHours).toBe(673.5);
+    expect(result.difference.soldHoursDelta).toBe(673.5);
+    expect(result.teams.reduce((sum, row) => sum + row.proposedHours, 0)).toBe(125);
   });
 
   it('calcula horas solo desde fases cuando la versión usa modo phases', () => {

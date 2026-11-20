@@ -9,12 +9,14 @@ interface TabsProps {
   tabs: readonly TabItem[];
   activeId: string;
   onSelect: (id: string) => void;
+  /** Etiqueta accesible para pestañas específicas, sin alterar el aspecto global. */
+  ariaLabel?: string;
 }
 
 /** Pestañas de sección, igual disposición que `KoraTabs.tsx` de la v1. */
-export function Tabs({ tabs, activeId, onSelect }: TabsProps) {
+export function Tabs({ tabs, activeId, onSelect, ariaLabel }: TabsProps) {
   return (
-    <div className={styles.tabs} role="tablist">
+    <div className={styles.tabs} role="tablist" aria-label={ariaLabel}>
       {tabs.map((tab) => (
         <button
           key={tab.id}

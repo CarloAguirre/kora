@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { ProjectPeriod, ProjectStatus, ProjectType } from '@kora/contracts';
+import type { ProjectPeriod, ProjectStatus, ProjectSummary, ProjectType } from '@kora/contracts';
 import styles from './ProjectsSummaryChart.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
@@ -8,6 +8,13 @@ import { useProjectsList } from '../api/projects.queries';
 
 /** Tope de la API por página — el gráfico muestra una sola página con los proyectos que pasan los filtros. */
 const CHART_PAGE_SIZE = 200;
+
+// Respetar las etiquetas originales a -35° y el ancho de 56 px/proyecto.
+// Solo se añade el espacio que realmente necesitan los nombres largos.
+const X_AXIS_MIN_HEIGHT = 70;
+const PROJECT_MIN_WIDTH = 56;
+const LABEL_ANGLE = (35 * Math.PI) / 180;
+const LABEL_FONT_SIZE = 11;
 
 interface ProjectsSummaryChartProps {
   type: ProjectType;
@@ -47,6 +54,9 @@ const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 ];
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
+// Los soportes "A demanda" no tienen tope de horas: lo consumido nunca es desvío.
+const deviationOf = (project: ProjectSummary) =>
+  project.supportPlanType === 'on_demand' ? 0 : Math.max(project.usedHours - project.soldHours, 0);
 
 function getPeriodRange(period: PeriodOption, detail: string) {
   const options = SUB_PERIOD_OPTIONS[period];
@@ -147,10 +157,49 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
         cliente: p.client?.companyName ?? '-',
         vendidas: p.soldHours,
         consumidas: p.usedHours,
-        desviadas: Math.max(p.usedHours - p.soldHours, 0),
+        desviadas: deviationOf(p),
+        onDemand: p.supportPlanType === 'on_demand',
       })),
     [filtered],
   );
+
+  const [axisLayout, setAxisLayout] = useState({ extraHeight: 0, leftPadding: 0 });
+
+  useEffect(() => {
+    // Medir la anchura real del texto con la fuente del gráfico. La lógica
+    // anterior dependía de un selector de ticks SVG que podía devolver vacío,
+    // y entonces dejaba el eje con su altura fija de 70 px.
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const fontFamily = getComputedStyle(document.body).fontFamily;
+    context.font = `${LABEL_FONT_SIZE}px ${fontFamily}`;
+
+    const widths = chartData.map((item) => context.measureText(item.name).width);
+    const longest = Math.max(0, ...widths);
+    const first = widths[0] ?? 0;
+
+    // El nombre inclinado extiende su extremo inferior una distancia
+    // sin(35°) * anchura. El margen de 14 px contempla tickMargin y baseline,
+    // sin alterar la altura útil donde se dibujan las barras.
+    const requiredAxisHeight = Math.max(
+      X_AXIS_MIN_HEIGHT,
+      Math.ceil(14 + longest * Math.sin(LABEL_ANGLE)),
+    );
+    // Los nombres se extienden hacia la izquierda del tick. Solo ajustar
+    // si el primero invade el margen disponible junto al eje Y.
+    const requiredLeftPadding = Math.max(
+      0,
+      Math.ceil(first * Math.cos(LABEL_ANGLE) - 72),
+    );
+
+    setAxisLayout((previous) =>
+      previous.extraHeight === requiredAxisHeight - X_AXIS_MIN_HEIGHT &&
+      previous.leftPadding === requiredLeftPadding
+        ? previous
+        : { extraHeight: requiredAxisHeight - X_AXIS_MIN_HEIGHT, leftPadding: requiredLeftPadding },
+    );
+  }, [chartData]);
 
   const totals = useMemo(
     () =>
@@ -158,7 +207,7 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
         (acc, p) => ({
           vendidas: acc.vendidas + p.soldHours,
           consumidas: acc.consumidas + p.usedHours,
-          desviadas: acc.desviadas + Math.max(p.usedHours - p.soldHours, 0),
+          desviadas: acc.desviadas + deviationOf(p),
         }),
         { vendidas: 0, consumidas: 0, desviadas: 0 },
       ),
@@ -216,16 +265,22 @@ export function ProjectsSummaryChart({ type, clientOptions, showFinalizedToggle 
 
       <div className={styles.body}>
         <div className={styles.chartArea}>
-          {/* Cada proyecto reserva un ancho fijo y el contenedor scrollea
-              horizontalmente — con muchos proyectos, comprimir todo en el
-              ancho visible vuelve las etiquetas ilegibles (mismo ajuste que
-              la v1 aplicó en fix(proyectos): improve chart readability). */}
+          {/* Misma inclinación (-35°) y separación original de las barras;
+              solo cambia el área disponible para leer los nombres completos. */}
           <div className={styles.chartScroll}>
-            <div style={{ minWidth: Math.max(chartData.length * 56, 100) }}>
-              <ResponsiveContainer width="100%" height={280}>
+            <div style={{ minWidth: Math.max(chartData.length * PROJECT_MIN_WIDTH, 100) }}>
+              <ResponsiveContainer width="100%" height={280 + axisLayout.extraHeight}>
                 <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--kora-surface-disabled)" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-35} textAnchor="end" height={70} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11 }}
+                    interval={0}
+                    angle={-35}
+                    textAnchor="end"
+                    height={X_AXIS_MIN_HEIGHT + axisLayout.extraHeight}
+                    padding={{ left: axisLayout.leftPadding }}
+                  />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="vendidas" name="HH Vendidas" fill="var(--kora-navy)" radius={[2, 2, 0, 0]} />
@@ -275,14 +330,21 @@ function Indicator({ label, value, tone }: { label: string; value: number; tone?
 
 function ChartTooltip({ active, payload }: { active?: boolean; payload?: readonly { payload: Record<string, unknown> }[] }) {
   if (!active || !payload?.length) return null;
-  const data = payload[0]?.payload as { fullName: string; cliente: string; vendidas: number; consumidas: number; desviadas: number };
+  const data = payload[0]?.payload as {
+    fullName: string;
+    cliente: string;
+    vendidas: number;
+    consumidas: number;
+    desviadas: number;
+    onDemand: boolean;
+  };
   return (
     <div className={styles.tooltip}>
       <p className={styles.tooltipTitle}>{data.fullName}</p>
       <p>Cliente: {data.cliente}</p>
-      <p>HH Vendidas: {formatHours(data.vendidas)}</p>
+      <p>HH Vendidas: {data.onDemand ? 'No aplica' : formatHours(data.vendidas)}</p>
       <p>HH Consumidas: {formatHours(data.consumidas)}</p>
-      <p className={styles.tooltipDanger}>HH Desviadas: {formatHours(data.desviadas)}</p>
+      <p className={styles.tooltipDanger}>HH Desviadas: {data.onDemand ? 'No aplica' : formatHours(data.desviadas)}</p>
     </div>
   );
 }

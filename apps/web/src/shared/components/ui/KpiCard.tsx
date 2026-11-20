@@ -16,6 +16,8 @@ export interface KpiCardProps {
   className?: string;
   onClick?: () => void;
   active?: boolean;
+  /** Etiqueta accesible opcional para una región de indicadores. */
+  ariaLabel?: string;
 }
 
 /**
@@ -23,7 +25,7 @@ export interface KpiCardProps {
  * CSS local, extraído aquí porque el panel de Facturación de Soporte lo
  * necesita 5 veces y no vale la pena duplicar esa hoja de estilos otra vez.
  */
-export function KpiCard({ label, value, sub, tone = 'default', icon, size = 'md', className, onClick, active }: KpiCardProps) {
+export function KpiCard({ label, value, sub, tone = 'default', icon, size = 'md', className, onClick, active, ariaLabel }: KpiCardProps) {
   const classes = [styles.card, tone === 'danger' ? styles.dangerCard : '', onClick ? styles.clickable : '', active ? styles.active : '', className]
     .filter(Boolean)
     .join(' ');
@@ -31,7 +33,8 @@ export function KpiCard({ label, value, sub, tone = 'default', icon, size = 'md'
   return (
     <Card
       className={classes}
-      {...(onClick ? { onClick, role: 'button', tabIndex: 0 } : {})}
+      {...(onClick ? { onClick, role: 'button', tabIndex: 0 } : ariaLabel ? { role: 'region' } : {})}
+      aria-label={ariaLabel}
     >
       <span className={styles.label}>
         {icon && <span className={[styles.icon, tone !== 'default' ? styles[tone] : ''].filter(Boolean).join(' ')}>{icon}</span>}

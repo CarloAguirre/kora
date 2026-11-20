@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CreateTicketHhRequestUseCase, splitByDailyCap } from './create-ticket-hh-request.use-case';
+import { CreateTicketHhRequestUseCase } from './create-ticket-hh-request.use-case';
 import { Ticket } from '../../domain/entities/ticket.entity';
 import type { TicketHhRequest } from '../../domain/entities/ticket-hh-request.entity';
 import type { TicketRepository } from '../../domain/repositories/ticket.repository';
@@ -8,6 +8,7 @@ import type { TicketHhRequestRepository } from '../../domain/repositories/ticket
 import type { TicketProjectReader } from '../ports/ticket-project-reader.port';
 import type { HourEntry } from '../../../hours/domain/entities/hour-entry.entity';
 import type { HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import type { HourEntryProjectReader } from '../../../hours/application/ports/hour-entry-project-reader.port';
 import { FixedClock, RecordingAuditRecorder, SequentialIdGenerator } from '../../../../test/fakes';
 import type { ActorContext } from '../../../../shared/application/use-case';
 
@@ -44,6 +45,9 @@ class StubHourEntryRepository implements Partial<HourEntryRepository> {
   async save(entry: HourEntry): Promise<void> {
     this.saved.push(entry);
   }
+  async sumApprovedHoursForProject(): Promise<number> {
+    return 0;
+  }
 }
 
 function buildTicket(): Ticket {
@@ -65,6 +69,7 @@ function buildUseCase(options: { regularHours?: number } = {}) {
     requests as unknown as TicketHhRequestRepository,
     new StubTicketProjectReader() as unknown as TicketProjectReader,
     hourEntries as unknown as HourEntryRepository,
+    { recalculateUsedHours: async () => {} } as unknown as HourEntryProjectReader,
     new RecordingAuditRecorder(),
     new FixedClock(NOW),
     new SequentialIdGenerator(),
@@ -74,23 +79,6 @@ function buildUseCase(options: { regularHours?: number } = {}) {
 
 const tranchesOf = (requests: StubTicketHhRequestRepository) =>
   requests.saved.map((request) => ({ hours: request.hours, isOvertime: request.isOvertime }));
-
-describe('splitByDailyCap', () => {
-  it('deja todo como horas normales mientras quepa en la jornada de 8h', () => {
-    expect(splitByDailyCap(4, 3)).toEqual([{ hours: 4, isOvertime: false }]);
-  });
-
-  it('separa el excedente de 8h como horas extra', () => {
-    expect(splitByDailyCap(4, 5)).toEqual([
-      { hours: 3, isOvertime: false },
-      { hours: 1, isOvertime: true },
-    ]);
-  });
-
-  it('marca todo como horas extra si la jornada ya está completa', () => {
-    expect(splitByDailyCap(2.5, 8)).toEqual([{ hours: 2.5, isOvertime: true }]);
-  });
-});
 
 describe('CreateTicketHhRequestUseCase — horas extra automáticas sobre 8h', () => {
   it('acepta una solicitud que por sí sola supera las 8h, separando 8h normales y el resto como horas extra', async () => {
@@ -141,5 +129,40 @@ describe('CreateTicketHhRequestUseCase — horas extra automáticas sobre 8h', (
 
     expect(result.isOk()).toBe(true);
     expect(tranchesOf(requests)).toEqual([{ hours: 4, isOvertime: false }]);
+  });
+});
+
+describe('CreateTicketHhRequestUseCase — líder que no decide en el proyecto', () => {
+  it('aprueba al instante sus horas normales aunque el proyecto lo lidere otra persona (igual que en Horas)', async () => {
+    const { useCase, requests, hourEntries } = buildUseCase();
+
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { date: '2026-09-10', hours: 1 },
+      actor: ACTOR,
+      actorRole: 'leader',
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(requests.saved.map((request) => request.status)).toEqual(['approved']);
+    expect(hourEntries.saved.map((entry) => entry.status)).toEqual(['approved']);
+  });
+
+  it('también aprueba al instante el tramo de horas extra: todas las horas de un líder se autoaprueban', async () => {
+    const { useCase, requests, hourEntries } = buildUseCase({ regularHours: 7 });
+
+    const result = await useCase.execute({
+      ticketId: 'ticket-1',
+      data: { date: '2026-09-10', hours: 3 },
+      actor: ACTOR,
+      actorRole: 'leader',
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(requests.saved.map((request) => [request.hours, request.isOvertime, request.status])).toEqual([
+      [1, false, 'approved'],
+      [2, true, 'approved'],
+    ]);
+    expect(hourEntries.saved.map((entry) => entry.status)).toEqual(['approved', 'approved']);
   });
 });

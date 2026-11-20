@@ -7,6 +7,7 @@ import {
   PROJECT_OBSERVATION_TYPES,
   PROJECT_OBSERVATION_TYPE_LABELS,
   type AddProjectObservationInput,
+  type ProjectObservationType,
   type ProjectModule,
 } from '@kora/contracts';
 import styles from './BitacoraCard.module.css';
@@ -37,6 +38,8 @@ export interface AddBitacoraRecordModalProps {
   modules: readonly ProjectModule[];
   onClose: () => void;
   onSuccess: (message: string) => void;
+  /** Tipo inicial según el contexto; el formulario PMO conserva Hito por defecto. */
+  initialType?: ProjectObservationType;
 }
 
 /**
@@ -45,7 +48,9 @@ export interface AddBitacoraRecordModalProps {
  * (no vive dentro de `BitacoraCard`) porque tanto la tabla completa como
  * `BitacoraMiniCard` (resumen en la pestaña Resumen) lo abren igual.
  */
-export function AddBitacoraRecordModal({ open, projectId, modules, onClose, onSuccess }: AddBitacoraRecordModalProps) {
+export function AddBitacoraRecordModal({
+  open, projectId, modules, onClose, onSuccess, initialType = 'hito',
+}: AddBitacoraRecordModalProps) {
   const addObservation = useAddProjectObservation();
 
   const moduleOptions = modules.map((module, index) => ({ value: module.id, label: `Fase ${index + 1} — ${module.name}` }));
@@ -58,12 +63,12 @@ export function AddBitacoraRecordModal({ open, projectId, modules, onClose, onSu
     formState: { errors, isSubmitting },
   } = useForm<z.input<typeof addProjectObservationSchema>, unknown, AddProjectObservationInput>({
     resolver: zodResolver(addProjectObservationSchema),
-    defaultValues: { type: 'hito', title: '', message: '', date: todayISO(), moduleId: null },
+    defaultValues: { type: initialType, title: '', message: '', date: todayISO(), moduleId: null },
   });
 
   useEffect(() => {
-    if (open) reset({ type: 'hito', title: '', message: '', date: todayISO(), moduleId: null });
-  }, [open, reset]);
+    if (open) reset({ type: initialType, title: '', message: '', date: todayISO(), moduleId: null });
+  }, [open, reset, initialType]);
 
   const onSubmit = handleSubmit(async (values) => {
     try {

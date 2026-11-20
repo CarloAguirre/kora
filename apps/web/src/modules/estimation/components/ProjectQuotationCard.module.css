@@ -8,3 +8,22 @@
 
 /* La versión enviada se distingue con una línea discreta azul, como exige la ficha v5. */
 .sentRow td:first-child{border-left:3px solid #3b82f6}
+
+.statuses{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.closedNotice{margin:0;padding:12px 14px;background:var(--kora-success-soft,#ecfdf3);color:var(--kora-success,#067647);border-radius:9px;font-size:12px;line-height:1.5}
+
+
+/* Resumen comercial de la versión traspasada, alineado con el prototipo v6. */
+.summaryHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.summaryHead p{margin:0;color:var(--kora-text-muted,#667085);font-size:12px}
+.calculatorOnlyBadge{display:inline-flex;align-items:center;background:#f3e8ff;color:#6b21a8;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:600;white-space:nowrap}
+.summaryGrid span{display:flex;flex-direction:column;gap:4px}
+.summaryGrid small{font-size:11px;color:var(--kora-text-muted,#667085)}
+.summaryGrid strong{font-size:14px}
+.costsScroll{overflow-x:auto}
+.costsTable{width:100%;border-collapse:collapse;text-align:left;font-size:12px}
+.costsTable th{background:#f8fafc;font-size:11px;color:var(--kora-text-muted,#667085);font-weight:500;padding:10px;border-bottom:1px solid var(--kora-border,#e6e8ee)}
+.costsTable td{padding:10px;border-bottom:1px solid var(--kora-border,#e6e8ee)}
+.costsTable th:last-child,.costsTable td:last-child{text-align:right}
+.noCosts{font-size:12px;color:var(--kora-text-muted,#667085);text-align:left!important}
+.commercialDetailLink{display:inline-block;margin-top:12px;font-size:12px;font-weight:600}

@@ -226,6 +226,47 @@
   gap: var(--kora-space-3);
 }
 
+/* La nota ocupa su propia fila bajo Fecha/Horas: puede ser larga (hasta 2000 caracteres). */
+.noteField {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kora-space-1);
+}
+
+.noteLabel {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  font-weight: var(--kora-weight-medium);
+  line-height: 16px;
+}
+
+.noteTextarea {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--kora-space-2) var(--kora-space-3);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-base);
+  color: var(--kora-text);
+  background: var(--kora-surface);
+  border: 1px solid var(--kora-blue-200);
+  border-radius: var(--kora-radius-input);
+  resize: vertical;
+  transition: border-color var(--kora-transition);
+}
+
+/* Mismo anillo de foco que `TextField`. */
+.noteTextarea:focus-visible {
+  outline: none;
+  border-color: var(--kora-blue-600);
+  box-shadow: 0 0 0 3px var(--kora-blue-surface);
+}
+
+.noteCounter {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
 .formFooter {
   display: flex;
   align-items: center;

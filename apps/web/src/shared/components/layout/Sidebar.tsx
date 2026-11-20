@@ -9,8 +9,6 @@ import {
   FolderOpenIcon,
   TicketIcon,
   TrendingUpIcon,
-  SettingsIcon,
-  HelpCircleIcon,
   BarChartIcon,
 } from '../icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
@@ -57,27 +55,18 @@ const NAVIGATION: readonly NavigationItem[] = [
     anyOf: ['projects:read', 'projects:read_assigned'],
   },
   {
-    to: '/calculadora',
-    label: 'Calculadora',
-    icon: <BarChartIcon size={20} />,
-    permission: 'projects:manage',
+    to: '/mis-proyectos',
+    label: 'Mis proyectos',
+    icon: <FolderOpenIcon size={20} />,
+    permission: 'hours:read_own',
   },
-  // Portal de cliente: mismas etiquetas "Proyectos"/"Soporte" que el resto del
-  // menú, pero apuntando a las páginas de solo-lectura del propio cliente en
-  // vez de a los listados internos — el permiso `own_client` es exclusivo del
-  // rol `cliente`, así que nunca coinciden para un mismo usuario con las
-  // entradas de arriba/abajo. Ver docs/DECISION-PORTAL-CLIENTE.md.
+  // Portal externo: un solo punto de navegación, "Proyectos".
+  // El permiso own_client es exclusivo del rol cliente.
   {
     to: '/portal/proyectos',
     label: 'Proyectos',
     icon: <FolderOpenIcon size={20} />,
     permission: 'projects:read_own_client',
-  },
-  {
-    to: '/portal/soporte',
-    label: 'Soporte',
-    icon: <HelpCircleIcon size={20} />,
-    permission: 'tickets:read_own_client',
   },
   {
     to: '/equipos',
@@ -114,12 +103,6 @@ const NAVIGATION: readonly NavigationItem[] = [
     icon: <UsersIcon size={20} />,
     permission: 'users:read',
   },
-  {
-    to: '/administracion/importar-datos',
-    label: 'Importar datos',
-    icon: <SettingsIcon size={20} />,
-    permission: 'admin:legacy_import',
-  },
 ];
 
 export interface SidebarProps {
@@ -140,6 +123,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
     // Mismo criterio para `finanzas`: perfil de un único propósito (ver
     // `kora-perfil-finanzas.html`), su menú es solo "Facturación".
     if (item.to === '/dashboard' && (user?.role === 'cliente' || user?.role === 'finanzas')) return false;
+    if (item.to === '/mis-proyectos' && user?.role !== 'collaborator') return false;
     if (item.permission) return can(item.permission);
     if (item.anyOf) return canAny(...item.anyOf);
     return true;

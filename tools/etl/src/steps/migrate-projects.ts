@@ -1,13 +1,17 @@
 import {
+  and,
   clientContacts,
   clients,
   eq,
+  isNull,
+  or,
   projectObservations,
   projectParticipationHistory,
   projectTeamMembers,
   projectTeams,
   projects,
   slugify,
+  sql,
   teamMembers,
   teams,
   users,
@@ -162,13 +166,17 @@ export async function migrateProjects(context: EtlContext): Promise<void> {
       }
     }
 
+    // Prospecto y Cotización solo pueden estar "No iniciado": la v1 los dejaba "Activo" por defecto.
+    const legacyStatus = mapProjectStatus(row.etapa, row.fase_proyecto, row.estado_proyecto);
+    const status = (salesStage === 'prospect' || salesStage === 'quoted') && legacyStatus === 'active' ? 'draft' : legacyStatus;
+
     const values = {
       name: row.nombre_proyecto.trim(),
       clientId,
       primaryContactId,
       type,
       salesStage: type === 'development' ? (salesStage ?? 'approved') : null,
-      status: mapProjectStatus(row.etapa, row.fase_proyecto, row.estado_proyecto),
+      status,
       phase: type === 'development' ? mapProjectPhase(row.fase_proyecto) : null,
       priority: mapPriority(row.prioridad),
       leaderUserId: row.id_lider ? (userIds.get(row.id_lider) ?? null) : null,
@@ -231,6 +239,7 @@ interface LegacyProjectTeam {
   id_proyecto: number;
   id_lider_usuario: number | null;
   horas_asignadas: number | null;
+  num_colaboradores: number | null;
 }
 
 async function migrateProjectTeams(context: EtlContext): Promise<void> {
@@ -257,16 +266,33 @@ async function migrateProjectTeams(context: EtlContext): Promise<void> {
       projectId,
       leaderUserId: row.id_lider_usuario ? (userIds.get(row.id_lider_usuario) ?? null) : null,
       assignedHours: row.horas_asignadas !== null ? String(row.horas_asignadas) : null,
+      // `N° colaboradores` del equipo en la v1. 0/nulo es "sin dato", no un
+      // tope de cero: en ese caso no se toca lo que ya haya (lo completa
+      // `backfillProjectTeamsFromMembers`). Si quedó por debajo de las personas
+      // asignadas, ese mismo paso lo sube al final del pipeline.
+      ...(row.num_colaboradores ? { memberCount: row.num_colaboradores } : {}),
     };
 
+    // Por legacy_id, o si no la fila sin legacy_id que creó
+    // `backfillProjectTeamsFromMembers` para el mismo (proyecto, equipo) —
+    // insertar otra chocaría con `project_teams_project_team_key`.
     const existing = await context.target
       .select({ id: projectTeams.id })
       .from(projectTeams)
-      .where(eq(projectTeams.legacyId, row.id))
+      .where(
+        or(
+          eq(projectTeams.legacyId, row.id),
+          and(isNull(projectTeams.legacyId), eq(projectTeams.projectId, projectId), eq(projectTeams.teamId, teamId)),
+        ),
+      )
+      .orderBy(sql`${projectTeams.legacyId} is null`)
       .limit(1);
 
     if (existing[0]) {
-      await context.target.update(projectTeams).set({ ...values, updatedAt: new Date() }).where(eq(projectTeams.id, existing[0].id));
+      await context.target
+        .update(projectTeams)
+        .set({ legacyId: row.id, ...values, updatedAt: new Date() })
+        .where(eq(projectTeams.id, existing[0].id));
       tracker.updated += 1;
     } else {
       await context.target.insert(projectTeams).values({ legacyId: row.id, ...values });

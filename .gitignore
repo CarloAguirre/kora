@@ -18,3 +18,7 @@ etl-report-*.json
 # servidor, no en el repo.
 /deploy.sh
 /.pnpm-store/
+
+# PDFs de facturas y comprobantes: persistidos fuera del control de versiones.
+/uploads/
+/apps/api/uploads/

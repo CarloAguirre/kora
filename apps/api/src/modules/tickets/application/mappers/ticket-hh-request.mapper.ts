@@ -1,7 +1,7 @@
 import type { TicketHhRequest as TicketHhRequestDto } from '@kora/contracts';
 import type { TicketHhRequestListItem } from '../../domain/repositories/ticket-hh-request.repository';
 
-export function toTicketHhRequestDto(item: TicketHhRequestListItem): TicketHhRequestDto {
+export function toTicketHhRequestDto(item: TicketHhRequestListItem, canReview: boolean): TicketHhRequestDto {
   return {
     id: item.id,
     ticketId: item.ticketId,
@@ -17,5 +17,6 @@ export function toTicketHhRequestDto(item: TicketHhRequestListItem): TicketHhReq
     reviewedAt: item.reviewedAt?.toISOString() ?? null,
     hourEntryId: item.hourEntryId,
     createdAt: item.createdAt.toISOString(),
+    canReview,
   };
 }

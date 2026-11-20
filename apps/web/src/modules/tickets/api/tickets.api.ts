@@ -4,6 +4,7 @@ import type {
   ListTicketLinkableProjectsQuery,
   ListTicketsQuery,
   ListTicketsResponse,
+  TicketDailyHours,
   TicketDetail,
   TicketLinkableClient,
   TicketLinkableProject,
@@ -11,21 +12,32 @@ import type {
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
+function filterParams(query: Partial<ListTicketsQuery>) {
+  return {
+    search: query.search || undefined,
+    clientId: query.clientId,
+    projectId: query.projectId,
+    assigneeUserId: query.assigneeUserId,
+    leaderUserId: query.leaderUserId,
+    status: query.status,
+    priority: query.priority,
+    month: query.month,
+  };
+}
+
 export const ticketsApi = {
   list(query: Partial<ListTicketsQuery>): Promise<ListTicketsResponse> {
     return api.get<ListTicketsResponse>('/tickets', {
       page: query.page,
       pageSize: query.pageSize,
-      search: query.search || undefined,
-      clientId: query.clientId,
-      projectId: query.projectId,
-      assigneeUserId: query.assigneeUserId,
-      leaderUserId: query.leaderUserId,
-      status: query.status,
-      priority: query.priority,
+      ...filterParams(query),
       sortField: query.sortField,
       sortDirection: query.sortDirection,
     });
+  },
+  /** HH aprobadas por ticket + día + persona de TODOS los tickets del filtro (sin paginar) — para el Excel del historial. */
+  dailyHours(query: Partial<ListTicketsQuery>): Promise<TicketDailyHours[]> {
+    return api.get<TicketDailyHours[]>('/tickets/daily-hours', filterParams(query));
   },
   detail(ticketId: string): Promise<TicketDetail> {
     return api.get<TicketDetail>(`/tickets/${ticketId}`);

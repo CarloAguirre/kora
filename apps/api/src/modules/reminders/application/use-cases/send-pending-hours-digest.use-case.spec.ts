@@ -43,11 +43,13 @@ function setup(input: {
 }) {
   const reader: HourReminderReader = {
     findHoursRegistrants: async () => [],
+    findFirstEntryDate: async () => null,
     sumDailyHours: async () => [],
     findHolidays: async (from, to) => (input.holidays ?? []).filter((day) => day >= from && day <= to),
     findPendingHourEntries: async () => input.pending,
     findTeamLeaderIdsForMember: async (memberId) => input.teamLeaders?.[memberId] ?? [],
     findActiveUsersByIds: async (ids) => ids.filter((id) => (input.activeUsers ?? ids).includes(id)).map(user),
+    findActiveAdminTierUsers: async () => [],
   };
   const projects = {
     findApproverCandidatesForMember: async (projectId: string, memberId: string | null) =>

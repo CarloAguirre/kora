@@ -29,6 +29,8 @@ export interface PaymentTriggerFieldsProps {
   compact?: boolean;
   /** Sin el texto de ayuda bajo el hito — para formularios en una fila, donde descuadra la altura. */
   hideHelper?: boolean;
+  /** Referencia a módulo comercial: informa el vínculo sin agregar otra celda al grid. */
+  linkedCommercialModule?: boolean;
 }
 
 /**
@@ -43,6 +45,7 @@ export function PaymentTriggerFields({
   disabled,
   compact,
   hideHelper,
+  linkedCommercialModule = false,
 }: PaymentTriggerFieldsProps) {
   return (
     <>
@@ -60,6 +63,7 @@ export function PaymentTriggerFields({
           {...(compact ? { 'aria-label': 'Fase' } : { label: 'Fase' })}
           options={PHASE_OPTIONS}
           placeholder="Selecciona la fase"
+          title={linkedCommercialModule ? 'Vinculado a módulo comercial. Selecciona una fase para reemplazar este vínculo.' : undefined}
           value={triggerPhase}
           disabled={disabled}
           onChange={(e) => onChange({ triggerPhase: e.target.value as ProjectPhase })}

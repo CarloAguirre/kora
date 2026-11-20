@@ -1,0 +1,55 @@
+/* Reutiliza los modales nativos Kora. Solo estiliza la revisión de tareas
+   y la confirmación explícita de cancelación al cerrar un bloque. */
+.content { display: grid; gap: 14px; min-width: 0; }
+.subtitle { margin: 0; font-size: 12px; line-height: 1.5; color: var(--kora-text-muted); }
+.warningNote {
+  padding: 10px 12px; border-radius: 9px;
+  background: #fff3c4; color: #98550c;
+  font-size: 12px; line-height: 1.5;
+}
+.fields { display: grid; gap: 14px; min-width: 0; }
+.field { display: grid; gap: 6px; font-size: 12px; color: var(--kora-text-muted); }
+.field input {
+  width: 100%; min-height: 41px; padding: 9px 12px;
+  border: 1px solid var(--kora-blue-200); border-radius: 8px;
+  color: var(--kora-navy); background: var(--kora-surface);
+}
+.field input[type="date"] { max-width: 330px; }
+.field input:focus-visible { outline: 2px solid var(--kora-blue-600); }
+.tableScroll { max-width: 100%; overflow-x: auto; }
+.taskTable { min-width: 560px; width: 100%; border-collapse: collapse; font-size: 11px; }
+.taskTable th {
+  background: var(--kora-surface-muted); color: var(--kora-text-muted);
+  font-weight: 550; text-align: left; white-space: nowrap;
+  padding: 10px 8px;
+}
+.taskTable td {
+  border-top: 1px solid var(--kora-border-subtle);
+  color: var(--kora-navy); padding: 10px 8px; vertical-align: middle;
+  line-height: 1.4; overflow-wrap: anywhere;
+}
+.taskTable td:nth-child(1) { min-width: 125px; }
+.taskTable td:nth-child(3) { min-width: 125px; }
+.taskTable td:last-child button { white-space: nowrap; }
+.warningFooter {
+  display: flex; align-items: center; justify-content: space-between;
+  flex: 1; gap: 10px; flex-wrap: wrap;
+}
+.forceLink {
+  border: 0; background: transparent; padding: 3px 0;
+  color: var(--kora-danger); text-decoration: underline; font-size: 12px;
+  text-align: left; cursor: pointer;
+}
+.forceLink:disabled { opacity: .5; cursor: not-allowed; }
+.cancelNote {
+  display: grid; gap: 4px;
+  background: #fff6f4; border: 1px solid #ffc2b9;
+  border-radius: 9px; padding: 12px 13px;
+  color: #9b2725; font-size: 12px; line-height: 1.4;
+}
+.cancelNote strong { font-size: 13px; }
+.error { font-size: 12px; color: var(--kora-danger); margin: 0; }
+@media (max-width: 580px) {
+  .warningFooter { justify-content: flex-start; }
+  .warningFooter > button { flex: 1 1 100%; text-align: center; }
+}

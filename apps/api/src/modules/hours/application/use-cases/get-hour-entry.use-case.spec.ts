@@ -48,10 +48,13 @@ class FakeEntryRepository implements HourEntryRepository {
   sumRegularHoursForUserAndDate(): Promise<number> {
     throw new Error('not implemented');
   }
+  summarize(): Promise<{ entries: number; hours: number }> {
+    throw new Error('not implemented');
+  }
   sumOvertimeHoursByUserForProjects(): Promise<never[]> {
     throw new Error('not implemented');
   }
-  sumOvertimeHoursByProjectAndUser(): Promise<never[]> {
+  sumOvertimeHoursByDayProjectAndUser(): Promise<never[]> {
     throw new Error('not implemented');
   }
 }
@@ -75,6 +78,18 @@ class FakeProjectReader implements HourEntryProjectReader {
   }
   async findModuleById(): Promise<null> {
     return null;
+  }
+  // El caso probado solo lee/autoriza HH: no configura bloques operativos.
+  // Implementar el puerto completo mantiene los dobles compatibles con 0054.
+  async findSegmentsForModule(): Promise<[]> {
+    return [];
+  }
+  async hasProjectPhases(): Promise<boolean> { return false; }
+  async hasAttributableWorkBlocks(): Promise<boolean> {
+    return false;
+  }
+  async isUserOnSegmentTeam(): Promise<boolean> {
+    return false;
   }
   async recalculateUsedHours(): Promise<void> {}
   async isProjectApprover(): Promise<boolean> {

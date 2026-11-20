@@ -27,7 +27,7 @@ export function quotationCommercialBlockers(
       percentage.toLocaleString('es-CL', { maximumFractionDigits: 2 }) + '% de 100%.');
   }
   if (version.origin === 'ai' && version.aiReviewStatus !== 'accepted') {
-    result.push('Acepta la propuesta IA en el bloque violeta de la parte superior.');
+    result.push('Acepta la propuesta IA desde el ciclo comercial de la calculadora.');
   }
   if (version.origin === 'ai' && version.draft.aiPoc?.edt &&
       version.draft.analysisProjectionStatus === 'modified') {

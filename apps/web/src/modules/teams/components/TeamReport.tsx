@@ -1,6 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { TeamReportProject, TeamReportResponse } from '@kora/contracts';
+import {
+  PROJECT_SALES_STAGES,
+  PROJECT_SALES_STAGE_LABELS,
+  type ProjectSalesStage,
+  type TeamReportProject,
+  type TeamReportResponse,
+} from '@kora/contracts';
 import styles from './TeamReport.module.css';
 import { Card } from '@/shared/components/ui/Card';
 import { Select } from '@/shared/components/ui/Select';
@@ -11,6 +17,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { SearchIcon, TriangleAlertIcon } from '@/shared/components/icons/Icons';
 import type { SortState } from '@/shared/components/ui/DataTable';
 import { compareSortValues, nextSortState, type SortValue } from '@/shared/lib/sort';
+import { ApiRequestError } from '@/shared/lib/api-client';
 import { projectTeamPath } from '@/app/router/paths';
 import { useTeamReport, useUpdateTeamReportComment } from '../api/teams.queries';
 import { RequestReportDataDialog } from './RequestReportDataDialog';
@@ -85,6 +92,7 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
   const [includePending, setIncludePending] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ParticipationStatus | 'all'>('all');
   const [alertFilter, setAlertFilter] = useState<AlertFilter>('');
+  const [salesStageFilter, setSalesStageFilter] = useState<ProjectSalesStage | ''>('');
   const [search, setSearch] = useState('');
   // `null` = el orden del servidor (cliente, proyecto) — el del período "Acumulado".
   const [sort, setSort] = useState<SortState<SortField> | null>(null);
@@ -103,6 +111,8 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
       if (statusFilter !== 'all' && row.participation.status !== statusFilter) return false;
       if (alertFilter === 'missing_assigned' && !row.missingAssigned) return false;
       if (alertFilter === 'missing_dates' && !row.missingDates) return false;
+      // En el reporte `salesStage` es `null` solo en soporte: esos proyectos no entran en ningún tipo.
+      if (salesStageFilter && row.project.salesStage !== salesStageFilter) return false;
       if (memberUserId && !((row.hoursByUser.get(memberUserId) ?? 0) > 0)) return false;
       if (query) {
         const haystack = [row.project.client?.companyName, row.project.name, row.project.comment].filter(Boolean).join(' ').toLowerCase();
@@ -113,13 +123,14 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
     if (!sort) return filtered;
     const valueOf = SORT_VALUE[sort.field];
     return [...filtered].sort((a, b) => compareSortValues(valueOf(a), valueOf(b), sort.direction));
-  }, [rows, statusFilter, alertFilter, memberUserId, search, sort]);
+  }, [rows, statusFilter, alertFilter, salesStageFilter, memberUserId, search, sort]);
 
   const pageCount = Math.max(1, Math.ceil(visibleRows.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const pageRows = visibleRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const hasFilters = statusFilter !== 'all' || alertFilter !== '' || memberUserId !== '' || search.trim() !== '';
+  const hasFilters =
+    statusFilter !== 'all' || alertFilter !== '' || salesStageFilter !== '' || memberUserId !== '' || search.trim() !== '';
 
   const resetPage = () => setPage(1);
 
@@ -153,6 +164,7 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
   const clearFilters = () => {
     setStatusFilter('all');
     setAlertFilter('');
+    setSalesStageFilter('');
     setSearch('');
     onMemberChange('');
     resetPage();
@@ -202,6 +214,10 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
           />
         </div>
       </div>
+      <p className={styles.activityHint}>
+        Solo se muestran proyectos con HH cargadas por integrantes del equipo en los últimos 10 días
+        (aprobadas o pendientes). El período seleccionado determina las HH mostradas, no qué proyectos aparecen.
+      </p>
 
       {report && <DataQualityAlert rows={rows} onShow={showAlertRows} onRequest={() => setRequestOpen(true)} />}
       <RequestReportDataDialog open={requestOpen} teamId={team.id} rows={rows} onClose={() => setRequestOpen(false)} />
@@ -269,6 +285,22 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
             />
             <Select
               className={styles.memberSelect}
+              aria-label="Tipo de proyecto"
+              options={[
+                { value: '', label: 'Tipo: todos' },
+                ...PROJECT_SALES_STAGES.map((stage) => ({
+                  value: stage,
+                  label: PROJECT_SALES_STAGE_LABELS[stage],
+                })),
+              ]}
+              value={salesStageFilter}
+              onChange={(event) => {
+                setSalesStageFilter(event.target.value as ProjectSalesStage | '');
+                resetPage();
+              }}
+            />
+            <Select
+              className={styles.memberSelect}
               aria-label="Colaborador"
               options={[
                 { value: '', label: 'Colaborador: todos' },
@@ -292,8 +324,15 @@ export function TeamReport({ team, currentUserId, memberUserId, onMemberChange }
             members={members}
             rows={pageRows}
             allRows={visibleRows}
+            hasRecentProjects={rows.length > 0}
             loading={isLoading}
-            error={error ? 'No se pudo cargar el reporte del equipo.' : null}
+            error={
+              error instanceof ApiRequestError && error.status === 403
+                ? 'Este reporte solo lo ve el líder oficial del equipo. Elige uno de los equipos que lideras.'
+                : error
+                  ? 'No se pudo cargar el reporte del equipo.'
+                  : null
+            }
             sort={sort}
             onSort={toggleSort}
             onClearFilters={clearFilters}
@@ -434,6 +473,7 @@ interface ReportTableProps {
   rows: readonly TeamReportRow[];
   /** Todas las filas filtradas (no solo la página) — base de la fila de totales. */
   allRows: readonly TeamReportRow[];
+  hasRecentProjects: boolean;
   loading: boolean;
   error: string | null;
   sort: SortState<SortField> | null;
@@ -442,7 +482,7 @@ interface ReportTableProps {
   isAccumulated: boolean;
 }
 
-function ReportTable({ team, members, rows, allRows, loading, error, sort, onSort, onClearFilters, isAccumulated }: ReportTableProps) {
+function ReportTable({ team, members, rows, allRows, hasRecentProjects, loading, error, sort, onSort, onClearFilters, isAccumulated }: ReportTableProps) {
   const toast = useToast();
   const updateComment = useUpdateTeamReportComment(team.id);
   const [hovered, setHovered] = useState<{
@@ -556,10 +596,16 @@ function ReportTable({ team, members, rows, allRows, loading, error, sort, onSor
           {!loading && !error && rows.length === 0 && (
             <tr>
               <td colSpan={columnCount} className={styles.stateCell}>
-                No hay proyectos con estos filtros.{' '}
-                <button type="button" className={styles.linkButton} onClick={onClearFilters}>
-                  Limpiar filtros
-                </button>
+                {hasRecentProjects ? (
+                  <>
+                    No hay proyectos con estos filtros.{' '}
+                    <button type="button" className={styles.linkButton} onClick={onClearFilters}>
+                      Limpiar filtros
+                    </button>
+                  </>
+                ) : (
+                  'El equipo no tiene proyectos con HH cargadas en los últimos 10 días.'
+                )}
               </td>
             </tr>
           )}
@@ -591,8 +637,8 @@ function ReportTable({ team, members, rows, allRows, loading, error, sort, onSor
                       </div>
                     </div>
                   </td>
-                  <DateCell iso={project.startDate} project={project} />
-                  <DateCell iso={project.endDate} project={project} />
+                  <DateCell iso={project.startDate} project={project} missing={row.missingDates} />
+                  <DateCell iso={project.endDate} project={project} missing={row.missingDates} />
                   <td className={styles.num}>
                     {row.missingAssigned ? (
                       <MissingData project={project} label="Sin asignar" hint="La asigna el Líder PM" />
@@ -674,8 +720,10 @@ function ReportTable({ team, members, rows, allRows, loading, error, sort, onSor
   );
 }
 
-function DateCell({ iso, project }: { iso: string | null; project: TeamReportProject }) {
-  return <td>{iso ? formatDayMonth(iso) : <MissingData project={project} label="Sin fecha" hint="Lo carga el Líder PM" />}</td>;
+/** Sin fecha se marca como dato faltante solo si aplica pedirlo (`missingDates`); si no —prospecto o sin horas del equipo—, guion. */
+function DateCell({ iso, project, missing }: { iso: string | null; project: TeamReportProject; missing: boolean }) {
+  if (iso) return <td>{formatDayMonth(iso)}</td>;
+  return <td>{missing ? <MissingData project={project} label="Sin fecha" hint="Lo carga el Líder PM" /> : <span className={styles.muted}>–</span>}</td>;
 }
 
 /** Dato que carga el Líder PM y falta — o "Solicitada ✓" si ya se le pidió desde el reporte. */

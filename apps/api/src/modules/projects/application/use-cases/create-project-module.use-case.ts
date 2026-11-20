@@ -47,7 +47,7 @@ export class CreateProjectModuleUseCase
         projectId: project.id,
         name: command.data.name,
         initialStage: command.data.initialStage,
-        estimatedHours: command.data.estimatedHours,
+        estimatedHours: command.data.estimatedHours ?? null,
         estimatedStartDate: command.data.estimatedStartDate ? new Date(command.data.estimatedStartDate) : null,
         estimatedEndDate: command.data.estimatedEndDate ? new Date(command.data.estimatedEndDate) : null,
       },

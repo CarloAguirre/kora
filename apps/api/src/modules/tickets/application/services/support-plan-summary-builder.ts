@@ -45,7 +45,7 @@ export class SupportPlanSummaryBuilder {
         now,
       );
     }
-    return this.buildUsageSummary(linkedProjectIds, plan.planType, plan.contractedHours, plan.planValueUf, plan.extraHourValueUf, plan.currency);
+    return this.buildUsageSummary(linkedProjectIds, plan, plan.planType);
   }
 
   /** Proyectos cuyas horas consume el contrato — ver `resolveSupportPlanHourProjectIds`. */
@@ -76,11 +76,14 @@ export class SupportPlanSummaryBuilder {
 
     const currentPeriod = current
       ? (() => {
-          const capacityHours = current.contractedHours + priorSurplusOf(current);
+          const priorSurplusHours = priorSurplusOf(current);
+          const capacityHours = current.contractedHours + priorSurplusHours;
           return {
             usedHours: current.consumedHoursPeriod,
             capacityHours,
             remainingHours: Math.max(capacityHours - current.consumedHoursPeriod, 0),
+            planHours: current.contractedHours,
+            priorSurplusHours,
           };
         })()
       : null;
@@ -117,18 +120,22 @@ export class SupportPlanSummaryBuilder {
     };
   }
 
+  /**
+   * Solo cuentan las horas registradas dentro de la vigencia del contrato
+   * (`startDate`..`endDate`, inclusive): las de tickets anteriores al inicio
+   * pertenecen a otro ciclo y no deben descontar de esta bolsa — mismo
+   * criterio que los períodos mensuales (`sumApprovedHoursForProjects` por rango).
+   */
   private async buildUsageSummary(
     projectIds: readonly string[],
+    plan: SupportPlanRecord,
     planType: 'bundle' | 'on_demand',
-    contractedHours: number,
-    planValueUf: number,
-    extraHourValueUf: number,
-    currency: SupportPlanRecord['currency'],
   ): Promise<SupportProjectSummary> {
+    const { contractedHours, planValueUf, extraHourValueUf, currency } = plan;
     const pages = await Promise.all(
       projectIds.map((projectId) =>
         this.hourEntries.search(
-          { projectId, status: 'approved' },
+          { projectId, status: 'approved', dateFrom: plan.startDate, dateTo: plan.endDate ?? undefined },
           { page: 1, pageSize: HOUR_ENTRY_PAGE_SIZE },
           { field: 'date', direction: 'asc' },
         ),

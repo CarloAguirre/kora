@@ -25,6 +25,16 @@
   flex-shrink: 0;
 }
 
+/* El logo real va sin recuadro, a la altura del bloque de texto: los logos
+   suelen ser apaisados y en un cuadrado de 56 px quedaban diminutos. */
+.logo {
+  height: 56px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
 .text {
   display: flex;
   flex-direction: column;

@@ -381,7 +381,9 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               </div>
             </div>
 
-            {ticket.canManage && ticket.status !== 'closed' && (
+            {/* Un ticket cerrado ya no se gestiona: el pie queda solo para que admin/PMO lo
+                elimine desde el historial (`canDelete` ya viene restringido por la API). */}
+            {(ticket.status === 'closed' ? ticket.canDelete : ticket.canManage) && (
               <div className={styles.footer}>
                 {ticket.status !== 'done' && ticket.canDelete && (
                   <Button
@@ -394,7 +396,7 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
                   </Button>
                 )}
                 <div className={styles.footerRight}>
-                  {ticket.status !== 'done' && ticket.canEditDetails && (
+                  {ticket.status !== 'done' && ticket.status !== 'closed' && ticket.canEditDetails && (
                     <Button variant="outline" onClick={() => setEditOpen(true)}>
                       Editar
                     </Button>
@@ -425,6 +427,11 @@ export function TicketDetailModal({ ticketId, onClose }: { ticketId: string; onC
               open={deleteOpen}
               title="Eliminar ticket"
               description={`¿Eliminar el ticket "${ticket.title}"? Esta acción no se puede deshacer.`}
+              warning={
+                hhRequests && hhRequests.length > 0
+                  ? `También se eliminarán las ${formatHours(hhRequests.reduce((sum, request) => sum + request.hours, 0))} HH registradas en este ticket.`
+                  : null
+              }
               confirmLabel="Eliminar"
               destructive
               onClose={() => setDeleteOpen(false)}

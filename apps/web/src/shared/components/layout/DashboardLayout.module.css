@@ -50,3 +50,11 @@
 /* La página de cotización desplaza solo contenido: el sticky de su resumen se ancla aquí. */
 .containedScroll{height:100vh;min-height:0;overflow:hidden}
 .containedScroll .content{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+
+/* Con un dialog modal nativo abierto, la vista de fondo no debe mostrar
+   ni desplazar su scrollbar. El dialog vive en el top layer: su scroll
+   interno permanece disponible, y se recupera el de la pagina al cerrar.
+   Incluye la variante containedScroll (Calculadora / otros contenidos). */
+.content:has(dialog[open]) {
+  overflow-y: hidden;
+}

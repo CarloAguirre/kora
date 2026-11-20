@@ -32,13 +32,22 @@ export const ticketHhRequestSchema = z.object({
   reviewedAt: isoDateTimeSchema.nullable(),
   hourEntryId: uuidSchema.nullable(),
   createdAt: isoDateTimeSchema,
+  /** ¿Puede quien consulta aprobar/rechazar ESTA solicitud? Mismo criterio que `ApproveTicketHhRequestUseCase` — solo `true` si está pendiente. */
+  canReview: z.boolean(),
 });
 export type TicketHhRequest = z.infer<typeof ticketHhRequestSchema>;
+
+/** Mismo tope que la descripción de un registro de horas normal (`hour-entry.contract.ts`), porque la nota termina siendo esa descripción. */
+export const TICKET_HH_REQUEST_NOTE_MAX_LENGTH = 2000;
 
 export const createTicketHhRequestSchema = z.object({
   date: z.iso.date(),
   hours: z.coerce.number().positive('Las horas deben ser mayores a 0.').max(24, 'No puede solicitar más de 24 horas en un día.'),
-  note: z.string().trim().max(500).optional(),
+  note: z
+    .string()
+    .trim()
+    .max(TICKET_HH_REQUEST_NOTE_MAX_LENGTH, `La nota no puede superar los ${TICKET_HH_REQUEST_NOTE_MAX_LENGTH} caracteres.`)
+    .optional(),
 });
 export type CreateTicketHhRequestInput = z.infer<typeof createTicketHhRequestSchema>;
 

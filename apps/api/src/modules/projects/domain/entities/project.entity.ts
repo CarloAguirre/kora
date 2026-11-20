@@ -31,6 +31,8 @@ export interface ProjectProps {
   estimatedDeliveryDate: Date | null;
   soldHours: number;
   usedHours: number;
+  /** Ajuste de consumo histórico aprobado fuera de registros HH; no es avance funcional ni horas de tareas. */
+  historicalHoursAdjustment: number;
   expectedProgress: number | null;
   actualProgress: number | null;
   supportPlanDescription: string | null;
@@ -69,6 +71,8 @@ export interface ProjectProps {
   contractAmount: number | null;
   /** Moneda de todos los tramos de pago del proyecto. */
   contractCurrency: ProjectContractCurrency;
+  /** Proyecto interno (de la propia empresa): sin plan de pago, fuera de Facturación y sin correos de cobro. */
+  isInternal: boolean;
   /** Hito 0 quedó pausado esperando que Gerencia active el proyecto a mano — ver `IssueProjectPaymentMilestoneInvoiceUseCase`. */
   pendingManagementApproval: boolean;
   /** Fecha del Hito 0 (kickoff) — editable por Gerencia/PMO. `null` si el proyecto nunca se activó. */
@@ -104,6 +108,7 @@ export interface CreateProjectProps {
   readonly additionalLinks?: string | null;
   readonly contractAmount?: number | null;
   readonly contractCurrency?: ProjectContractCurrency;
+  readonly isInternal?: boolean;
   readonly phase?: ProjectPhase | null;
   /** Subconjunto de estados con sentido al crear (draft/active/on_hold) — ver `createProjectSchema`. */
   readonly status?: ProjectStatus | null;
@@ -163,6 +168,7 @@ export class Project extends AggregateRoot<string> {
       estimatedDeliveryDate: props.estimatedDeliveryDate ?? null,
       soldHours: props.soldHours ?? 0,
       usedHours: 0,
+      historicalHoursAdjustment: 0,
       expectedProgress: null,
       actualProgress: null,
       supportPlanDescription: props.supportPlanDescription ?? null,
@@ -198,6 +204,7 @@ export class Project extends AggregateRoot<string> {
       periodReportAchievements: null,
       contractAmount: props.contractAmount ?? null,
       contractCurrency: props.contractCurrency ?? 'UF',
+      isInternal: props.type === 'development' && (props.isInternal ?? false),
       pendingManagementApproval: false,
       hito0At: null,
       hito0Source: null,
@@ -262,6 +269,10 @@ export class Project extends AggregateRoot<string> {
 
   get allowsOvertime(): boolean {
     return this.props.allowsOvertime;
+  }
+
+  get isInternal(): boolean {
+    return this.props.isInternal;
   }
 
   get pendingManagementApproval(): boolean {
@@ -339,6 +350,7 @@ export class Project extends AggregateRoot<string> {
         | 'periodReportAchievements'
         | 'contractAmount'
         | 'contractCurrency'
+        | 'isInternal'
       >
     >,
     now: Date,
@@ -348,7 +360,10 @@ export class Project extends AggregateRoot<string> {
       if (check.isErr()) return err(check.error);
     }
     if (data.name !== undefined) data.name = data.name.trim();
-    if (this.props.type === 'support') data.phase = null;
+    if (this.props.type === 'support') {
+      data.phase = null;
+      data.isInternal = false;
+    }
 
     assignDefined(this.props, data);
     this.touch(now);
@@ -402,8 +417,14 @@ export class Project extends AggregateRoot<string> {
     this.touch(now);
   }
 
-  recordUsedHours(hours: number, now: Date): void {
-    this.props.usedHours = hours;
+  /**
+   * Recibe exclusivamente la suma de HH aprobadas en hour_entries.
+   * La corrección histórica vive separada del registro de actividad, así que
+   * no debe sumarse al llamador ni al resultado anterior de usedHours.
+   */
+  recordUsedHours(approvedEntryHours: number, now: Date): void {
+    this.props.usedHours =
+      Math.round((approvedEntryHours + this.props.historicalHoursAdjustment) * 100) / 100;
     this.touch(now);
   }
 

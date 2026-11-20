@@ -8,6 +8,11 @@
   flex-direction: column;
   gap: var(--kora-space-2);
   z-index: var(--kora-z-toast);
+  /* Un fixed portalizado dentro de <dialog> puede adoptar su ancho
+     min-content: fijar ancho evita que cada palabra ocupe una línea. */
+  width: min(420px, calc(100vw - 48px));
+  box-sizing: border-box;
+  align-items: stretch;
   /* El contenedor no debe bloquear clics en la página que hay debajo. */
   pointer-events: none;
 }
@@ -16,8 +21,10 @@
   display: flex;
   align-items: flex-start;
   gap: var(--kora-space-2);
-  min-width: 280px;
-  max-width: 420px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  box-sizing: border-box;
   padding: var(--kora-space-3) var(--kora-space-4);
   border-radius: var(--kora-radius);
   background: var(--kora-navy);
@@ -44,8 +51,11 @@
 }
 
 .message {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .dismiss {
@@ -77,6 +87,7 @@
     left: var(--kora-space-4);
     right: var(--kora-space-4);
     bottom: var(--kora-space-4);
+    width: auto;
   }
 
   .toast {

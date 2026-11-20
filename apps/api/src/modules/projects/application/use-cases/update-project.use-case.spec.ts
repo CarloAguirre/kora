@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { UpdateProjectUseCase } from './update-project.use-case';
 import { Project } from '../../domain/entities/project.entity';
-import { CannotReassignProjectLeaderError, SoldHoursLockedAfterHito0Error } from '../../domain/errors/project.errors';
+import { CannotReassignProjectLeaderError, ProjectApprovalRequiredForActivationError, SoldHoursChangeReasonRequiredError, ProjectTeamHasRoadmapBlocksError } from '../../domain/errors/project.errors';
 import type { ProjectRepository } from '../../domain/repositories/project.repository';
 import type { ProjectTeamRepository } from '../../domain/repositories/project-team.repository';
+import type { ProjectModuleRepository } from '../../domain/repositories/project-module.repository';
 import type { ProjectClientReader } from '../ports/project-client-reader.port';
 import type { ProjectUserReader } from '../ports/project-user-reader.port';
 import type { AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
@@ -33,7 +34,12 @@ function buildUseCase(leaderUserId: string | null, project: Project = buildProje
     nameIsTakenByAnother: vi.fn().mockResolvedValue(false),
     save: vi.fn().mockResolvedValue(undefined),
   } as unknown as ProjectRepository;
-  const projectTeams = { findByProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectTeamRepository;
+  const projectTeams = {
+    findByProject: vi.fn().mockResolvedValue([]),
+    save: vi.fn().mockResolvedValue(undefined),
+    remove: vi.fn().mockResolvedValue(undefined),
+  } as unknown as ProjectTeamRepository;
+  const modules = { listForProject: vi.fn().mockResolvedValue([]) } as unknown as ProjectModuleRepository;
   const clients = {} as ProjectClientReader;
   const users = { findManyByIds: vi.fn().mockResolvedValue([]) } as unknown as ProjectUserReader;
   const audit = { record: vi.fn().mockResolvedValue(undefined) } as unknown as AuditRecorder;
@@ -57,8 +63,9 @@ function buildUseCase(leaderUserId: string | null, project: Project = buildProje
     new FixedClock(NOW),
     paymentMilestones,
     paymentTriggers,
+    modules,
   );
-  return { useCase, projects };
+  return { useCase, projects, projectTeams, modules, changeLog };
 }
 
 /**
@@ -110,6 +117,31 @@ describe('UpdateProjectUseCase — reasignar líder', () => {
   });
 });
 
+describe('UpdateProjectUseCase — etapa comercial y estado operativo', () => {
+  const PMO = { actor: { userId: 'pmo-1', email: 'pmo@kabeli.cl' }, actorPermissions: ['projects:manage'] as const };
+
+  it('impide retroceder a Cotización si el proyecto sigue Activo', async () => {
+    const project = buildProject(null);
+    project.activateFromHito0(NOW, 'manual', 'Contrato firmado');
+    const { useCase, projects } = buildUseCase(null, project);
+    const result = await useCase.execute({ projectId: 'project-1', data: { salesStage: 'quoted' }, ...PMO });
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectApprovalRequiredForActivationError);
+    expect(projects.save).not.toHaveBeenCalled();
+    expect(project.salesStage).toBe('approved');
+  });
+
+  it('permite retroceder a Cotización después de detener el proyecto', async () => {
+    const project = buildProject(null);
+    project.changeStatus('on_hold', NOW);
+    const { useCase, projects } = buildUseCase(null, project);
+    const result = await useCase.execute({ projectId: 'project-1', data: { salesStage: 'quoted' }, ...PMO });
+    expect(result.isOk()).toBe(true);
+    expect(projects.save).toHaveBeenCalledOnce();
+    expect(project.salesStage).toBe('quoted');
+    expect(project.status).toBe('on_hold');
+  });
+});
+
 /** `primaryContactId` — contacto propio del proyecto, distinto del contacto del cliente. Antes solo se fijaba al crear un contrato de soporte; esto lo habilita para cualquier proyecto vía edición. */
 describe('UpdateProjectUseCase — primaryContactId', () => {
   it('fija el contacto propio del proyecto', async () => {
@@ -156,7 +188,7 @@ describe('UpdateProjectUseCase — primaryContactId', () => {
   });
 });
 
-/** Desde el Hito 0 corren las horas vendidas: quedan fijas aunque el proyecto después se detenga o finalice. */
+/** Las HH vendidas tras Hito 0 se pueden ajustar con motivo y trazabilidad. */
 describe('UpdateProjectUseCase — HH vendidas tras el Hito 0', () => {
   const PMO = { actor: { userId: 'pmo-1', email: 'pmo@kabeli.cl' }, actorPermissions: ['projects:manage'] as const };
 
@@ -174,13 +206,49 @@ describe('UpdateProjectUseCase — HH vendidas tras el Hito 0', () => {
     return project;
   }
 
-  it('rechaza cambiar las HH vendidas de un proyecto con Hito 0', async () => {
+  it('exige motivo cuando cambian las HH vendidas tras Hito 0', async () => {
     const { useCase, projects } = buildUseCase(null, activatedProject());
 
     const result = await useCase.execute({ projectId: 'project-1', data: { soldHours: 1200 }, ...PMO });
 
-    expect(result.isErr() && result.error).toBeInstanceOf(SoldHoursLockedAfterHito0Error);
+    expect(result.isErr() && result.error).toBeInstanceOf(SoldHoursChangeReasonRequiredError);
     expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza también un motivo vacío tras Hito 0', async () => {
+    const { useCase, projects } = buildUseCase(null, activatedProject());
+    const result = await useCase.execute({
+      projectId: 'project-1',
+      data: { soldHours: 1200, soldHoursChangeReason: '   ' },
+      ...PMO,
+    });
+    expect(result.isErr() && result.error).toBeInstanceOf(SoldHoursChangeReasonRequiredError);
+    expect(projects.save).not.toHaveBeenCalled();
+  });
+
+  it('permite ajustar HH tras Hito 0 y registra antes, después, motivo y autor en bitácora', async () => {
+    const { useCase, projects, changeLog } = buildUseCase(null, activatedProject());
+
+    const result = await useCase.execute({
+      projectId: 'project-1',
+      data: { soldHours: 1200, soldHoursChangeReason: '  Ampliación aprobada  ' },
+      ...PMO,
+    });
+
+    expect(result.isOk()).toBe(true);
+    const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
+    expect(saved.toSnapshot().soldHours).toBe(1200);
+    expect(changeLog.record).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          projectId: 'project-1',
+          message: 'HH vendidas actualizadas de 1000 a 1200 después del Hito 0. Motivo: Ampliación aprobada',
+        }),
+      ]),
+      'pmo-1',
+      NOW,
+      expect.anything(),
+    );
   });
 
   it('permite reenviar las mismas HH vendidas sin cambiarlas', async () => {
@@ -199,5 +267,45 @@ describe('UpdateProjectUseCase — HH vendidas tras el Hito 0', () => {
     expect(result.isOk()).toBe(true);
     const saved = (projects.save as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Project;
     expect(saved.toSnapshot().soldHours).toBe(1200);
+  });
+});
+
+describe('UpdateProjectUseCase — equipos con bloques', () => {
+  const actor = { userId: 'leader-1', email: 'leader@kora.cl' };
+  const actorPermissions = ['projects:read_assigned'] as const;
+  const team = {
+    id: 'project-team-1', teamId: 'team-1', teamName: 'Desarrollo',
+    teamSlug: 'desarrollo', leaderUserId: 'leader-1', leaderName: 'Líder',
+    effectiveLeaderUserId: 'leader-1',
+    assignedHours: 200, memberCount: 0, maxMembers: 2,
+    leaderConsumedHours: 0,
+  };
+
+  it('rechaza quitar un equipo mientras tenga bloques operativos', async () => {
+    const { useCase, projects, projectTeams, modules } = buildUseCase('leader-1');
+    vi.mocked(projectTeams.findByProject).mockResolvedValue([team]);
+    vi.mocked(modules.listForProject).mockResolvedValue([{
+      segments: [{ id: 'segment-1', teamId: 'team-1' }],
+    }] as never);
+
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { teams: [] }, actor, actorPermissions,
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error).toBeInstanceOf(ProjectTeamHasRoadmapBlocksError);
+    expect(projects.save).not.toHaveBeenCalled();
+    expect(projectTeams.remove).not.toHaveBeenCalled();
+  });
+
+  it('permite quitar el equipo sin bloques de trabajo', async () => {
+    const { useCase, projectTeams, modules } = buildUseCase('leader-1');
+    vi.mocked(projectTeams.findByProject).mockResolvedValue([team]);
+    vi.mocked(modules.listForProject).mockResolvedValue([]);
+
+    const result = await useCase.execute({
+      projectId: 'project-1', data: { teams: [] }, actor, actorPermissions,
+    });
+    expect(result.isOk()).toBe(true);
+    expect(projectTeams.remove).toHaveBeenCalledWith('project-1', 'team-1', expect.anything());
   });
 });

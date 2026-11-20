@@ -38,6 +38,15 @@ export class ListEstimationDriveFilesUseCase {
       });
     }
 
+    if (!this.drive.isConfigured() && folderId !== 'kora-poc-fallback') {
+      return estimationDriveFolderListingSchema.parse({
+        folderId,
+        folderUrl: input.driveFolderUrl,
+        connection: 'not_configured',
+        files: [],
+        message: 'No se puede listar esta carpeta sin credenciales de Drive. Autorízala desde la cotización.',
+      });
+    }
     if (!this.drive.isConfigured()) {
       return estimationDriveFolderListingSchema.parse({
         folderId,

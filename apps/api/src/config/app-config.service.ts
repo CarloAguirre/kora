@@ -32,6 +32,11 @@ export interface HttpSettings {
   readonly corsOrigins: readonly string[];
 }
 
+export interface LanguageToolSettings {
+  /** Servidor LanguageTool propio para la revisión gramatical; `null` la deshabilita. */
+  readonly url: string | null;
+}
+
 export interface HourReminderSettings {
   /** Si las tareas programadas de recordatorios de horas corren (la ejecución manual desde la API no depende de esto). */
   readonly enabled: boolean;
@@ -55,6 +60,9 @@ export interface AiSettings {
   readonly enabled: boolean;
   readonly geminiApiKey: string;
   readonly geminiModel: string;
+  readonly provider: 'auto' | 'gemini' | 'openai' | 'poc';
+  readonly openaiApiKey: string;
+  readonly openaiModel: string;
 }
 
 export interface MailSettings {
@@ -113,6 +121,11 @@ export class AppConfigService {
     };
   }
 
+  /** Prueba de autorización temporal sobre OAuth web existente, apagada por defecto. */
+  get googleDriveOauthPocEnabled(): boolean {
+    return this.config.get('GOOGLE_DRIVE_OAUTH_POC_ENABLED', { infer: true });
+  }
+
   get googleDrive(): GoogleDriveSettings {
     const clientEmail = this.config.get('GOOGLE_DRIVE_CLIENT_EMAIL', { infer: true }) ?? '';
     const privateKeyRaw = this.config.get('GOOGLE_DRIVE_PRIVATE_KEY', { infer: true }) ?? '';
@@ -126,9 +139,16 @@ export class AppConfigService {
 
   get ai(): AiSettings {
     const geminiApiKey = this.config.get('GEMINI_API_KEY', { infer: true }) ?? '';
+    const openaiApiKey = this.config.get('OPENAI_API_KEY', { infer: true }) ?? '';
+    const provider = this.config.get('AI_PROVIDER', { infer: true });
 
     return {
-      enabled: geminiApiKey !== '',
+      enabled: provider === 'openai' ? openaiApiKey !== '' :
+        provider === 'gemini' ? geminiApiKey !== '' :
+          provider === 'poc' ? false : geminiApiKey !== '',
+      provider,
+      openaiApiKey,
+      openaiModel: this.config.get('OPENAI_MODEL', { infer: true }),
       geminiApiKey,
       geminiModel: this.config.get('GEMINI_MODEL', { infer: true }),
     };
@@ -144,6 +164,10 @@ export class AppConfigService {
       redirectTo: this.config.get('MAIL_REDIRECT_TO', { infer: true }) ?? null,
       webAppUrl: this.config.get('WEB_APP_URL', { infer: true }).replace(/\/+$/, ''),
     };
+  }
+
+  get languageTool(): LanguageToolSettings {
+    return { url: this.config.get('LANGUAGETOOL_URL', { infer: true }) ?? null };
   }
 
   get hourReminders(): HourReminderSettings {

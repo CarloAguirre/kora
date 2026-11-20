@@ -77,6 +77,12 @@ describe('paymentMilestoneReadyReason', () => {
     expect(paymentMilestoneReadyReason(cuota, project(), TODAY)).toBe('llegó su fecha de cobro (08-10-2026)');
   });
 
+  it('una cotización detenida no genera cobros por fecha ni por fase aunque el hito ya se cumpla', () => {
+    const quotation = project({ salesStage: 'quoted', phase: 'pilot' });
+    expect(paymentMilestoneReadyReason(milestone({ triggerType: 'date', triggerDate: new Date('2026-10-07') }), quotation, TODAY)).toBeNull();
+    expect(paymentMilestoneReadyReason(milestone({ triggerType: 'phase', triggerPhase: 'pilot' }), quotation, TODAY)).toBeNull();
+  });
+
   it('nunca para tramos manuales, en 0 o que ya no están pendientes', () => {
     expect(paymentMilestoneReadyReason(milestone({ triggerType: 'manual' }), project(), TODAY)).toBeNull();
     expect(paymentMilestoneReadyReason(milestone({ amount: 0 }), project(), TODAY)).toBeNull();

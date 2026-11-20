@@ -47,6 +47,35 @@ const draft = quotationDraftDataSchema.parse({
 });
 
 describe('Proyección semanal por equipos de la EDT', () => {
+  it('reparte 25 HH entre 1,5 semanas sin perder centésimos ni ocultar medias semanas', () => {
+    const manual = quotationDraftDataSchema.parse({
+      mode: 'phases', teams: [{ ...team(dev), hoursPerWeek: 40, duration: 1.5 }],
+      phases: [{ name: 'Análisis', startWeek: 1, durationWeeks: 1.5,
+        teamHours: [{ teamId: dev, hours: 25 }] }],
+    });
+    const plan = quotationTeamWeeklyPlan(manual)!;
+    expect(plan.totalHours).toBe(25);
+    expect(plan.rows[0]?.activeWeeks).toBe(1.5);
+    expect(plan.rows[0]?.lastWeek).toBe(1.5);
+    expect([...plan.rows[0]!.weeklyHours.values()]).toEqual([16.67, 8.33]);
+    expect([...plan.rows[0]!.halfWeekHours!.keys()]).toEqual([1, 1.5, 2]);
+    expect([...plan.rows[0]!.halfWeekHours!.values()].reduce((sum, n) => sum + n, 0))
+      .toBe(25);
+  });
+
+  it('una fase iniciada a mitad de semana se refleja en ambas semanas', () => {
+    const manual = quotationDraftDataSchema.parse({
+      mode: 'phases', teams: [team(dev)],
+      phases: [{ name: 'Diseño', startWeek: 1.5, durationWeeks: 1,
+        teamHours: [{ teamId: dev, hours: 12 }] }],
+    });
+    const plan = quotationTeamWeeklyPlan(manual)!;
+    expect([...plan.rows[0]!.weeklyHours.values()]).toEqual([6, 6]);
+    expect(plan.rows[0]!.activeWeeks).toBe(1);
+    expect(plan.rows[0]!.firstWeek).toBe(1.5);
+    expect(plan.rows[0]!.lastWeek).toBe(1.5);
+  });
+
   it('suma fases solapadas, semanas activas y HH sin duplicar tareas', () => {
     const plan = quotationTeamWeeklyPlan(draft)!;
     const development = plan.rows.find((row) => row.teamKey === dev)!;
@@ -62,6 +91,26 @@ describe('Proyección semanal por equipos de la EDT', () => {
     expect(testing.totalHours).toBe(10);
     expect([...testing.weeklyHours.values()]).toEqual([5, 5]);
     expect([...plan.weekTotals.values()]).toEqual([20, 30, 10]);
+  });
+
+
+  it('incluye nuevas tareas y fases comerciales en cargas y picos, sin omitir HH', () => {
+    const stage = 'KS-0777e456-fd76-445e-83f1-afc25061c107';
+    const edited = quotationDraftDataSchema.parse({
+      ...draft,
+      edtCommercialStages: [{ code: stage, name: 'Integración final',
+        startWeek: 2, durationWeeks: 1 }],
+      edtCommercialTasks: [{
+        wbs: 'KT-0777e456-fd76-445e-83f1-afc25061c108',
+        stageCode: stage, name: 'Pruebas finales', teamId: dev, hours: 20, fixed: false,
+      }],
+    });
+    const plan = quotationTeamWeeklyPlan(edited)!;
+    expect(plan.totalHours).toBe(80);
+    expect(plan.rows.find((row) => row.teamKey === dev)?.totalHours).toBe(70);
+    expect([...plan.rows.find((row) => row.teamKey === dev)!.weeklyHours.values()])
+      .toEqual([20, 45, 5]);
+    expect([...plan.weekTotals.values()]).toEqual([20, 50, 10]);
   });
 
   it('concilia centésimos cuando se ajustan HH de una tarea', () => {

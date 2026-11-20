@@ -9,11 +9,14 @@ import {
 import {
   PROJECT_PAYMENT_MILESTONE_REPOSITORY,
   type ProjectPaymentMilestoneRepository,
+  type ProjectPaymentReceipt,
 } from '../../domain/repositories/project-payment-milestone.repository';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
 export interface MarkProjectPaymentMilestonePaidCommand {
+  readonly projectId?: string;
+  readonly receipt?: ProjectPaymentReceipt;
   readonly milestoneId: string;
   readonly data: MarkProjectPaymentMilestonePaidInput;
   readonly actor: ActorContext;
@@ -37,12 +40,14 @@ export class MarkProjectPaymentMilestonePaidUseCase
 
   async execute(command: MarkProjectPaymentMilestonePaidCommand): Promise<Result<void, ApplicationError>> {
     const milestone = await this.milestones.findById(command.milestoneId);
-    if (!milestone) return err(new ProjectPaymentMilestoneNotFoundError(command.milestoneId));
+    if (!milestone || (command.projectId && command.projectId !== milestone.projectId)) {
+      return err(new ProjectPaymentMilestoneNotFoundError(command.milestoneId));
+    }
     if (milestone.status === 'paid') return err(new ProjectPaymentMilestoneAlreadyPaidError());
     if (milestone.status !== 'invoiced') return err(new ProjectPaymentMilestoneNotIssuedError());
 
     const paidAt = new Date(command.data.paidAt);
-    await this.milestones.markPaid(command.milestoneId, paidAt);
+    await this.milestones.markPaid(command.milestoneId, paidAt, undefined, command.receipt);
 
     await this.audit.record({
       actor: { userId: command.actor.userId, email: command.actor.email },

@@ -2,6 +2,17 @@
 **Fecha:** 2026-11-03 · **Rama:** `feature/calculadora-cotizacion-ui-v5` · **Estado:** auditoría y ejecución por cortes verificables.
 **Fuentes mandatarias:** `kora-proyectos-v5(1).html` adjunto al hilo y seis capturas 20261103-171446/171502/171540/171600/171624/171904. Las imágenes pertenecen a la referencia recibida; no suponer que ya están en este repositorio. **No copiar la implementación simulada del HTML dentro de React.** Conservar componentes, capacidades y estilos operativos existentes.
 
+> **Actualización de criterio (04-11-2026):** las afirmaciones de este
+> documento sobre «esperar planificación manual para asignar fechas» solo
+> aplican mientras el proyecto está **No iniciado** o la cotización no fue
+> aprobada y traspasada. Cuando la cotización ya fue aprobada por cliente/PM,
+> traspasada y el proyecto pasa a **Activo con fecha de inicio**, Kora
+> materializa automáticamente las semanas comerciales como
+> `project_module_segments` y entregas de cierre con fechas reales,
+> persistidas y editables. **No se solicita otra aprobación.** El proceso
+> idempotente está detallado en
+> `docs/ROADMAP-V5_02-CIERRE-BLOQUE-ASIGNACION-2026-11-04.md`.
+
 ## 1. Hallazgo: por qué falla el POST transfer-approved
 El payload `{ "revision": 12, "confirmation": "TRASPASAR_COTIZACION_APROBADA" }` es conforme al contrato. El `409` surge de la protección transaccional de `DrizzleQuotationRepository.transferApproved`, no de ese body.
 Actualmente exige proyecto `draft` + `salesStage=approved` y rechaza cuando hay *cualquier* `sold_hours`, `used_hours`, `start_date`, `contract_amount`, `project_teams`, `project_modules`, `hour_entries` o plan de pagos no predeterminado. **No eliminar esa salvaguarda para aparentar éxito**: podría sobrescribir datos reales, pagos, ejecución o resultados de Forecast.

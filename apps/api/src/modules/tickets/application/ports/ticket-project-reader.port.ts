@@ -42,6 +42,13 @@ export interface TicketProjectReader {
   isProjectApprover(projectId: string, actorUserId: string, assigneeUserId: string | null): Promise<boolean>;
   /** Enumerado de `isProjectApprover` — quién(es) decidirían una solicitud de HH de `assigneeUserId` en este proyecto, para mostrarlo al enviarla. */
   findHhApprovers(projectId: string, assigneeUserId: string | null): Promise<{ id: string; fullName: string }[]>;
+  /**
+   * ¿Participa `actorUserId` en el proyecto (líder, desarrollador, responsable
+   * comercial, líder efectivo de un equipo asignado o miembro activo)? Mismo
+   * alcance que la ficha del proyecto (`GetProjectUseCase`) para quien solo
+   * tiene `projects:read_assigned`.
+   */
+  isParticipant(projectId: string, actorUserId: string): Promise<boolean>;
 }
 
 export const TICKET_PROJECT_READER = Symbol('TicketProjectReader');

@@ -6,6 +6,17 @@ import type {
 } from '@kora/contracts';
 import { estimationApi, estimationKeys } from './estimation.api';
 
+/** Oculta la función experimental si la API no la habilitó explícitamente. */
+export function useEstimationDriveOAuthPocStatus(enabled = true) {
+  return useQuery({
+    queryKey: [...estimationKeys.all, 'drive-oauth-poc-status'] as const,
+    queryFn: () => estimationApi.driveOAuthPocStatus(),
+    enabled,
+    retry: false,
+    staleTime: 60_000,
+  });
+}
+
 export function useEstimationQuestionnaireDefinition(enabled = true) {
   return useQuery({
     queryKey: estimationKeys.questionnaireDefinition(),
@@ -58,9 +69,19 @@ export function useEstimationDriveFiles(driveFolderUrl: string, enabled = true) 
   });
 }
 
+export interface AnalyzeEstimationWithSummaries extends AnalyzeEstimationPocInput {
+  readonly onThoughtSummary?: (text: string) => void;
+  readonly onProgress?: (phase: string, text: string, at?: string) => void;
+  readonly onHeartbeat?: (seconds: number) => void;
+  readonly signal?: AbortSignal;
+}
+
 export function useAnalyzeEstimationPoc() {
   return useMutation({
-    mutationFn: (input: AnalyzeEstimationPocInput) => estimationApi.analyzePoc(input),
+    mutationFn: ({ onThoughtSummary, onProgress, onHeartbeat, signal, ...input }: AnalyzeEstimationWithSummaries) =>
+      onThoughtSummary
+        ? estimationApi.analyzePocStream(input, onThoughtSummary, signal, onProgress, onHeartbeat)
+        : estimationApi.analyzePoc(input),
   });
 }
 

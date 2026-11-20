@@ -9,6 +9,18 @@ import type { UserStatus } from '@kora/contracts';
  * son el contrato y no cambian.
  */
 
+export class ClientCompanyRequiredError extends ValidationError {
+  constructor() {
+    super('Selecciona la empresa a la que pertenece el usuario cliente.', 'USER_CLIENT_COMPANY_REQUIRED');
+  }
+}
+
+export class ClientCompanyNotAllowedError extends ValidationError {
+  constructor() {
+    super('La empresa solo se puede asignar a usuarios con rol Cliente.', 'USER_CLIENT_COMPANY_NOT_ALLOWED');
+  }
+}
+
 export class InvalidEmailError extends ValidationError {
   constructor(message: string) {
     super(message, 'USER_INVALID_EMAIL');

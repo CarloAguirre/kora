@@ -7,10 +7,9 @@ import styles from './ClientCompanyHeader.module.css';
  * Franja "empresa" que encabeza el portal — nombre, contacto y logo de marca.
  *
  * El Figma de referencia muestra el logo real del cliente y el wordmark
- * "kabeli" a la derecha. No hay assets de logo por cliente en este proyecto,
- * así que se usa un ícono neutro como marcador de posición del logo del
- * cliente; la marca es `KabeliLogo`, igual que en la ficha de proyecto del
- * portal (`ClientProjectDetailPage`).
+ * "kabeli" a la derecha. El logo se carga en "Editar cliente"; si el cliente
+ * no tiene uno, queda un ícono neutro en su lugar. La marca es `KabeliLogo`,
+ * igual que en la ficha de proyecto del portal (`ClientProjectDetailPage`).
  */
 export function ClientCompanyHeader({
   company,
@@ -25,9 +24,13 @@ export function ClientCompanyHeader({
   return (
     <div className={styles.row}>
       <div className={styles.identity}>
-        <div className={styles.logoPlaceholder} aria-hidden="true">
-          <BuildingIcon size={28} />
-        </div>
+        {company.logoUrl ? (
+          <img className={styles.logo} src={company.logoUrl} alt={`Logo de ${company.name}`} />
+        ) : (
+          <div className={styles.logoPlaceholder} aria-hidden="true">
+            <BuildingIcon size={28} />
+          </div>
+        )}
         <div className={styles.text}>
           <span className={styles.name}>
             {company.name}

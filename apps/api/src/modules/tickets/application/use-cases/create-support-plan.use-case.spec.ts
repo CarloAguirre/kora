@@ -76,7 +76,7 @@ describe('CreateSupportPlanUseCase — proyecto contenedor de soporte', () => {
     expect(result.isOk()).toBe(true);
     expect(savedProjects).toHaveLength(1);
     const project = savedProjects[0]!.toSnapshot();
-    expect(project).toMatchObject({ name: 'Soporte Abarca Motores', type: 'support', status: 'active', clientId: CLIENT_ID, supportHours: 50 });
+    expect(project).toMatchObject({ name: 'Soporte Abarca Motores', type: 'support', status: 'active', clientId: CLIENT_ID, soldHours: 50, supportHours: 50 });
     expect(savedPlans[0]!.projectId).toBe(project.id);
     expect(plans.linkProjects).toHaveBeenCalledWith(savedPlans[0]!.id, [APP_2, APP_3], expect.anything());
   });

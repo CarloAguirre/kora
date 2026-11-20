@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './DropdownMenu.module.css';
 
@@ -21,6 +21,12 @@ export interface DropdownMenuItem {
   tone?: 'default' | 'success' | 'danger';
   onSelect: () => void;
   disabled?: boolean;
+  /** Símbolo a la izquierda del texto (p.ej. el marcador de una entrega en el Roadmap). */
+  icon?: ReactNode;
+  /** Texto secundario a la derecha (p.ej. el estado del ítem). */
+  hint?: string;
+  /** Marca el ítem como el seleccionado actualmente. */
+  active?: boolean;
 }
 
 export interface DropdownMenuProps {
@@ -32,9 +38,11 @@ export interface DropdownMenuProps {
 
 interface PanelPosition {
   top: number;
-  left?: number;
-  right?: number;
+  left: number;
 }
+
+/** Distancia mínima entre el panel y el borde de la ventana. */
+const VIEWPORT_MARGIN = 8;
 
 export function DropdownMenu({ trigger, items, align = 'right', className }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
@@ -42,18 +50,23 @@ export function DropdownMenu({ trigger, items, align = 'right', className }: Dro
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  /** `useLayoutEffect`: el panel se pinta primero oculto para medirlo y se ubica antes del
+      paint. Se ajusta a la ventana — un disparador pegado al borde derecho o inferior (p.ej. un
+      marcador al final del Roadmap) dejaba el panel cortado fuera de la pantalla. */
+  useLayoutEffect(() => {
     if (!open) return;
 
     const updatePosition = () => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      const anchor = containerRef.current?.getBoundingClientRect();
+      const panel = panelRef.current?.getBoundingClientRect();
+      if (!anchor || !panel) return;
       const gap = 4;
-      setPosition(
-        align === 'right'
-          ? { top: rect.bottom + gap, right: window.innerWidth - rect.right }
-          : { top: rect.bottom + gap, left: rect.left },
-      );
+      const preferredLeft = align === 'right' ? anchor.right - panel.width : anchor.left;
+      const left = Math.max(VIEWPORT_MARGIN, Math.min(preferredLeft, window.innerWidth - VIEWPORT_MARGIN - panel.width));
+      const fitsBelow = anchor.bottom + gap + panel.height <= window.innerHeight - VIEWPORT_MARGIN;
+      const fitsAbove = anchor.top - gap - panel.height >= VIEWPORT_MARGIN;
+      const top = !fitsBelow && fitsAbove ? anchor.top - gap - panel.height : anchor.bottom + gap;
+      setPosition({ top, left });
     };
     updatePosition();
 
@@ -75,6 +88,7 @@ export function DropdownMenu({ trigger, items, align = 'right', className }: Dro
       document.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
+      setPosition(null);
     };
   }, [open, align]);
 
@@ -84,12 +98,16 @@ export function DropdownMenu({ trigger, items, align = 'right', className }: Dro
 
       {open &&
         items.length > 0 &&
-        position &&
         createPortal(
           <div
             ref={panelRef}
             className={styles.panel}
-            style={{ position: 'fixed', top: position.top, left: position.left, right: position.right }}
+            style={{
+              position: 'fixed',
+              top: position?.top ?? 0,
+              left: position?.left ?? 0,
+              visibility: position ? undefined : 'hidden',
+            }}
             role="menu"
           >
             {items.map((item) => (
@@ -102,15 +120,19 @@ export function DropdownMenu({ trigger, items, align = 'right', className }: Dro
                   styles.item,
                   item.tone === 'success' ? styles.itemSuccess : '',
                   item.tone === 'danger' ? styles.itemDanger : '',
+                  item.active ? styles.itemActive : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
+                aria-current={item.active || undefined}
                 onClick={() => {
                   setOpen(false);
                   item.onSelect();
                 }}
               >
-                {item.label}
+                {item.icon && <span className={styles.itemIcon}>{item.icon}</span>}
+                <span className={styles.itemLabel}>{item.label}</span>
+                {item.hint && <span className={styles.itemHint}>{item.hint}</span>}
               </button>
             ))}
           </div>,
