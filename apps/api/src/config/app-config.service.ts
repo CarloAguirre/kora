@@ -32,6 +32,11 @@ export interface HttpSettings {
   readonly corsOrigins: readonly string[];
 }
 
+export interface ExportApiSettings {
+  /** Clave que exige `GET /export/kora` en `X-Api-Key`; `null` deja el endpoint cerrado. */
+  readonly apiKey: string | null;
+}
+
 export interface LanguageToolSettings {
   /** Servidor LanguageTool propio para la revisión gramatical; `null` la deshabilita. */
   readonly url: string | null;
@@ -168,6 +173,10 @@ export class AppConfigService {
 
   get languageTool(): LanguageToolSettings {
     return { url: this.config.get('LANGUAGETOOL_URL', { infer: true }) ?? null };
+  }
+
+  get exportApi(): ExportApiSettings {
+    return { apiKey: this.config.get('EXPORT_API_KEY', { infer: true }) ?? null };
   }
 
   get hourReminders(): HourReminderSettings {
