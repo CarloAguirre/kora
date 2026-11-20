@@ -1,4 +1,5 @@
 import { ConflictError, DomainError, NotFoundError, ValidationError } from '@kora/core';
+import { OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE } from '@kora/contracts';
 
 export class HourEntryNotFoundError extends NotFoundError {
   constructor(identifier: string) {
@@ -107,6 +108,13 @@ export class InvalidHourEntrySegmentError extends ValidationError {
 export class HourEntrySegmentRequiredError extends ValidationError {
   constructor() {
     super('Selecciona un bloque de trabajo para imputar las HH de esta fase.', 'HOUR_ENTRY_SEGMENT_REQUIRED');
+  }
+}
+
+/** «Otro» (fase sin tarea vinculada) exige describir lo realizado. */
+export class OtherWorkDescriptionRequiredError extends ValidationError {
+  constructor() {
+    super(OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE, 'HOUR_ENTRY_OTHER_DESCRIPTION_REQUIRED');
   }
 }
 

@@ -82,19 +82,33 @@ describe('registro diario: imputación por bloque del Roadmap', () => {
   it('exige selección consciente de la tarea u Otro si existen tareas del colaborador en el bloque', () => {
     const selected = { ...base, moduleId: 'module-1', segmentId: 'segment-1',
       roadmapNeedsPhase: true, roadmapNeedsSegment: true, roadmapNeedsTask: true };
-    expect(validateDailyBlock(selected, context)).toBe('Selecciona tu tarea o «Asignar a otra».');
+    expect(validateDailyBlock(selected, context)).toBe('Selecciona tu tarea u «Otro».');
     expect(validateDailyBlock({ ...selected, taskId: 'task-1', category: 'Modelo de datos' }, context))
       .toBeNull();
     expect(validateDailyBlock({ ...selected, taskId: '__other__', category: 'Reunión de seguimiento' }, context))
       .toBeNull();
     expect(validateDailyBlock({ ...selected, taskId: '__other__', category: '' }, context))
-      .toBe('Indica la actividad realizada.');
+      .toBe('Al elegir «Otro», indica el nombre de lo realizado.');
   });
 
-  it('sin bloque ni tareas se permite optar por «Asignar a otra»', () => {
+  it('«Otro» exige nombre y descripción de lo realizado', () => {
+    const other = { ...base, moduleId: 'module-1', segmentId: 'segment-1', taskId: '__other__',
+      roadmapNeedsPhase: true, roadmapNeedsSegment: true, roadmapNeedsTask: true };
+    const missing = 'Al elegir «Otro», describe lo realizado (mínimo 5 caracteres).';
+    expect(validateDailyBlock({ ...other, description: '' }, context)).toBe(missing);
+    expect(validateDailyBlock({ ...other, description: '  abc ' }, context)).toBe(missing);
+    expect(validateDailyBlock({ ...other, description: 'Reunión de avance' }, context)).toBeNull();
+    // Con tarea vinculada la descripción sigue siendo opcional.
+    expect(validateDailyBlock({ ...other, taskId: 'task-1', description: '' }, context)).toBeNull();
+    // Edición de un registro que ya era «Otro» en la misma fase: no se fuerza.
+    expect(validateDailyBlock({ ...other, description: '' },
+      { ...context, requireOtherWorkDescription: false })).toBeNull();
+  });
+
+  it('sin bloque ni tareas se permite optar por «Otro»', () => {
     const phase = { ...base, moduleId: 'module-1', roadmapNeedsPhase: true,
       roadmapNeedsSegment: false, roadmapNeedsTask: true };
-    expect(validateDailyBlock(phase, context)).toBe('Selecciona tu tarea o «Asignar a otra».');
+    expect(validateDailyBlock(phase, context)).toBe('Selecciona tu tarea u «Otro».');
     expect(validateDailyBlock({ ...phase, taskId: '__other__' }, context)).toBeNull();
   });
 

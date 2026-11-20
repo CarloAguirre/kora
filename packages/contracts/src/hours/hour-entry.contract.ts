@@ -78,6 +78,27 @@ export function expectedAssignmentForProject(project: {
   return 'Prospecto';
 }
 
+/**
+ * «Otro» en el stepper fase → bloque → tarea: HH de "Proyecto" imputadas a una
+ * fase SIN tarea vinculada. Como no hay tarea que explique el trabajo, exige
+ * nombre (actividad) y una descripción de lo realizado.
+ */
+export const OTHER_WORK_MIN_DESCRIPTION_LENGTH = 5;
+export const OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE =
+  `Al elegir «Otro», describe lo realizado (mínimo ${OTHER_WORK_MIN_DESCRIPTION_LENGTH} caracteres).`;
+
+export function isOtherWorkHourEntry(entry: {
+  assignment?: string | null;
+  moduleId?: string | null;
+  taskId?: string | null;
+}): boolean {
+  return entry.assignment === 'Proyecto' && Boolean(entry.moduleId) && !entry.taskId;
+}
+
+export function hasOtherWorkDescription(description: string | null | undefined): boolean {
+  return (description ?? '').trim().length >= OTHER_WORK_MIN_DESCRIPTION_LENGTH;
+}
+
 /** Fecha inclusiva en que comienzan las imputaciones con vínculo operativo. */
 export const HOUR_ENTRY_PLAN_LINK_START_DATE = '2026-11-11';
 

@@ -215,7 +215,11 @@ function EditEntryForm({
     user?.id === entry.user.id ? user.role === 'collaborator' : entry.designatedApprover !== null;
   // Las horas extra de un líder se autoaprueban; con el registro de otro se asume que no.
   const overtimeNeedsApproval = user?.id === entry.user.id ? hourEntryRequiresApproval(user.role, true) : true;
+  // Como la API: la descripción de «Otro» se exige al PASAR a «Otro» (desde
+  // una tarea u otra fase), no al corregir un registro que ya estaba así.
+  const requireOtherWorkDescription = Boolean(entry.taskId) || block.moduleId !== (entry.module?.id ?? '');
   const validationOptions = {
+    requireOtherWorkDescription,
     projects: selectableProjects,
     isCollaborator: ownerRequiresApprover,
     overtimeNeedsApproval,
@@ -319,6 +323,7 @@ function EditEntryForm({
         onToggleExpand={() => setBlock((prev) => ({ ...prev, expanded: !prev.expanded }))}
         onAdjustHours={(delta) => updateBlock({ hours: stepBlockHours(block.hours, delta) })}
         ownerUserId={entry.user.id}
+        requireOtherWorkDescription={requireOtherWorkDescription}
       />
 
       <div className={styles.actions}>

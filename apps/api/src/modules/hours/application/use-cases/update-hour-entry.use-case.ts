@@ -1,6 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { expectedAssignmentForProject, hourEntryRequiresApproval, type RoleCode, type UpdateHourEntryInput } from '@kora/contracts';
+import {
+  expectedAssignmentForProject,
+  hasOtherWorkDescription,
+  hourEntryRequiresApproval,
+  isOtherWorkHourEntry,
+  type RoleCode,
+  type UpdateHourEntryInput,
+} from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import { splitByDailyCap, type HoursTranche } from '../../domain/services/daily-cap';
 import {
@@ -16,6 +23,7 @@ import {
   ReferencedModuleNotFoundError,
   InvalidHourEntrySegmentError,
   HourEntrySegmentRequiredError,
+  OtherWorkDescriptionRequiredError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -175,6 +183,15 @@ export class UpdateHourEntryUseCase implements UseCase<UpdateHourEntryCommand, v
         ))).some(Boolean);
         if (hasEligibleSegment && !taskId) return err(new HourEntrySegmentRequiredError());
       }
+    }
+    // Pasar a «Otro» (desde una tarea u otra fase) exige describir lo
+    // realizado, igual que el alta. Un registro que ya estaba sin tarea en la
+    // misma fase se sigue pudiendo corregir sin reescribir su bitácora.
+    const switchesToOtherWork = isOtherWorkHourEntry({ assignment, moduleId, taskId }) &&
+      (Boolean(previous.taskId) || moduleId !== previous.moduleId);
+    if (switchesToOtherWork &&
+        !hasOtherWorkDescription(data.description !== undefined ? data.description : previous.description)) {
+      return err(new OtherWorkDescriptionRequiredError());
     }
     // Una hora normal que con la edición pase de la jornada de 8h del día se
     // queda con lo que cabe; el resto pasa a un registro nuevo de horas extra

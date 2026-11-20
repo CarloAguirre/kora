@@ -1,10 +1,20 @@
 import type { ProjectPhaseOption } from '@kora/contracts';
 
 /**
- * «Asignar a otra» permite registrar una actividad sin vincularla a una tarea.
- * Es una elección consciente, nunca una reasignación automática ni una FK.
+ * «Otro» permite registrar una actividad sin vincularla a una tarea. Es una
+ * elección consciente, nunca una FK; exige nombre y descripción de lo realizado
+ * (`isOtherWorkHourEntry` en contratos).
  */
 export const OTHER_TASK_OPTION = '__other__';
+export const OTHER_TASK_LABEL = 'Otro (trabajo sin tarea asignada)';
+
+/**
+ * Tarea inicial al elegir fase/bloque: si el autor no tiene tareas propias en
+ * la fase, «Otro» es la única opción y se preselecciona para no dejarlo
+ * frente a un selector obligatorio sin alternativas reconocibles.
+ */
+export const initialTaskIdForPhase = (ownTasksInPhase: readonly unknown[]): string =>
+  ownTasksInPhase.length === 0 ? OTHER_TASK_OPTION : '';
 
 export const toHourTaskId = (value: string | null | undefined): string | undefined =>
   value && value !== OTHER_TASK_OPTION ? value : undefined;

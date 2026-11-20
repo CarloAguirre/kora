@@ -1,6 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ForbiddenError, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import { expectedAssignmentForProject, hourEntryRequiresApproval, type CreateHourEntryInput, type RoleCode } from '@kora/contracts';
+import {
+  expectedAssignmentForProject,
+  hasOtherWorkDescription,
+  hourEntryRequiresApproval,
+  isOtherWorkHourEntry,
+  type CreateHourEntryInput,
+  type RoleCode,
+} from '@kora/contracts';
 import { HourEntry } from '../../domain/entities/hour-entry.entity';
 import {
   AssignmentMismatchesProjectStageError,
@@ -13,6 +20,7 @@ import {
   ReferencedModuleNotFoundError,
   InvalidHourEntrySegmentError,
   HourEntrySegmentRequiredError,
+  OtherWorkDescriptionRequiredError,
   ReferencedProjectNotFoundError,
 } from '../../domain/errors/hour-entry.errors';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
@@ -132,6 +140,11 @@ export class CreateHourEntryUseCase implements UseCase<CreateHourEntryCommand, {
       )).some(Boolean)) {
         return err(new HourEntrySegmentRequiredError());
       }
+    }
+    // «Otro»: sin tarea que explique el trabajo, la descripción es obligatoria
+    // (el nombre ya lo exige el esquema de `category`).
+    if (isOtherWorkHourEntry(data) && !hasOtherWorkDescription(data.description)) {
+      return err(new OtherWorkDescriptionRequiredError());
     }
 
     if (data.designatedApproverUserId) {
