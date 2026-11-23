@@ -61,10 +61,13 @@ export class DrizzleSupportConsumptionReader implements SupportConsumptionReader
         )
         .groupBy(ticketHhRequests.date),
       // 2b. `used_hours` sin desglose diario (tickets migrados de la v1) — a la fecha de reporte.
+      // `"tickets".id` explícito: en un select de UNA tabla drizzle no califica las columnas, y
+      // `${tickets.id}` dentro de la subconsulta quedaba como `"id"` → resolvía a `r.id` y la resta
+      // daba siempre 0 (contaba el `used_hours` completo encima de las horas ya registradas).
       db
         .select({
-          day: sql<string>`((${tickets.createdAt} at time zone 'America/Santiago')::date)::text`,
-          hours: sql<string>`${tickets.usedHours} - coalesce((select sum(r.hours) from ${ticketHhRequests} r where r.ticket_id = ${tickets.id} and r.status = 'approved'), 0)`,
+          day: sql<string>`(("tickets"."created_at" at time zone 'America/Santiago')::date)::text`,
+          hours: sql<string>`"tickets"."used_hours" - coalesce((select sum(r.hours) from ${ticketHhRequests} r where r.ticket_id = "tickets"."id" and r.status = 'approved'), 0)`,
         })
         .from(tickets)
         .where(and(inArray(tickets.projectId, ids), isNull(tickets.deletedAt), gt(tickets.usedHours, '0'))),
