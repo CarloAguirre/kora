@@ -81,7 +81,10 @@ export interface SupportMonthlyPeriodUsageUpdate {
   readonly consumedHoursPeriod: number;
   readonly consumedHoursEnd: number | null;
   readonly surplusHours: number;
-  readonly status: 'active' | 'expired';
+  /** Se recalculan en cadena: dependen del sobrante y del acumulado del período anterior. */
+  readonly reusedBalanceHours: number;
+  readonly consumedHoursStart: number;
+  readonly status: SupportMonthlyPeriodRecord['status'];
 }
 
 /**

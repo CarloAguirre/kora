@@ -115,8 +115,12 @@ export function TicketHistoryPage() {
         return rows;
       };
       // El desglose por día viene de un endpoint aparte (sin paginar, mismos filtros) — en paralelo con las páginas.
-      const [rows, dailyHours] = await Promise.all([fetchAllTickets(), ticketsApi.dailyHours(query)]);
-      exportTicketHistory(rows, dailyHours);
+      const [rows, dailyHours, contracts] = await Promise.all([
+        fetchAllTickets(),
+        ticketsApi.dailyHours(query),
+        ticketsApi.contractConsumption(query),
+      ]);
+      exportTicketHistory(rows, dailyHours, contracts);
     } catch (exportErr) {
       setExportError(exportErr instanceof Error ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {

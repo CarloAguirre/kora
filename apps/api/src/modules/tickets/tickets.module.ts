@@ -9,6 +9,9 @@ import { CreateTicketUseCase } from './application/use-cases/create-ticket.use-c
 import { UpdateTicketUseCase } from './application/use-cases/update-ticket.use-case';
 import { ListTicketsUseCase } from './application/use-cases/list-tickets.use-case';
 import { ListTicketDailyHoursUseCase } from './application/use-cases/list-ticket-daily-hours.use-case';
+import { ListTicketContractConsumptionUseCase } from './application/use-cases/list-ticket-contract-consumption.use-case';
+import { SUPPORT_CONSUMPTION_READER } from './application/ports/support-consumption-reader.port';
+import { DrizzleSupportConsumptionReader } from './infrastructure/persistence/drizzle-support-consumption.reader';
 import { GetTicketUseCase } from './application/use-cases/get-ticket.use-case';
 import { ChangeTicketStatusUseCase } from './application/use-cases/change-ticket-status.use-case';
 import { DeleteTicketUseCase } from './application/use-cases/delete-ticket.use-case';
@@ -86,6 +89,7 @@ import { HoursModule } from '../hours/hours.module';
     UpdateTicketUseCase,
     ListTicketsUseCase,
     ListTicketDailyHoursUseCase,
+    ListTicketContractConsumptionUseCase,
     GetTicketUseCase,
     ChangeTicketStatusUseCase,
     DeleteTicketUseCase,
@@ -118,6 +122,7 @@ import { HoursModule } from '../hours/hours.module';
     SupportMonthlyPeriodReconciler,
 
     { provide: TICKET_REPOSITORY, useClass: DrizzleTicketRepository },
+    { provide: SUPPORT_CONSUMPTION_READER, useClass: DrizzleSupportConsumptionReader },
     { provide: TICKET_HISTORY_REPOSITORY, useClass: DrizzleTicketHistoryRepository },
     { provide: TICKET_HH_REQUEST_REPOSITORY, useClass: DrizzleTicketHhRequestRepository },
     { provide: SUPPORT_PLAN_REPOSITORY, useClass: DrizzleSupportPlanRepository },

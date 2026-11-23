@@ -107,6 +107,8 @@ export class DrizzleSupportPlanRepository implements SupportPlanRepository {
         consumedHoursPeriod: String(usage.consumedHoursPeriod),
         consumedHoursEnd: usage.consumedHoursEnd === null ? null : String(usage.consumedHoursEnd),
         surplusHours: String(usage.surplusHours),
+        reusedBalanceHours: String(usage.reusedBalanceHours),
+        consumedHoursStart: String(usage.consumedHoursStart),
         status: usage.status,
         updatedAt: new Date(),
       })

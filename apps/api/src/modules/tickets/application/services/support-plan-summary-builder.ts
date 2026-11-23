@@ -1,17 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { SupportProjectSummary } from '@kora/contracts';
-import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import {
   SUPPORT_PLAN_REPOSITORY,
   type SupportMonthlyPeriodRecord,
   type SupportPlanRecord,
   type SupportPlanRepository,
 } from '../../domain/repositories/support-plan.repository';
-import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconciler';
+import { SUPPORT_CONSUMPTION_READER, type SupportConsumptionReader } from '../ports/support-consumption-reader.port';
+import { SupportMonthlyPeriodReconciler, canonicalPeriodChain } from './support-monthly-period-reconciler';
 import { resolveSupportPlanHourProjectIds, resolveSupportPlanProjectIds } from './support-plan-linked-projects';
 
 const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-const HOUR_ENTRY_PAGE_SIZE = 2000;
 
 /**
  * "Estado del proyecto" + "Historial de progreso" de `FichaProyectoSoporte`
@@ -29,7 +28,7 @@ const HOUR_ENTRY_PAGE_SIZE = 2000;
 export class SupportPlanSummaryBuilder {
   constructor(
     @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
-    @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
+    @Inject(SUPPORT_CONSUMPTION_READER) private readonly consumption: SupportConsumptionReader,
     private readonly periods: SupportMonthlyPeriodReconciler,
   ) {}
 
@@ -108,7 +107,8 @@ export class SupportPlanSummaryBuilder {
       planValueUf,
       extraHourValueUf,
       currency,
-      usedHours: periods.reduce((sum, period) => sum + period.consumedHoursPeriod, 0),
+      // Solo la cadena real: los duplicados traslapados de la v1 no suman (ver `canonicalPeriodChain`).
+      usedHours: round2(canonicalPeriodChain(periods).reduce((sum, period) => sum + period.consumedHoursPeriod, 0)),
       availableHours: currentPeriod?.capacityHours ?? null,
       currentPeriod,
       history: periods.map((period) => ({
@@ -121,10 +121,10 @@ export class SupportPlanSummaryBuilder {
   }
 
   /**
-   * Solo cuentan las horas registradas dentro de la vigencia del contrato
+   * Solo cuentan las horas dentro de la vigencia del contrato
    * (`startDate`..`endDate`, inclusive): las de tickets anteriores al inicio
-   * pertenecen a otro ciclo y no deben descontar de esta bolsa — mismo
-   * criterio que los períodos mensuales (`sumApprovedHoursForProjects` por rango).
+   * pertenecen a otro ciclo y no deben descontar de esta bolsa. Mismo consumo
+   * que los períodos mensuales — ver `SupportConsumptionReader`.
    */
   private async buildUsageSummary(
     projectIds: readonly string[],
@@ -132,24 +132,15 @@ export class SupportPlanSummaryBuilder {
     planType: 'bundle' | 'on_demand',
   ): Promise<SupportProjectSummary> {
     const { contractedHours, planValueUf, extraHourValueUf, currency } = plan;
-    const pages = await Promise.all(
-      projectIds.map((projectId) =>
-        this.hourEntries.search(
-          { projectId, status: 'approved', dateFrom: plan.startDate, dateTo: plan.endDate ?? undefined },
-          { page: 1, pageSize: HOUR_ENTRY_PAGE_SIZE },
-          { field: 'date', direction: 'asc' },
-        ),
-      ),
-    );
-    const items = pages.flatMap((page) => page.items);
+    const days = await this.consumption.listDailyHours(projectIds, plan.startDate, plan.endDate);
 
     const byMonth = new Map<string, number>();
-    for (const entry of items) {
-      const key = `${entry.date.getUTCFullYear()}-${entry.date.getUTCMonth()}`;
-      byMonth.set(key, (byMonth.get(key) ?? 0) + entry.hours);
+    for (const day of days) {
+      const key = day.date.slice(0, 7);
+      byMonth.set(key, (byMonth.get(key) ?? 0) + day.hours);
     }
 
-    const usedHours = items.reduce((sum, entry) => sum + entry.hours, 0);
+    const usedHours = round2(days.reduce((sum, day) => sum + day.hours, 0));
 
     return {
       planType,
@@ -163,11 +154,15 @@ export class SupportPlanSummaryBuilder {
       history: [...byMonth.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([key, hours]) => ({
-          label: MONTH_LABELS[Number(key.split('-')[1])]!,
+          label: MONTH_LABELS[Number(key.split('-')[1]) - 1]!,
           contractedHours: null,
           priorSurplusHours: null,
-          usedHours: hours,
+          usedHours: round2(hours),
         })),
     };
   }
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

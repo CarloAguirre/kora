@@ -80,6 +80,9 @@ export interface TicketRepository {
    */
   listDailyHours(filters: TicketFilters, context?: TransactionContext): Promise<TicketDailyHoursRow[]>;
 
+  /** Proyectos (sin repetir) de los tickets que cumplen `filters` — para ubicar sus contratos de soporte. */
+  listProjectIds(filters: TicketFilters, context?: TransactionContext): Promise<string[]>;
+
   save(ticket: Ticket, context?: TransactionContext): Promise<void>;
 
   /** Ids de tickets `closed` de estos proyectos que aún no están facturados — para `MarkSupportInvoiceIssuedUseCase` (planes `on_demand`). */

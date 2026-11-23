@@ -90,6 +90,33 @@ describe('exportación del historial de tickets', () => {
     expect(detail['M4']?.v).toBe(0);
   });
 
+  it('con contrato de soporte, el total del Excel cuadra con el de Kora', () => {
+    const project = { id: '33333333-3333-4333-8333-333333333333', name: 'Soporte Cliente' };
+    const planId = '44444444-4444-4444-8444-444444444444';
+    const inside = ticket({ project, usedHours: 8 });
+    const before = ticket({ id: '22222222-2222-4222-8222-222222222222', project, usedHours: 3, createdAt: '2026-04-10T15:00:00.000Z' });
+    const workbook = buildTicketHistoryWorkbook([inside, before], [hours()], {
+      contracts: [{ planId, name: 'Soporte Cliente', projectIds: [project.id], startDate: '2026-05-01', endDate: null, usedHours: 15 }],
+      entries: [
+        { planId, date: '2026-11-05', hours: 5, projectName: 'Soporte Cliente', userFullName: 'Ana', category: 'Monitoreo', description: '', source: 'without_ticket' },
+        { planId, date: '2026-11-06', hours: 2, projectName: 'Desarrollo X', userFullName: 'Luis', category: 'Ajuste', description: '', source: 'linked_project' },
+      ],
+    });
+    const detail = workbook.Sheets['Detalle por día']!;
+    const totals = workbook.Sheets['Total contrato']!;
+
+    expect(detail['P1']?.v).toBe('Cuenta en total contrato');
+    expect(detail['P2']?.v).toBe('Sí');
+    expect(detail['P3']?.v).toBe('No: fuera de la vigencia del contrato');
+    expect(detail['N4']?.v).toBe('Registro sin ticket');
+    expect(detail['N5']?.v).toBe('Proyecto vinculado al contrato');
+    expect(totals['B2']?.v).toBe(8);
+    expect(totals['F2']?.v).toBe(15);
+    expect(totals['G2']?.v).toBe(15);
+    expect(totals['H2']?.v).toBe(0);
+    expect(totals['I2']?.v).toBe(3);
+  });
+
   it('impide exportar tickets duplicados u omitidos por paginación', () => {
     const first = ticket();
     const second = ticket({ id: '22222222-2222-4222-8222-222222222222' });

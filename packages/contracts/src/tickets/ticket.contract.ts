@@ -253,6 +253,45 @@ export const ticketDailyHoursSchema = z.object({
 export type TicketDailyHours = z.infer<typeof ticketDailyHoursSchema>;
 
 /**
+ * Consumo de los contratos de soporte de los tickets del filtro
+ * (`GET /tickets/contract-consumption`, mismos filtros que `GET /tickets`) —
+ * lo que el Excel del historial necesita para que su total cuadre con el de
+ * la ficha del contrato: el total que muestra Kora y los registros de horas
+ * que el contrato consume sin pasar por un ticket.
+ */
+export const ticketContractConsumptionSchema = z.object({
+  planId: uuidSchema,
+  name: z.string(),
+  /** Proyectos cuyas horas consume el contrato (contenedor + vinculados). */
+  projectIds: z.array(uuidSchema),
+  /** Vigencia que cuenta, 'YYYY-MM-DD' inclusive; `endDate = null` = sin tope. */
+  startDate: z.string(),
+  endDate: z.string().nullable(),
+  /** Total del contrato — la misma cifra que la ficha del contrato y la tabla de Soporte. */
+  usedHours: z.number(),
+});
+
+export const ticketContractHourEntrySchema = z.object({
+  planId: uuidSchema,
+  /** 'YYYY-MM-DD'. */
+  date: z.string(),
+  hours: z.number(),
+  projectName: z.string(),
+  userFullName: z.string(),
+  category: z.string(),
+  description: z.string(),
+  source: z.enum(['without_ticket', 'linked_project', 'deleted_ticket']),
+});
+
+export const ticketContractConsumptionResponseSchema = z.object({
+  contracts: z.array(ticketContractConsumptionSchema),
+  entries: z.array(ticketContractHourEntrySchema),
+});
+export type TicketContractConsumption = z.infer<typeof ticketContractConsumptionSchema>;
+export type TicketContractHourEntry = z.infer<typeof ticketContractHourEntrySchema>;
+export type TicketContractConsumptionResponse = z.infer<typeof ticketContractConsumptionResponseSchema>;
+
+/**
  * Proyecto seleccionable para vincular un ticket (selector "Proyecto"/"Proyecto
  * de desarrollo" del modal). A propósito un tipo aparte, más angosto que
  * `ProjectSummary`: lo sirve un endpoint sin el acotamiento a "mis proyectos

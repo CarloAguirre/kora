@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import type { SupportConsumptionReader } from '../ports/support-consumption-reader.port';
 import type {
   CreateNextSupportMonthlyPeriodInput,
   SupportMonthlyPeriodRecord,
@@ -51,14 +51,14 @@ class InMemoryPeriods implements PlanRepositoryUsed {
   }
 }
 
-/** Horas aprobadas por fecha — la suma respeta el rango [desde, hasta] inclusivo, igual que el repositorio real. */
-class FakeHourEntries implements Pick<HourEntryRepository, 'sumApprovedHoursForProjects'> {
+/** Consumo por fecha — respeta el rango [desde, hasta] inclusivo, igual que el lector real. */
+class FakeConsumption implements Pick<SupportConsumptionReader, 'listDailyHours'> {
   constructor(private readonly entries: { date: string; hours: number }[]) {}
 
-  async sumApprovedHoursForProjects(_projectIds: readonly string[], from: Date, to: Date): Promise<number> {
-    return this.entries
-      .filter((entry) => new Date(`${entry.date}T00:00:00Z`) >= from && new Date(`${entry.date}T00:00:00Z`) <= to)
-      .reduce((sum, entry) => sum + entry.hours, 0);
+  async listDailyHours(_projectIds: readonly string[], from: Date, to: Date | null) {
+    return this.entries.filter(
+      (entry) => new Date(`${entry.date}T00:00:00Z`) >= from && (to === null || new Date(`${entry.date}T00:00:00Z`) <= to),
+    );
   }
 }
 
@@ -66,7 +66,7 @@ function build(periods: SupportMonthlyPeriodRecord[], entries: { date: string; h
   const repository = new InMemoryPeriods(periods);
   const reconciler = new SupportMonthlyPeriodReconciler(
     repository as unknown as SupportPlanRepository,
-    new FakeHourEntries(entries) as unknown as HourEntryRepository,
+    new FakeConsumption(entries) as unknown as SupportConsumptionReader,
     new PassthroughUnitOfWork(),
     new SequentialIdGenerator('period'),
   );
@@ -201,12 +201,17 @@ describe('SupportMonthlyPeriodReconciler — renovación del período', () => {
     expect(repository.sorted()[0]?.status).toBe('expired');
   });
 
-  it('no toca contratos que no son mensuales ni contratos ya terminados', async () => {
-    for (const other of [plan({ planType: 'bundle' }), plan({ status: 'ended' })]) {
-      const { repository, reconciler } = build([period()]);
-      await reconciler.listPeriods(other, TODAY);
-      expect(repository.sorted()).toEqual([period()]);
-    }
+  it('no toca contratos que no son mensuales', async () => {
+    const { repository, reconciler } = build([period()], [{ date: '2026-08-20', hours: 6 }]);
+    await reconciler.listPeriods(plan({ planType: 'bundle' }), TODAY);
+    expect(repository.sorted()).toEqual([period()]);
+  });
+
+  it('en un contrato terminado recalcula el consumo pero no abre períodos nuevos', async () => {
+    const { repository, reconciler } = build([period()], [{ date: '2026-08-20', hours: 6 }]);
+    await reconciler.listPeriods(plan({ status: 'ended' }), TODAY);
+    expect(repository.sorted()).toHaveLength(1);
+    expect(repository.sorted()[0]).toMatchObject({ status: 'expired', consumedHoursPeriod: 6 });
   });
 
   it('ignora los períodos anulados al buscar el último de la cadena', async () => {
@@ -259,5 +264,42 @@ describe('SupportMonthlyPeriodReconciler — consumo del período vigente', () =
     const periods = await reconciler.listPeriods(plan(), TODAY);
 
     expect(periods[0]?.consumedHoursPeriod).toBe(0);
+  });
+});
+
+describe('SupportMonthlyPeriodReconciler — recálculo de períodos cerrados', () => {
+  it('recalcula un período ya cerrado cuando cambian sus horas y arrastra el saldo al siguiente', async () => {
+    const { repository, reconciler } = build(
+      [
+        period({ id: 'aug', status: 'expired', consumedHoursPeriod: 2, consumedHoursEnd: 2, surplusHours: 8 }),
+        period({ id: 'sep', startDate: d('2026-09-01'), endDate: d('2026-10-01'), reusedBalanceHours: 8, consumedHoursStart: 2 }),
+      ],
+      [
+        { date: '2026-08-05', hours: 2 },
+        { date: '2026-08-28', hours: 5 }, // Aprobada después del cierre.
+      ],
+    );
+
+    await reconciler.listPeriods(plan(), TODAY);
+
+    const [august, september] = repository.sorted();
+    expect(august).toMatchObject({ status: 'expired', consumedHoursPeriod: 7, consumedHoursEnd: 7, surplusHours: 3 });
+    expect(september).toMatchObject({ reusedBalanceHours: 3, consumedHoursStart: 7 });
+  });
+
+  it('ignora los períodos duplicados que se traslapan con la cadena', async () => {
+    const { repository, reconciler } = build(
+      [
+        period({ id: 'aug', status: 'expired' }),
+        period({ id: 'dup', startDate: d('2026-08-08'), endDate: d('2026-09-08'), status: 'expired' }),
+        period({ id: 'sep', startDate: d('2026-09-01'), endDate: d('2026-10-01') }),
+      ],
+      [{ date: '2026-08-20', hours: 4 }],
+    );
+
+    await reconciler.listPeriods(plan(), TODAY);
+
+    expect(repository.sorted().find((p) => p.id === 'aug')?.consumedHoursPeriod).toBe(4);
+    expect(repository.sorted().find((p) => p.id === 'dup')?.consumedHoursPeriod).toBe(0);
   });
 });

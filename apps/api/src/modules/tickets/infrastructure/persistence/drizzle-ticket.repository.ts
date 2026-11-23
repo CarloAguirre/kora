@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { alias, and, asc, clients, count, desc, eq, gt, gte, ilike, inArray, isNull, isUuid, lt, or, projects, sql, ticketHhRequests, tickets, users, type Database } from '@kora/db';
+import { alias, and, asc, clients, count, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, isUuid, lt, or, projects, sql, ticketHhRequests, tickets, users, type Database } from '@kora/db';
 
 /** `YYYY-MM-DD` para comparar contra columnas `date` sin corrimiento de zona horaria. */
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
@@ -197,6 +197,15 @@ export class DrizzleTicketRepository implements TicketRepository {
       userFullName: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim(),
       hours: Number(row.hours),
     }));
+  }
+
+  async listProjectIds(filters: TicketFilters, context?: TransactionContext): Promise<string[]> {
+    const db = resolveDb(this.database, context);
+    const rows = await db
+      .selectDistinct({ projectId: tickets.projectId })
+      .from(tickets)
+      .where(and(this.buildWhere(filters), isNotNull(tickets.projectId)));
+    return rows.flatMap((row) => (row.projectId ? [row.projectId] : []));
   }
 
   async findClosedUnbilledIds(projectIds: readonly string[], context?: TransactionContext): Promise<string[]> {
