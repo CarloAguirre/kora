@@ -52,8 +52,15 @@ class InMemoryPeriods implements PlanRepositoryUsed {
 }
 
 /** Consumo por fecha — respeta el rango [desde, hasta] inclusivo, igual que el lector real. */
-class FakeConsumption implements Pick<SupportConsumptionReader, 'listDailyHours'> {
-  constructor(private readonly entries: { date: string; hours: number }[]) {}
+class FakeConsumption implements Pick<SupportConsumptionReader, 'listDailyHours' | 'sumTicketHoursBefore'> {
+  constructor(
+    private readonly entries: { date: string; hours: number }[],
+    private readonly ticketHoursBeforeStart = 0,
+  ) {}
+
+  async sumTicketHoursBefore(): Promise<number> {
+    return this.ticketHoursBeforeStart;
+  }
 
   async listDailyHours(_projectIds: readonly string[], from: Date, to: Date | null) {
     return this.entries.filter(
@@ -62,11 +69,11 @@ class FakeConsumption implements Pick<SupportConsumptionReader, 'listDailyHours'
   }
 }
 
-function build(periods: SupportMonthlyPeriodRecord[], entries: { date: string; hours: number }[] = []) {
+function build(periods: SupportMonthlyPeriodRecord[], entries: { date: string; hours: number }[] = [], ticketHoursBeforeStart = 0) {
   const repository = new InMemoryPeriods(periods);
   const reconciler = new SupportMonthlyPeriodReconciler(
     repository as unknown as SupportPlanRepository,
-    new FakeConsumption(entries) as unknown as SupportConsumptionReader,
+    new FakeConsumption(entries, ticketHoursBeforeStart) as unknown as SupportConsumptionReader,
     new PassthroughUnitOfWork(),
     new SequentialIdGenerator('period'),
   );
@@ -301,5 +308,24 @@ describe('SupportMonthlyPeriodReconciler — recálculo de períodos cerrados', 
 
     expect(repository.sorted().find((p) => p.id === 'aug')?.consumedHoursPeriod).toBe(4);
     expect(repository.sorted().find((p) => p.id === 'dup')?.consumedHoursPeriod).toBe(0);
+  });
+});
+
+describe('SupportMonthlyPeriodReconciler — horas de tickets anteriores al inicio', () => {
+  it('se suman solo al primer período de la cadena', async () => {
+    const { repository, reconciler } = build(
+      [
+        period({ id: 'aug', status: 'expired' }),
+        period({ id: 'sep', startDate: d('2026-09-01'), endDate: d('2026-10-01') }),
+      ],
+      [{ date: '2026-08-20', hours: 4 }, { date: '2026-09-03', hours: 1 }],
+      2.5,
+    );
+
+    await reconciler.listPeriods(plan({ startDate: d('2026-08-01') }), TODAY);
+
+    const [august, september] = repository.sorted();
+    expect(august?.consumedHoursPeriod).toBe(6.5);
+    expect(september?.consumedHoursPeriod).toBe(1);
   });
 });

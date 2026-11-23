@@ -32,6 +32,9 @@ import { resolveSupportPlanHourProjectIds } from './support-plan-linked-projects
  *   reutilizado del siguiente; en `expire` se pierde. El primer período
  *   conserva el saldo con el que nació (p. ej. migrado de la v1).
  *
+ * Las horas de tickets anteriores al inicio del contrato se suman al primer
+ * período — ver `SupportConsumptionReader.sumTicketHoursBefore`.
+ *
  * Períodos traslapados (duplicados de la v1 que empiezan antes de que termine
  * el anterior) quedan fuera de la cadena: no se recalculan ni suman, para no
  * contar dos veces las mismas horas — ver `canonicalPeriodChain`.
@@ -82,13 +85,17 @@ export class SupportMonthlyPeriodReconciler {
     }
 
     const projectIds = await resolveSupportPlanHourProjectIds(this.plans, plan);
-    const days = await this.consumption.listDailyHours(projectIds, chain[0]!.startDate, lastDayOf(chain.at(-1)!));
+    const [days, beforeStart] = await Promise.all([
+      this.consumption.listDailyHours(projectIds, chain[0]!.startDate, lastDayOf(chain.at(-1)!)),
+      this.consumption.sumTicketHoursBefore(projectIds, plan.startDate),
+    ]);
 
     const computed = chain.map((period) => ({ period, next: period }));
     for (let index = 0; index < computed.length; index += 1) {
       const { period } = computed[index]!;
       const previous = index > 0 ? computed[index - 1]!.next : null;
-      const consumed = sumConsumptionDays(days, period.startDate, period.endDate);
+      // Las horas de tickets anteriores al inicio del contrato se suman a su primer mes (como en la v1).
+      const consumed = round2(sumConsumptionDays(days, period.startDate, period.endDate) + (index === 0 ? beforeStart : 0));
       const reusedBalanceHours = previous ? (accumulate ? previous.surplusHours : 0) : period.reusedBalanceHours;
       const consumedHoursStart = previous ? (previous.consumedHoursEnd ?? round2(previous.consumedHoursStart + previous.consumedHoursPeriod)) : period.consumedHoursStart;
       const hasEnded = period.endDate.getTime() <= today.getTime();

@@ -87,6 +87,41 @@ export class DrizzleSupportConsumptionReader implements SupportConsumptionReader
       .map(([date, hours]) => ({ date, hours: Math.round(hours * 100) / 100 }));
   }
 
+  async sumTicketHoursBefore(projectIds: readonly string[], before: Date, context?: TransactionContext): Promise<number> {
+    if (projectIds.length === 0) return 0;
+    const db = resolveDb(this.database, context);
+    const ids = [...projectIds];
+    const beforeKey = isoDay(before);
+
+    const [requests, undetailedTickets] = await Promise.all([
+      db
+        .select({ hours: sql<string>`coalesce(sum("ticket_hh_requests"."hours"), 0)` })
+        .from(ticketHhRequests)
+        .innerJoin(tickets, eq(tickets.id, ticketHhRequests.ticketId))
+        .where(
+          and(
+            inArray(tickets.projectId, ids),
+            isNull(tickets.deletedAt),
+            eq(ticketHhRequests.status, 'approved'),
+            sql`"ticket_hh_requests"."date" < ${beforeKey}`,
+          ),
+        ),
+      // Columnas calificadas a mano: ver la nota de `listDailyHours` (2b).
+      db
+        .select({
+          day: sql<string>`(("tickets"."created_at" at time zone 'America/Santiago')::date)::text`,
+          hours: sql<string>`"tickets"."used_hours" - coalesce((select sum(r.hours) from ${ticketHhRequests} r where r.ticket_id = "tickets"."id" and r.status = 'approved'), 0)`,
+        })
+        .from(tickets)
+        .where(and(inArray(tickets.projectId, ids), isNull(tickets.deletedAt), gt(tickets.usedHours, '0'))),
+    ]);
+
+    const undetailed = undetailedTickets
+      .filter((row) => row.day < beforeKey && Number(row.hours) > 0)
+      .reduce((sum, row) => sum + Number(row.hours), 0);
+    return Math.round((Number(requests[0]?.hours ?? 0) + undetailed) * 100) / 100;
+  }
+
   async listEntriesWithoutTicket(
     projectIds: readonly string[],
     from: Date,

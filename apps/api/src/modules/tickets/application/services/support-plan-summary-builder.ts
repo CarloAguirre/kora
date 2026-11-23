@@ -121,10 +121,9 @@ export class SupportPlanSummaryBuilder {
   }
 
   /**
-   * Solo cuentan las horas dentro de la vigencia del contrato
-   * (`startDate`..`endDate`, inclusive): las de tickets anteriores al inicio
-   * pertenecen a otro ciclo y no deben descontar de esta bolsa. Mismo consumo
-   * que los períodos mensuales — ver `SupportConsumptionReader`.
+   * Cuentan las horas dentro de la vigencia del contrato (`startDate`..`endDate`,
+   * inclusive) más las de tickets anteriores al inicio, que se suman al primer
+   * mes. Mismo consumo que los períodos mensuales — ver `SupportConsumptionReader`.
    */
   private async buildUsageSummary(
     projectIds: readonly string[],
@@ -132,15 +131,20 @@ export class SupportPlanSummaryBuilder {
     planType: 'bundle' | 'on_demand',
   ): Promise<SupportProjectSummary> {
     const { contractedHours, planValueUf, extraHourValueUf, currency } = plan;
-    const days = await this.consumption.listDailyHours(projectIds, plan.startDate, plan.endDate);
+    const [days, beforeStart] = await Promise.all([
+      this.consumption.listDailyHours(projectIds, plan.startDate, plan.endDate),
+      this.consumption.sumTicketHoursBefore(projectIds, plan.startDate),
+    ]);
 
+    // Las horas de tickets anteriores al inicio se suman al primer mes del contrato (como en los mensuales).
     const byMonth = new Map<string, number>();
+    if (beforeStart > 0) byMonth.set(plan.startDate.toISOString().slice(0, 7), beforeStart);
     for (const day of days) {
       const key = day.date.slice(0, 7);
       byMonth.set(key, (byMonth.get(key) ?? 0) + day.hours);
     }
 
-    const usedHours = round2(days.reduce((sum, day) => sum + day.hours, 0));
+    const usedHours = round2(days.reduce((sum, day) => sum + day.hours, 0) + beforeStart);
 
     return {
       planType,

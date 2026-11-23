@@ -45,6 +45,16 @@ export interface SupportConsumptionReader {
     context?: TransactionContext,
   ): Promise<SupportConsumptionDay[]>;
 
+  /**
+   * Horas de tickets de estos proyectos anteriores a `before` (solicitudes de
+   * HH aprobadas con fecha previa + `used_hours` sin desglose de tickets
+   * reportados antes). El contrato las suma a su PRIMER mes, igual que la v1:
+   * el trabajo de soporte hecho antes de firmar el contrato también lo
+   * consume. Solo horas de tickets: los registros sin ticket o de proyectos
+   * vinculados anteriores al inicio no cuentan.
+   */
+  sumTicketHoursBefore(projectIds: readonly string[], before: Date, context?: TransactionContext): Promise<number>;
+
   /** Registros aprobados en [from, to] que no respaldan una solicitud aprobada de un ticket vigente — ordenados por fecha. */
   listEntriesWithoutTicket(
     projectIds: readonly string[],

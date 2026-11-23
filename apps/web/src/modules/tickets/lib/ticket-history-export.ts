@@ -47,7 +47,8 @@ const ENTRY_SOURCE_LABELS: Record<TicketContractHourEntry['source'], string> = {
   deleted_ticket: 'Registro de ticket eliminado',
 };
 
-const OUTSIDE_VALIDITY = 'No: fuera de la vigencia del contrato';
+const OUTSIDE_VALIDITY = 'No: posterior al término del contrato';
+const BEFORE_START = 'Sí: anterior al inicio (se suma al primer mes)';
 
 /** El resumen conserva las columnas históricas en su orden original. */
 const COLUMNS: ReadonlyArray<{ label: string; getValue: (ticket: TicketSummary) => CellValue }> = [
@@ -152,8 +153,9 @@ function buildDailyRows(
 
 /**
  * Contrato en cuyo total cuenta una fila de ticket: el del proyecto del
- * ticket, si la fecha cae en su vigencia. Las HH sin desglose diario se
- * imputan a la fecha de reporte, igual que en Kora.
+ * ticket, salvo que la fecha sea posterior a su término. Las anteriores al
+ * inicio también cuentan (Kora las suma al primer mes). Las HH sin desglose
+ * diario se imputan a la fecha de reporte, igual que en Kora.
  */
 function ticketDetailRow(row: DailyRow, contracts: readonly TicketContractConsumption[]): DetailRow {
   const projectId = row.ticket.project?.id ?? '';
@@ -162,10 +164,8 @@ function ticketDetailRow(row: DailyRow, contracts: readonly TicketContractConsum
   const contract = contracts.find((item) => item.projectIds.includes(projectId));
   if (!contract) return { ...base, contractId: null, countsLabel: 'No: sin contrato de soporte' };
   const day = row.day || ticketReportDay(row.ticket.createdAt);
-  if (day < contract.startDate || (contract.endDate !== null && day > contract.endDate)) {
-    return { ...base, contractId: null, countsLabel: OUTSIDE_VALIDITY };
-  }
-  return { ...base, contractId: contract.planId, countsLabel: 'Sí' };
+  if (contract.endDate !== null && day > contract.endDate) return { ...base, contractId: null, countsLabel: OUTSIDE_VALIDITY };
+  return { ...base, contractId: contract.planId, countsLabel: day < contract.startDate ? BEFORE_START : 'Sí' };
 }
 
 function entryDetailRow(entry: TicketContractHourEntry, contract: TicketContractConsumption | undefined, clientName: string): DetailRow {
@@ -198,7 +198,8 @@ function buildContractTotalsSheet(contracts: readonly TicketContractConsumption[
     'Total Excel',
     'Total contrato en Kora',
     'Diferencia',
-    'HH de tickets fuera de vigencia (no cuentan)',
+    'De las HH tickets: anteriores al inicio (en el primer mes)',
+    'HH de tickets posteriores al término (no cuentan)',
   ];
   const body = contracts.map((contract) => {
     const sum = (predicate: (row: DetailRow) => boolean) =>
@@ -209,8 +210,12 @@ function buildContractTotalsSheet(contracts: readonly TicketContractConsumption[
     const linked = ofKind('linked_project');
     const deleted = ofKind('deleted_ticket');
     const total = roundHours(tickets + withoutTicket + linked + deleted);
+    const beforeStart = sum((row) => row.contractId === contract.planId && row.countsLabel === BEFORE_START);
     const outside = sum((row) => row.countsLabel === OUTSIDE_VALIDITY && contract.projectIds.includes(row.projectId));
-    return [contract.name, tickets, withoutTicket, linked, deleted, total, contract.usedHours, roundHours(total - contract.usedHours), outside];
+    return [
+      contract.name, tickets, withoutTicket, linked, deleted, total, contract.usedHours, roundHours(total - contract.usedHours),
+      beforeStart, outside,
+    ];
   });
   const sheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
   sheet['!cols'] = headers.map((label, index) => ({ wch: index === 0 ? 34 : Math.max(14, Math.min(30, label.length + 2)) }));
