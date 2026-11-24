@@ -33,6 +33,7 @@ import {
   type QuotationVersion,
   type QuotationTeamCatalogEntry,
   type UpdateQuotationDraftInput,
+  soldHoursAreCommercialEstimate,
 } from '@kora/contracts';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
@@ -1079,10 +1080,16 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       // Presupuestos de equipo previos (con o sin fases) se conservan.
       // Cada nueva cotización aporta únicamente sus propias HH y fases;
       // las HH consumidas siguen en projects.used_hours sin modificaciones.
+      // Sin Roadmap ni contrato, project.sold_hours son las «HH estimadas» de
+      // Prospecto/Cotización: la cotización aprobada las reemplaza, no se suman.
+      const replacesEstimatedSoldHours = soldHoursAreCommercialEstimate({
+        moduleCount: existingModules.length, contractAmount: project.contractAmount,
+      });
+      const previousSoldHours = replacesEstimatedSoldHours ? 0 : Number(project.soldHours);
       let transferPlan: ReturnType<typeof planCommercialPreparationTransfer>;
       try {
         transferPlan = planCommercialPreparationTransfer({
-          previousSoldHours: Number(project.soldHours),
+          previousSoldHours,
           approvedQuotationHours: Number(version.totalHours),
           phaseZeroBillableHours: draft.phaseZeroBillableHours ?? 0,
           existingTeams,
@@ -1212,7 +1219,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           phaseZeroBillableHours: billablePhaseZero,
           futureQuotedHours: Number(version.totalHours),
           uncalendarizedProspectPhase: {
-            priorSoldHours: Number(project.soldHours),
+            priorSoldHours: previousSoldHours,
+            replacedEstimatedSoldHours: replacesEstimatedSoldHours
+              ? Number(project.soldHours) : null,
             phase1AssignedHours: transferPlan.phase1AssignedHours,
             existingTeams: existingTeams.map((row) => ({
               teamId: row.teamId,

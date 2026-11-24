@@ -5,7 +5,22 @@ type Model = ReturnType<typeof quotationExportModel>;
 type CellValue = string | number | null | undefined;
 type RowValues = CellValue[];
 type TemplateArchive = ReturnType<typeof XLSX.CFB.read>;
-type SheetSpec = { title: string; subtitle: string; headers: string[]; data: RowValues[] };
+/** styles: índice de estilo (cellXfs) por columna de datos, cuando el de la
+ * fila de ejemplo corporativa no corresponde (p. ej. formato fecha heredado). */
+type SheetSpec = { title: string; subtitle: string; headers: string[]; data: RowValues[]; styles?: Record<number, string> };
+/** Estilo general con ajuste de texto de las filas de datos corporativas. */
+const GENERAL_DATA_STYLE = '24';
+type Draft = Model['draft'];
+export const quotationCostRecurrenceLabel = (value: Draft['costs'][number]['recurrence']): string =>
+  value === 'once' ? 'Único' : value === 'monthly' ? 'Mensual' : 'Anual';
+export const quotationPaymentTriggerLabel = (item: Draft['paymentPlan'][number]): string => {
+  if (item.trigger === 'phase') return 'Inicio de fase: ' + (item.triggerPhase?.trim() || 'por definir');
+  if (item.trigger === 'date') {
+    const [y, m, d] = (item.triggerDate ?? '').split('-');
+    return 'Fecha: ' + (y && m && d ? d + '-' + m + '-' + y : 'por definir');
+  }
+  return 'Aprobación del proyecto';
+};
 const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const PKG_REL = 'http://schemas.openxmlformats.org/package/2006/relationships';
@@ -114,7 +129,7 @@ export function patchStyledTableSheet(xml: string, spec: SheetSpec): string {
   }
   for (let i = 0; i < spec.data.length; i++) {
     const row = cloneRow(sample, i + 5);
-    writeRow(row, spec.data[i] ?? []);
+    writeRow(row, spec.data[i] ?? [], spec.styles);
     rows.push(row);
   }
   data.replaceChildren(...rows);
@@ -169,7 +184,10 @@ function patchSummary(xml: string, model: Model): string {
   }
   set(5, 0, total); set(5, 3, reserve);
   set(5, 6, total + reserve);
-  set(5, 9, null); // Sin planificación diaria, no inventar días hábiles.
+  // Días hábiles: los del análisis si existen; si no, semanas × 5, la misma
+  // convención de días relativos que usa la hoja Roadmap_Semanal.
+  set(5, 9, draft.analysis?.summary?.durationWorkingDays ??
+    (model.weeks ? Math.ceil(model.weeks * 5) : null));
   set(5, 11, model.weeks || null);
   set(8, 0, 'Perfil / equipo'); set(8, 1, 'HH'); set(8, 2, '% total');
   set(8, 4, 'Módulo'); set(8, 5, 'HH base'); set(8, 6, '% total');
@@ -311,6 +329,8 @@ function buildSpecs(model: Model): Map<string, SheetSpec> {
       return [p.code,p.name,p.name,p.startWeek,p.startWeek+p.durationWeeks-1,
         round(hh),p.durationWeeks,teams||'Por asignar','Planificada','EDT / cotización'];
     }),
+    // La fila de ejemplo trae formato dd/mm/yyyy en esta columna: 1 → 01-01-1900.
+    styles:{6:GENERAL_DATA_STYLE},
   });
   if(weekly?.rows.length){
     const teamKeys=[...new Set(weekly.rows.map(r=>r.teamKey))];
@@ -361,8 +381,9 @@ function buildSpecs(model: Model): Map<string, SheetSpec> {
       ['Resumen','Tarifa por HH',version.hourlyRate??'No definido',version.currency],
       ['Resumen','Neto',version.netAmount??'No definido',version.currency],
       ['Resumen','Total',version.totalAmount??'No definido',version.currency],
-      ...draft.costs.map(c=>['Costo externo',c.description,c.amount,c.recurrence]),
-      ...draft.paymentPlan.map(p=>['Plan de pago',p.name,p.percent+'%',p.trigger]),
+      ...draft.costs.map(c=>['Costo externo',c.description,c.amount,
+        quotationCostRecurrenceLabel(c.recurrence)+' · '+version.currency]),
+      ...draft.paymentPlan.map(p=>['Plan de pago',p.name,p.percent+'%',quotationPaymentTriggerLabel(p)]),
     ],
   });
   return out;

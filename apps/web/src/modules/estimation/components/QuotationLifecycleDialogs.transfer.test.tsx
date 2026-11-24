@@ -12,6 +12,9 @@ const project = {
   soldHours: 60,
   usedHours: 15,
   prospectPhaseHours: 15,
+  // Contrato previo: las HH vendidas anteriores son venta real y se suman.
+  contractAmount: 500,
+  modules: [],
   teams: [
     { teamId: DEV, teamName: 'Desarrollo', assignedHours: 40 },
     { teamId: UX, teamName: 'UX-UI', assignedHours: 20 },
@@ -66,5 +69,19 @@ describe('Resumen de traspaso aditivo con HH previas conservadas', () => {
       .toBeInTheDocument();
     expect(within(dialog).getByText(/Equipo histórico conservado: 20 HH previas/))
       .toBeInTheDocument();
+  });
+
+  it('reemplaza las HH estimadas de Cotización cuando no hay Roadmap ni contrato', () => {
+    const estimate = { ...project, soldHours: 620, usedHours: 0, contractAmount: null,
+      modules: [], teams: [] } as unknown as ProjectDetail;
+    render(<QuotationTransferDialog project={estimate} version={version}
+      open afterApproval={false} pending={false} onClose={vi.fn()}
+      onTransfer={vi.fn()}/>);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('HH estimadas (Prospecto/Cotización)')).toBeInTheDocument();
+    expect(within(dialog).getByText(/620 HH; se reemplazan por la cotización aprobada/))
+      .toBeInTheDocument();
+    expect(within(dialog).queryByText('HH vendidas anteriores')).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/^100 HH \(cotización\)/)).toBeInTheDocument();
   });
 });

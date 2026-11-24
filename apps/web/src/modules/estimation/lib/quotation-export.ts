@@ -1,7 +1,9 @@
 import * as XLSX from 'xlsx';
 import { quotationEdtAssignments, type QuotationVersion } from '@kora/contracts';
 import { quotationTeamWeeklyPlan } from '../components/quotation-team-weekly-plan';
-import { patchFormattedQuotationTemplate } from './quotation-export-template';
+import {
+  patchFormattedQuotationTemplate, quotationCostRecurrenceLabel, quotationPaymentTriggerLabel,
+} from './quotation-export-template';
 
 /**
  * Exportación comercial de lectura. Nunca cambia la cotización, ejecuta Gemini,
@@ -53,12 +55,19 @@ export function quotationExportModel({ version, project, teamNames }: QuotationE
   const weeks = Math.max(0, ...phases.map((p) => p.startWeek + p.durationWeeks - 1));
   const team = (id: string | null) => id ? teamNames.get(id) ?? 'Equipo sin catálogo' : 'Sin equipo asignado';
   const client = project.client?.companyName?.trim() || 'Cliente no especificado';
+  // Cotización manual sin descripción: describir lo que SÍ está registrado
+  // (fases y su secuencia) en lugar de un aviso de «pendiente».
+  const phaseScope = phases.length
+    ? project.name.trim() + ' · ' + phases.length + (phases.length === 1 ? ' fase: ' : ' fases: ') +
+      phases.map((p) => p.name.trim()).join(', ') + '.'
+    : null;
   return {
     version, draft, details, phases, weeks, team, client, projectName: project.name,
     projectDescription: project.description ?? null,
     weekly: quotationTeamWeeklyPlan(draft),
     scope: draft.aiPoc?.confirmedUnderstanding ||
-      draft.aiPoc?.proposal?.summary || project.description ||
+      draft.aiPoc?.proposal?.summary || draft.analysis?.project?.objective?.trim() ||
+      project.description?.trim() || phaseScope ||
       'Objetivo pendiente de definición comercial.',
     status: version.status === 'approved' ? 'Aprobada' :
       version.status === 'sent' ? 'Enviada' : 'Borrador',
@@ -306,10 +315,10 @@ export function buildQuotationWorkbook(context: QuotationExportContext): XLSX.Wo
   sheet(book, 'Comercial', rows('Condiciones comerciales de la versión',
     ['Tipo', 'Concepto', 'Monto / porcentaje', 'Unidad / evento'],
     [
-      ...draft.costs.map((c) => ['Costo externo', c.description, c.amount, c.recurrence]),
+      ...draft.costs.map((c) => ['Costo externo', c.description, c.amount,
+        quotationCostRecurrenceLabel(c.recurrence) + ' · ' + version.currency]),
       ...draft.paymentPlan.map((p) => ['Hito de pago', p.name, p.percent,
-        p.trigger === 'phase' ? p.triggerPhase ?? 'Fase pendiente' :
-          p.trigger === 'date' ? p.triggerDate ?? 'Fecha pendiente' : 'Aprobación']),
+        quotationPaymentTriggerLabel(p)]),
     ]), [25, 55, 24, 38]);
   const notes = [
     ...draft.assumptions.map((note) => ['Supuesto', note]),
