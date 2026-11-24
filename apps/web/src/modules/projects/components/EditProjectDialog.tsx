@@ -1002,7 +1002,8 @@ export function EditProjectDialog({ open, project, onClose, onSuccess, isManagem
                 label={hoursLabel}
                 type="number"
                 min={0}
-                disabled={estimationDisabled}
+                disabled={estimationDisabled || !isManagement}
+                helperText={isManagement ? undefined : 'Solo Gerencia/PMO puede modificarlas.'}
                 errorText={errors.soldHours?.message}
                 {...register('soldHours')}
               />
