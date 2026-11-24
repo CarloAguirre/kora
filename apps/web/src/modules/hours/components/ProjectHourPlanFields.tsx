@@ -15,6 +15,12 @@ export interface ProjectHourPlanFieldsProps {
   tasks: readonly PlanTask[];
   taskId: string;
   requiresPhase: boolean;
+  /**
+   * El autor es parte del equipo de algún bloque de la fase y no eligió una
+   * tarea propia: el bloque es obligatorio (misma regla que `validateDailyBlock`
+   * y la API). Se marca con asterisco para que no parezca opcional.
+   */
+  requiresSegment?: boolean;
   /** Etiqueta verificable del aprobador, cuando se encuentra en el detalle. */
   approverName?: string | null;
   onPhaseChange: (id: string) => void;
@@ -29,7 +35,7 @@ export interface ProjectHourPlanFieldsProps {
  * opción explícita de UI y no se envía como task_id.
  */
 export function ProjectHourPlanFields({
-  phases, phaseId, segments, segmentId, tasks, taskId, requiresPhase, approverName,
+  phases, phaseId, segments, segmentId, tasks, taskId, requiresPhase, requiresSegment = false, approverName,
   onPhaseChange, onSegmentChange, onTaskChange,
 }: ProjectHourPlanFieldsProps) {
   const selectedTask = tasks.find((task) => task.id === taskId);
@@ -49,6 +55,7 @@ export function ProjectHourPlanFields({
         />
         {showTriplet && <>
           {segments.length > 0 && <Select label="Bloque de trabajo"
+            required={requiresSegment}
             placeholder="Seleccionar bloque..."
             options={segments.map((segment) => ({
               value: segment.id, label: segment.name,

@@ -89,6 +89,17 @@ describe('Vincula estas horas al plan', () => {
     expect(initialTaskIdForPhase(tasks)).toBe('');
   });
 
+  it('marca el bloque como obligatorio solo cuando se exige', () => {
+    const { rerender } = render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
+      segments={segments} segmentId="" tasks={[]} taskId={OTHER_TASK_OPTION}
+      requiresPhase requiresSegment {...callbacks()} />);
+    expect(screen.getByLabelText(/^Bloque de trabajo/)).toBeRequired();
+    rerender(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
+      segments={segments} segmentId="" tasks={tasks} taskId="task-1"
+      requiresPhase {...callbacks()} />);
+    expect(screen.getByLabelText(/^Bloque de trabajo/)).not.toBeRequired();
+  });
+
   it('permite elegir explícitamente «Otro» sin enviar un ID inexistente', () => {
     const props = callbacks();
     render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"

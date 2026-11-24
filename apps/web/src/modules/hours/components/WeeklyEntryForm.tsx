@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE,
@@ -25,6 +25,8 @@ import { useHourEntryProjectOptions } from '../hooks/useHourEntryProjectOptions'
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
+import { SubmitBlockers } from './SubmitBlockers';
+import { revealInScroller } from '../lib/reveal-in-scroller';
 import {
   activityForTaskChange, initialTaskIdForPhase, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId,
 } from './hour-task-selection';
@@ -100,6 +102,11 @@ export function WeeklyEntryForm({
   const [dayHours, setDayHours] = useState<string[]>(['', '', '', '', '']);
   const [autoFill, setAutoFill] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // El error se muestra arriba; con el formulario desplazado hasta el botón quedaba fuera de vista.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) revealInScroller(errorRef.current);
+  }, [error]);
   const [submitting, setSubmitting] = useState(false);
 
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(assignment as HourEntryAssignment);
@@ -218,7 +225,8 @@ export function WeeklyEntryForm({
     return null;
   };
 
-  const canSubmit = validate() === null;
+  const pendingError = validate();
+  const canSubmit = pendingError === null;
 
   const onSubmit = async () => {
     setError(null);
@@ -265,7 +273,7 @@ export function WeeklyEntryForm({
       <p className={styles.formSubtitle}>Registra tus horas por día y se suman automáticamente</p>
 
       {error && (
-        <div className={styles.alert} role="alert">
+        <div ref={errorRef} className={styles.alert} role="alert">
           <AlertIcon size={18} className={styles.alertIcon} />
           <span>{error}</span>
         </div>
@@ -371,6 +379,8 @@ export function WeeklyEntryForm({
           tasks={availableTasks}
           taskId={taskId}
           requiresPhase={hasProjectPhases}
+          requiresSegment={Boolean(moduleId) && availableSegments.length > 0 &&
+            (!taskId || taskId === OTHER_TASK_OPTION)}
           approverName={projectDetail?.teams.find((team) =>
             team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
           )?.leader?.fullName ?? resolveHourApprover(hourPhases, user?.id, segmentId)}
@@ -493,6 +503,8 @@ export function WeeklyEntryForm({
           onChange={(event) => setDescription(event.target.value)}
         />
       </div>
+
+      <SubmitBlockers items={pendingError ? [{ key: 'week', message: pendingError }] : []} />
 
       <div className={styles.actions}>
         <Button variant="outline" type="button" onClick={onClose}>
