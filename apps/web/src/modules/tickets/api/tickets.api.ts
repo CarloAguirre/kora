@@ -23,6 +23,8 @@ function filterParams(query: Partial<ListTicketsQuery>) {
     status: query.status,
     priority: query.priority,
     month: query.month,
+    workedFrom: query.workedFrom,
+    workedTo: query.workedTo,
   };
 }
 

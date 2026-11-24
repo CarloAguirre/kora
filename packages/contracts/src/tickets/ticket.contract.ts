@@ -223,6 +223,13 @@ export const listTicketsQuerySchema = paginationQuerySchema.extend({
   priority: ticketPrioritySchema.optional(),
   /** 'YYYY-MM': solo tickets con actividad en ese mes — creados, resueltos o con horas (no rechazadas) en el mes. */
   month: z.string().regex(/^\d{4}-\d{2}$/, 'Formato de mes inválido.').optional(),
+  /**
+   * 'YYYY-MM-DD', inclusive: solo tickets con HH aprobadas cuya FECHA TRABAJADA
+   * (la de la solicitud de HH, no la de reporte) cae en el rango; las horas y
+   * el desglose del Excel se acotan a esos días. Se puede dar uno solo.
+   */
+  workedFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido.').optional(),
+  workedTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido.').optional(),
   sortField: ticketSortFieldSchema.default('createdAt'),
   sortDirection: sortDirectionSchema.default('desc'),
 });

@@ -56,6 +56,10 @@ export function TicketHistoryPage() {
   const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([]);
   const [leaderUserIds, setLeaderUserIds] = useState<string[]>([]);
   const [status,setStatus] = useState<TicketStatus | ''>('');
+  // Rango de FECHA TRABAJADA (la de las HH aprobadas), no de reporte.
+  const [workedFrom, setWorkedFrom] = useState('');
+  const [workedTo, setWorkedTo] = useState('');
+  const workedRangeError = workedFrom && workedTo && workedFrom > workedTo ? 'Debe ser posterior a la fecha inicio.' : null;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<{ field: TicketSortField; direction: 'asc' | 'desc' }>({
@@ -79,6 +83,9 @@ export function TicketHistoryPage() {
     assigneeUserId: assigneeUserIds.length > 0 ? assigneeUserIds : undefined,
     leaderUserId: leaderUserIds.length > 0 ? leaderUserIds : undefined,
     status: status || undefined,
+    // Con el rango inválido no se filtra por fecha (el campo ya muestra el error).
+    workedFrom: (!workedRangeError && workedFrom) || undefined,
+    workedTo: (!workedRangeError && workedTo) || undefined,
     sortField: sort.field,
     sortDirection: sort.direction,
   };
@@ -120,7 +127,7 @@ export function TicketHistoryPage() {
         ticketsApi.dailyHours(query),
         ticketsApi.contractConsumption(query),
       ]);
-      exportTicketHistory(rows, dailyHours, contracts);
+      exportTicketHistory(rows, dailyHours, contracts, { from: query.workedFrom, to: query.workedTo });
     } catch (exportErr) {
       setExportError(exportErr instanceof Error ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {
@@ -264,6 +271,27 @@ export function TicketHistoryPage() {
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as TicketStatus | '');
+                setPage(1);
+              }}
+            />
+            <TextField
+              className={styles.date}
+              label="Fecha trabajada inicio"
+              type="date"
+              value={workedFrom}
+              onChange={(event) => {
+                setWorkedFrom(event.target.value);
+                setPage(1);
+              }}
+            />
+            <TextField
+              className={styles.date}
+              label="Fecha trabajada fin"
+              type="date"
+              value={workedTo}
+              errorText={workedRangeError ?? undefined}
+              onChange={(event) => {
+                setWorkedTo(event.target.value);
                 setPage(1);
               }}
             />

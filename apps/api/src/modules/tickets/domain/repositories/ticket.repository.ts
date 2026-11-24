@@ -13,6 +13,12 @@ export interface TicketFilters {
   readonly priority?: TicketPriority | undefined;
   /** Solo tickets con actividad en [from, to): creados, resueltos o con horas no rechazadas en el rango. */
   readonly activityBetween?: { readonly from: Date; readonly to: Date } | undefined;
+  /**
+   * Solo tickets con HH aprobadas cuya fecha trabajada cae en [from, to) —
+   * cualquiera de los dos extremos puede faltar. Acota también `sumHours` y
+   * `listDailyHours` a esos días.
+   */
+  readonly workedBetween?: { readonly from?: Date | undefined; readonly to?: Date | undefined } | undefined;
   readonly includeDeleted?: boolean | undefined;
 }
 

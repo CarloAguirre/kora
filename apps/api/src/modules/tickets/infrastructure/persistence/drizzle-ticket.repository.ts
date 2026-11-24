@@ -149,20 +149,12 @@ export class DrizzleTicketRepository implements TicketRepository {
   async sumHours(filters: TicketFilters, context?: TransactionContext): Promise<number> {
     const db = resolveDb(this.database, context);
     const where = this.buildWhere(filters);
-    if (filters.activityBetween) {
-      const { from, to } = filters.activityBetween;
+    if (filters.activityBetween || filters.workedBetween) {
       const rows = await db
         .select({ total: sql<string>`coalesce(sum(${ticketHhRequests.hours}), 0)` })
         .from(ticketHhRequests)
         .innerJoin(tickets, eq(tickets.id, ticketHhRequests.ticketId))
-        .where(
-          and(
-            where,
-            eq(ticketHhRequests.status, 'approved'),
-            gte(ticketHhRequests.date, from),
-            lt(ticketHhRequests.date, to),
-          ),
-        );
+        .where(and(where, eq(ticketHhRequests.status, 'approved'), ...this.hhDateConditions(filters)));
       return Number(rows[0]?.total ?? 0);
     }
     const rows = await db.select({ total: sql<string>`coalesce(sum(${tickets.usedHours}), 0)` }).from(tickets).where(where);
@@ -171,11 +163,7 @@ export class DrizzleTicketRepository implements TicketRepository {
 
   async listDailyHours(filters: TicketFilters, context?: TransactionContext): Promise<TicketDailyHoursRow[]> {
     const db = resolveDb(this.database, context);
-    const conditions = [this.buildWhere(filters), eq(ticketHhRequests.status, 'approved')];
-    if (filters.activityBetween) {
-      const { from, to } = filters.activityBetween;
-      conditions.push(gte(ticketHhRequests.date, from), lt(ticketHhRequests.date, to));
-    }
+    const conditions = [this.buildWhere(filters), eq(ticketHhRequests.status, 'approved'), ...this.hhDateConditions(filters)];
     const rows = await db
       .select({
         ticketId: ticketHhRequests.ticketId,
@@ -290,6 +278,14 @@ export class DrizzleTicketRepository implements TicketRepository {
         ),
       );
     }
+    if (filters.workedBetween) {
+      const { from, to } = filters.workedBetween;
+      const fromCondition = from ? sql` and r.date >= ${isoDay(from)}` : sql``;
+      const toCondition = to ? sql` and r.date < ${isoDay(to)}` : sql``;
+      conditions.push(
+        sql`exists (select 1 from ${ticketHhRequests} r where r.ticket_id = ${tickets.id} and r.status = 'approved'${fromCondition}${toCondition})`,
+      );
+    }
     if (filters.search) {
       const term = `%${filters.search.trim()}%`;
       // El código visible ("IN0948"/"ME0012"/"OP0003") no se persiste: se arma en
@@ -301,6 +297,17 @@ export class DrizzleTicketRepository implements TicketRepository {
       conditions.push(or(ilike(tickets.title, term), ilike(tickets.legacyId, term), ilike(code, term)));
     }
     return conditions.length > 0 ? and(...conditions) : undefined;
+  }
+
+  /** Acota las solicitudes de HH (`sumHours`/`listDailyHours`) a los días de `activityBetween` y `workedBetween`. */
+  private hhDateConditions(filters: TicketFilters) {
+    const conditions = [];
+    if (filters.activityBetween) {
+      conditions.push(gte(ticketHhRequests.date, filters.activityBetween.from), lt(ticketHhRequests.date, filters.activityBetween.to));
+    }
+    if (filters.workedBetween?.from) conditions.push(gte(ticketHhRequests.date, filters.workedBetween.from));
+    if (filters.workedBetween?.to) conditions.push(lt(ticketHhRequests.date, filters.workedBetween.to));
+    return conditions;
   }
 
   private buildOrderBy(sort: SortRequest<TicketSortableField>) {

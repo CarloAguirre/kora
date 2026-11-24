@@ -43,13 +43,17 @@ export class ListTicketContractConsumptionUseCase
     }
 
     const now = this.clock.now();
+    const { workedFrom, workedTo } = command.query;
     const contracts: TicketContractConsumption[] = [];
     const entries: TicketContractHourEntry[] = [];
     for (const plan of plans.values()) {
       const projectIds = await this.summaryBuilder.resolveLinkedProjectIds(plan);
+      // Con filtro de fecha trabajada, los registros sin ticket también se acotan a esos días (dentro de la vigencia).
+      const from = latest(plan.startDate, workedFrom ? utcDay(workedFrom) : null)!;
+      const to = earliest(plan.endDate, workedTo ? utcDay(workedTo) : null);
       const [summary, withoutTicket, container] = await Promise.all([
         this.summaryBuilder.build(plan, projectIds, now),
-        this.consumption.listEntriesWithoutTicket(projectIds, plan.startDate, plan.endDate),
+        this.consumption.listEntriesWithoutTicket(projectIds, from, to),
         plan.projectId ? this.projects.findById(plan.projectId) : Promise.resolve(null),
       ]);
       contracts.push({
@@ -80,4 +84,18 @@ export class ListTicketContractConsumptionUseCase
 
 function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function utcDay(day: string): Date {
+  return new Date(`${day}T00:00:00.000Z`);
+}
+
+function latest(a: Date | null, b: Date | null): Date | null {
+  if (!a || !b) return a ?? b;
+  return a > b ? a : b;
+}
+
+function earliest(a: Date | null, b: Date | null): Date | null {
+  if (!a || !b) return a ?? b;
+  return a < b ? a : b;
 }
