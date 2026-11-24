@@ -14,7 +14,7 @@ import { resolveTicketFilters, type ListTicketsQueryCommand } from './list-ticke
  * soporte: por cada contrato de los tickets del filtro, su total en Kora
  * (`SupportPlanSummaryBuilder`, la cifra de la ficha) y los registros de horas
  * que consume sin pasar por un ticket (cargados directo al proyecto de
- * soporte o a un proyecto vinculado). Muestra horas de todo el contrato, no
+ * soporte). Muestra horas de todo el contrato, no
  * solo las propias: exige `tickets:read` (alcance completo).
  */
 @Injectable()

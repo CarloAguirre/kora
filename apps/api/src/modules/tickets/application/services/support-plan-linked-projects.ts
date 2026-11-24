@@ -13,14 +13,15 @@ export async function resolveSupportPlanProjectIds(plans: SupportPlanRepository,
 }
 
 /**
- * Proyectos cuyas horas consume el contrato: los cubiertos MÁS el proyecto
- * "contenedor" de soporte (`plan.projectId`). Un contrato con enlaces recibe
- * horas por los dos lados — las de tickets, que se abren contra el
- * contenedor, y las cargadas directo a un proyecto cubierto —, así que sumar
- * solo uno subcontaría el consumo real. `consolidated` además pool-ea entre
- * todos sus proyectos cubiertos.
+ * Proyectos cuyas horas consume el contrato: solo el proyecto "contenedor" de
+ * soporte (`plan.projectId`) — ahí se abren los tickets (el proyecto cubierto
+ * va aparte, en "Proyecto de desarrollo") y se cargan las horas de soporte sin
+ * ticket. Las horas cargadas directo a un proyecto cubierto son de su
+ * desarrollo, no de soporte: antes se sumaban, y vincular un proyecto ya
+ * terminado le cargaba al contrato todo su desarrollo dentro de la vigencia.
+ * Sin contenedor (no debería pasar) cae a los cubiertos.
  */
 export async function resolveSupportPlanHourProjectIds(plans: SupportPlanRepository, plan: SupportPlanRecord): Promise<string[]> {
-  const covered = await resolveSupportPlanProjectIds(plans, plan);
-  return plan.projectId && !covered.includes(plan.projectId) ? [plan.projectId, ...covered] : covered;
+  if (plan.projectId) return [plan.projectId];
+  return resolveSupportPlanProjectIds(plans, plan);
 }

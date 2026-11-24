@@ -25,7 +25,7 @@ import { resolveSupportPlanHourProjectIds } from './support-plan-linked-projects
  * - TODOS los períodos de la cadena se recalculan en vivo con el consumo del
  *   contrato (`SupportConsumptionReader`), también los ya cerrados: así la
  *   ficha del contrato cuadra siempre con el Excel del historial de tickets,
- *   aunque una hora se apruebe tarde o se vincule un proyecto después. Las
+ *   aunque una hora se apruebe tarde. Las
  *   facturas ya emitidas no se tocan (guardan su propio `hours_billed`).
  * - En política `accumulate`, el sobrante de cada período (contratadas +
  *   saldo reutilizado − consumidas, nunca negativo) pasa como saldo

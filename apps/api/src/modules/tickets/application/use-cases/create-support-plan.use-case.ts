@@ -51,7 +51,7 @@ export interface CreateSupportPlanCommand {
  * fuera de todo lo que lista proyectos de soporte (Proyectos → Soporte,
  * dashboard, ficha de cliente, selector de proyecto del ticket). Los tickets
  * se abren contra el contenedor y el proyecto cubierto va en "Proyecto de
- * desarrollo"; el consumo suma ambos (ver `resolveSupportPlanHourProjectIds`).
+ * desarrollo"; el consumo cuenta solo el contenedor (ver `resolveSupportPlanHourProjectIds`).
  */
 @Injectable()
 export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanCommand, { id: string }, ApplicationError> {
