@@ -84,4 +84,35 @@ describe('Resumen de traspaso aditivo con HH previas conservadas', () => {
     expect(within(dialog).queryByText('HH vendidas anteriores')).not.toBeInTheDocument();
     expect(within(dialog).getByText(/^100 HH \(cotización\)/)).toBeInTheDocument();
   });
+
+  it('usa el catálogo para nombrar equipos cotizados que aún no están en la ficha', () => {
+    const fresh = { ...project, soldHours: 0, usedHours: 0, contractAmount: null,
+      modules: [], teams: [] } as unknown as ProjectDetail;
+    render(<QuotationTransferDialog project={fresh} version={version}
+      teamNames={new Map([[DEV, 'Desarrollo'], [QA, 'QA']])}
+      open afterApproval={false} pending={false} onClose={vi.fn()}
+      onTransfer={vi.fn()}/>);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/^Equipo Desarrollo: 80 HH asignadas/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Equipo QA: 20 HH asignadas/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Equipo Kora|Equipo Equipo/)).not.toBeInTheDocument();
+  });
+
+  it('reemplaza las HH estimadas por equipo y deja sin presupuesto a los no cotizados', () => {
+    const estimate = { ...project, soldHours: 620, usedHours: 0, contractAmount: null,
+      modules: [] } as unknown as ProjectDetail;
+    render(<QuotationTransferDialog project={estimate} version={version}
+      teamNames={new Map([[QA, 'QA']])}
+      open afterApproval={false} pending={false} onClose={vi.fn()}
+      onTransfer={vi.fn()}/>);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/60 HH estimadas por equipo, reemplazadas por la cotización/))
+      .toBeInTheDocument();
+    expect(within(dialog).getByText(/40 HH estimadas se reemplazan por 80 HH asignadas/))
+      .toBeInTheDocument();
+    expect(within(dialog).getByText(/^Equipo QA: 20 HH asignadas/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/20 HH estimadas que quedan sin presupuesto/))
+      .toBeInTheDocument();
+    expect(within(dialog).queryByText(/HH previas \+/)).not.toBeInTheDocument();
+  });
 });

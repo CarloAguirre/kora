@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ProjectDetail, ProjectQuotation, QuotationVersion } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useConfirmAction } from '@/shared/components/ui/useConfirmAction';
 import { QuotationApprovalDialog, QuotationTransferDialog } from './QuotationLifecycleDialogs';
-import { useQuotationLifecycle } from '../api/quotation.queries';
+import { useQuotationActiveTeams, useQuotationLifecycle } from '../api/quotation.queries';
 import styles from './QuotationCommercialLifecycleCard.module.css';
 import { quotationCommercialBlockers } from './quotation-commercial-blockers';
 
@@ -33,6 +33,10 @@ export function QuotationCommercialLifecycleCard({
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferFromApproval, setTransferFromApproval] = useState(false);
   const [transferRevision, setTransferRevision] = useState<number | null>(null);
+  // Nombres reales de los equipos cotizados: aún no están en la ficha del proyecto.
+  const activeTeams = useQuotationActiveTeams(project.id, transferOpen);
+  const teamNames = useMemo(() => new Map((activeTeams.data ?? [])
+    .map((team) => [team.teamId, team.name])), [activeTeams.data]);
   const toast = useToast();
   const reportError = (message: string) => toast.error(message);
   const { confirm, dialog: confirmationDialog } = useConfirmAction();
@@ -164,7 +168,7 @@ export function QuotationCommercialLifecycleCard({
           onApprove={() => void approveClient()} />
       )}
       {transferOpen && (
-        <QuotationTransferDialog project={project} version={version} open
+        <QuotationTransferDialog project={project} version={version} open teamNames={teamNames}
           afterApproval={transferFromApproval} pending={actions.transferApproved.isPending}
           onClose={closeTransfer} onTransfer={() => void transfer()} />
       )}

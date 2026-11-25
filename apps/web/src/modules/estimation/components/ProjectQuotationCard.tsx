@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { isQuotationDraftEligibleProject, type ProjectDetail, type QuotationVersion } from '@kora/contracts';
 import { projectQuotationPath } from '@/app/router/paths';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
-import { useAppliedQuotationPlanning, useProjectQuotation, useQuotationLifecycle } from '../api/quotation.queries';
+import {
+  useAppliedQuotationPlanning, useProjectQuotation, useQuotationActiveTeams, useQuotationLifecycle,
+} from '../api/quotation.queries';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
 import { NewProjectQuotationModal } from './NewProjectQuotationModal';
@@ -36,6 +38,10 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
   );
   const [transferFromApproval, setTransferFromApproval] = useState(false);
   const [transferRevision, setTransferRevision] = useState<number | null>(null);
+  // Nombres reales de los equipos cotizados: aún no están en la ficha del proyecto.
+  const activeTeams = useQuotationActiveTeams(project.id, Boolean(transferring) && canAccessCalculator);
+  const teamNames = useMemo(() => new Map((activeTeams.data ?? [])
+    .map((team) => [team.teamId, team.name])), [activeTeams.data]);
   const versions = [...(data?.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
   // El traspaso cierra todas las versiones del proyecto, incluso las no seleccionadas.
   const closed = Boolean(data?.transferredVersionId);
@@ -242,7 +248,7 @@ export function ProjectQuotationCard({ project }: { project: ProjectDetail }) {
           onApprove={() => void confirmApproval()} />
       )}
       {transferring && (
-        <QuotationTransferDialog project={project} version={transferring} open
+        <QuotationTransferDialog project={project} version={transferring} open teamNames={teamNames}
           afterApproval={transferFromApproval} pending={lifecycle.transferApproved.isPending}
           error={actionError} onClose={closeTransfer} onTransfer={() => void confirmTransfer()} />
       )}

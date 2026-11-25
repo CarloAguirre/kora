@@ -1093,6 +1093,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           approvedQuotationHours: Number(version.totalHours),
           phaseZeroBillableHours: draft.phaseZeroBillableHours ?? 0,
           existingTeams,
+          replaceEstimatedTeamHours: replacesEstimatedSoldHours,
           quotationTeams: [...byTeam].map(([teamId, quotedHours]) => ({
             teamId, quotedHours,
           })),
@@ -1126,6 +1127,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             updatedAt: new Date(),
           },
         });
+      }
+      // HH estimadas de equipos que no entraron a la cotización: dejan de ser
+      // presupuesto. El equipo, su cupo, líder e integrantes se conservan.
+      if (transferPlan.clearedEstimatedTeamIds.length > 0) {
+        await tx.update(projectTeams).set({ assignedHours: null, updatedAt: new Date() })
+          .where(and(eq(projectTeams.projectId, projectId),
+            inArray(projectTeams.teamId, transferPlan.clearedEstimatedTeamIds)));
       }
       // Las fases comercialmente aceptadas son la fuente de verdad del
       // Roadmap inicial y de los hitos. No usar nombres de módulos Gemini que
@@ -1230,6 +1238,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             })),
           },
           phase2QuotationAllocations: transferPlan.teamAllocations,
+          clearedEstimatedTeamIds: transferPlan.clearedEstimatedTeamIds,
           paymentCount: draft.paymentPlan.length,
           preservedPreviousPayments: !replaceDefaultPayments,
           preservedStartDate: true,

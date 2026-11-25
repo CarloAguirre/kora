@@ -12,6 +12,7 @@ vi.mock('@/shared/components/ui/Toast', () => ({
   useToast: () => ({ error: mocks.toastError, success: mocks.toastSuccess }),
 }));
 vi.mock('../api/quotation.queries', () => ({
+  useQuotationActiveTeams: () => ({ data: [] }),
   useQuotationLifecycle: () => ({
     acceptAi: { mutateAsync: mocks.acceptAi, isPending: false },
     markSent: { mutateAsync: mocks.markSent, isPending: false },
