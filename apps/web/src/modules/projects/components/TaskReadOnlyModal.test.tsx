@@ -59,9 +59,10 @@ describe('Consulta de tarea del colaborador', () => {
     }
 
     const description = within(dialog).getByRole('textbox', { name: 'Descripción' });
-    expect(description).toHaveValue(expect.stringContaining('VIDEO 1:'));
-    expect(description).toHaveValue(expect.stringContaining('VIDEO 2:'));
-    expect(description).not.toHaveValue(expect.stringContaining('Bloque de trabajo:'));
+    const descriptionValue = (description as HTMLTextAreaElement).value;
+    expect(descriptionValue).toContain('VIDEO 1:');
+    expect(descriptionValue).toContain('VIDEO 2:');
+    expect(descriptionValue).not.toContain('Bloque de trabajo:');
     expect(description).toHaveAttribute('readonly');
     expect(description).not.toBeDisabled();
     expect(within(dialog).queryByRole('button', { name: /guardar|duplicar|editar|calendario/i }))
