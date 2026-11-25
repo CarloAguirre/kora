@@ -60,7 +60,8 @@ describe('Tabla operativa compartida de tareas', () => {
     expect(view).toHaveAttribute('title', 'Ver detalle de tarea');
     expect(view).toBeEnabled();
     fireEvent.click(view);
-    expect(onViewTask).toHaveBeenCalledExactlyOnceWith(module.tasks[0]);
+    expect(onViewTask).toHaveBeenCalledOnce();
+    expect(onViewTask).toHaveBeenCalledWith(module.tasks[0]);
     expect(onEditTask).not.toHaveBeenCalled();
     expect(within(table).queryByRole('button', { name: /editar|duplicar|eliminar/i }))
       .not.toBeInTheDocument();
