@@ -44,6 +44,28 @@ describe('Tabla operativa compartida de tareas', () => {
     expect(onDeleteTask).not.toHaveBeenCalled();
     expect(onAddTask).not.toHaveBeenCalled();
   });
+  it('muestra un ojo después de Fecha límite en la vista colaborador y solo abre la tarea', () => {
+    const onViewTask = vi.fn();
+    const onEditTask = vi.fn();
+    render(<ProjectPhaseTasksTable module={module} canManage={false} readOnly
+      onViewTask={onViewTask} onEditTask={onEditTask} />);
+    const table = screen.getByRole('table');
+    const headers = within(table).getAllByRole('columnheader').map((th) => th.textContent);
+    expect(headers).toEqual([
+      'Tarea', 'Asignada a', 'Bloque de trabajo', 'Estado', 'Fecha límite', 'Detalle',
+    ]);
+    const view = within(table).getByRole('button', {
+      name: 'Ver detalle de tarea Análisis de flujos existentes',
+    });
+    expect(view).toHaveAttribute('title', 'Ver detalle de tarea');
+    expect(view).toBeEnabled();
+    fireEvent.click(view);
+    expect(onViewTask).toHaveBeenCalledExactlyOnceWith(module.tasks[0]);
+    expect(onEditTask).not.toHaveBeenCalled();
+    expect(within(table).queryByRole('button', { name: /editar|duplicar|eliminar/i }))
+      .not.toBeInTheDocument();
+  });
+
   it('usa Badge nativo y conserva etiquetas adicionales y referencias sin asignación', () => {
     const altered = {
       ...module,
