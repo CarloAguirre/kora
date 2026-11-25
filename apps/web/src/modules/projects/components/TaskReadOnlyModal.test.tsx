@@ -23,8 +23,8 @@ const task = {
   id: '0777e456-fd76-445e-83f1-afc25061c104',
   name: 'Investigación Framework agentico 1',
   description: 'Bloque de trabajo: Diseño de solución · ID ' + blockId +
-    '\\nVIDEO 1: https://www.youtube.com/watch?v=ejemplo' +
-    '\\nVIDEO 2: https://www.youtube.com/watch?v=ejemplo2',
+    '\nVIDEO 1: https://www.youtube.com/watch?v=ejemplo' +
+    '\nVIDEO 2: https://www.youtube.com/watch?v=ejemplo2',
   teamId: '0777e456-fd76-445e-83f1-afc25061c103',
   teamName: 'Desarrollo',
   assigneeUserId: '0777e456-fd76-445e-83f1-afc25061c105',
@@ -74,7 +74,7 @@ describe('Consulta de tarea del colaborador', () => {
     render(<TaskReadOnlyModal module={module} onClose={vi.fn()} task={{
       ...task, segmentId: null, segmentName: null,
       assigneeUserId: null, assigneeName: null,
-      description: 'Referencia cotización X\\nNotas internas visibles',
+      description: 'Referencia cotización X\nNotas internas visibles',
       status: 'todo',
     }} />);
     expect(screen.getByRole('textbox', { name: 'Asignado a' })).toHaveValue('Sin asignar');
