@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { MyProjectDetailPage } from './MyProjectDetailPage';
+import type { ProjectModule, ProjectModuleTask } from '@kora/contracts';
 
 const mocks = vi.hoisted(() => ({ detail: vi.fn(), roadmap: vi.fn() }));
 vi.mock('../api/projects.queries', () => ({ useMyProjectDetail: mocks.detail }));
@@ -41,8 +42,24 @@ vi.mock('../components/MyProjectBitacora', () => ({
   MyProjectBitacora: () => <div>Bitácora en consulta</div>,
 }));
 vi.mock('../components/ProjectPhaseTasksTable', () => ({
-  ProjectPhaseTasksTable: ({ readOnly, canManage }: { readOnly: boolean; canManage: boolean }) =>
-    <div data-testid="task-table">{readOnly && !canManage ? 'Tareas en consulta' : 'EDICION ACTIVADA'}</div>,
+  ProjectPhaseTasksTable: ({ readOnly, canManage, module, onViewTask }: {
+    readOnly: boolean; canManage: boolean; module: ProjectModule;
+    onViewTask?: (task: ProjectModuleTask) => void;
+  }) =>
+    <div data-testid="task-table">
+      {readOnly && !canManage ? 'Tareas en consulta' : 'EDICION ACTIVADA'}
+      {onViewTask && module.tasks[0] && <button type="button"
+        onClick={() => onViewTask(module.tasks[0]!)}>
+        Ver detalle de tarea {module.tasks[0].name}
+      </button>}
+    </div>,
+}));
+vi.mock('../components/TaskReadOnlyModal', () => ({
+  TaskReadOnlyModal: ({ task, onClose }: { task: ProjectModuleTask; onClose: () => void }) =>
+    <div role="dialog" aria-label="Detalle de tarea">
+      {task.name}
+      <button type="button" onClick={onClose}>Cerrar consulta</button>
+    </div>,
 }));
 vi.mock('../components/SegmentDrawer', () => ({
   SegmentDrawer: ({ readOnly, onEdit, onDelete, onClose }: {
@@ -135,6 +152,15 @@ describe('Detalle de proyecto del colaborador', () => {
       .not.toBeInTheDocument();
     fireEvent.click(within(taskDetail).getByRole('button', { name: 'Cerrar detalle' }));
     expect(screen.queryByRole('region', { name: 'Tarea: Revisar prototipo' }))
+      .not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalle de tarea Revisar prototipo' }));
+    expect(screen.getByRole('dialog', { name: 'Detalle de tarea' }))
+      .toHaveTextContent('Revisar prototipo');
+    expect(screen.queryByRole('button', { name: /Guardar cambios|Editar tarea|Eliminar tarea/ }))
+      .not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar consulta' }));
+    expect(screen.queryByRole('dialog', { name: 'Detalle de tarea' }))
       .not.toBeInTheDocument();
   });
   it('App Walvy sin HH de bloques muestra plazo calendario en el detalle del colaborador', () => {
