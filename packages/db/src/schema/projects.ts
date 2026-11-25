@@ -131,6 +131,8 @@ export const projects = pgTable(
 
     soldHours: numeric('sold_hours', { precision: 10, scale: 2 }).notNull().default('0'),
     usedHours: numeric('used_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+    /** Saldo anterior no registrado en hour_entries; se suma una sola vez en recordUsedHours. */
+    historicalHoursAdjustment: numeric('historical_hours_adjustment', { precision: 10, scale: 2 }).notNull().default('0'),
     expectedProgress: integer('expected_progress'),
     actualProgress: integer('actual_progress'),
 
@@ -184,6 +186,11 @@ export const projects = pgTable(
     contractAmount: numeric('contract_amount', { precision: 14, scale: 2 }),
     /** Moneda en que se cobran todos los tramos de pago del proyecto. */
     contractCurrency: projectContractCurrencyEnum('contract_currency').notNull().default('UF'),
+    /**
+     * Proyecto interno de la propia empresa (no se le cobra a nadie): sin monto de contrato ni plan de pago,
+     * fuera del libro de Facturación y sin correos de facturación. Se activa siempre a mano (no hay factura que dispare el Hito 0).
+     */
+    isInternal: boolean('is_internal').notNull().default(false),
 
     /** Hito 0 quedó pausado esperando que Gerencia (admin/pmo) active el proyecto a mano — ver `project_billing_settings`. */
     pendingManagementApproval: boolean('pending_management_approval').notNull().default(false),
@@ -257,6 +264,7 @@ export const projectTeamMembers = pgTable(
     activity: text('activity'),
     assignedHours: numeric('assigned_hours', { precision: 10, scale: 2 }).notNull().default('0'),
     consumedHours: numeric('consumed_hours', { precision: 10, scale: 2 }).notNull().default('0'),
+    blockedAt: timestamp('blocked_at', { withTimezone: true, mode: 'date' }),
     ...timestamps,
   },
   (table) => [
@@ -298,6 +306,25 @@ export const projectModules = pgTable('project_modules', {
   ...timestamps,
 });
 
+/** Exclusión operativa de una referencia EDT (no modifica la cotización de origen).
+ * Se identifica por versión de cotización, fase, WBS y rol, no por el texto visible.
+ */
+export const projectRoadmapReferenceExclusions = pgTable('project_roadmap_reference_exclusions', {
+  id: primaryId(),
+  projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+  moduleId: uuid('module_id').notNull().references(() => projectModules.id, { onDelete: 'cascade' }),
+  versionId: uuid('version_id').notNull(),
+  wbs: varchar('wbs', { length: 160 }).notNull(),
+  role: varchar('role', { length: 160 }).notNull(),
+  actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('roadmap_ref_exclusion_identity_key').on(
+    table.moduleId, table.versionId, table.wbs, table.role,
+  ),
+  index('roadmap_ref_exclusion_project_idx').on(table.projectId),
+]);
+
 /** Entrega estimada de un módulo — hace de hito "Entrega a cliente" (no existe un concepto de hito genérico separado). */
 export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   id: primaryId(),
@@ -309,12 +336,18 @@ export const projectModuleDeliveries = pgTable('project_module_deliveries', {
   /** Nullable por entregas creadas antes de este campo — las nuevas siempre lo piden (ver `addProjectModuleDeliverySchema`). */
   name: varchar('name', { length: 300 }),
   description: text('description'),
+  /** Identidad del bloque que cierra; NULL en entregas de fase independientes. */
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   /** Colaborador del equipo responsable a quien se le asignó esta entrega — `null` ⇔ "Sin asignar". */
   assigneeUserId: uuid('assignee_user_id').references(() => users.id, { onDelete: 'set null' }),
   estimatedDate: date('estimated_date', { mode: 'date' }).notNull(),
   status: projectModuleDeliveryStatusEnum('status').notNull().default('planned'),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla entregada. */
   rejectionReason: text('rejection_reason'),
+  /** Cierre confirmado de la entrega de un bloque: distinto de la fecha prometida. */
+  completedOn: date('completed_on', { mode: 'date' }),
+  completedByUserId: uuid('completed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  completionComment: text('completion_comment'),
   ...timestamps,
 });
 
@@ -330,6 +363,8 @@ export const projectModuleSegments = pgTable('project_module_segments', {
   name: varchar('name', { length: 300 }).notNull(),
   startDate: date('start_date', { mode: 'date' }).notNull(),
   endDate: date('end_date', { mode: 'date' }).notNull(),
+  estimatedHours: numeric('estimated_hours', { precision: 10, scale: 2 }),
+  closedAt: timestamp('closed_at', { withTimezone: true, mode: 'date' }),
   ...timestamps,
 });
 
@@ -360,6 +395,7 @@ export const projectModuleSegmentMembers = pgTable(
 /** Tarea puntual (una fecha) de una fase/módulo, por equipo y opcionalmente asignada a una persona — marcador en el Roadmap y base de "Mis tareas". */
 export const projectModuleTasks = pgTable('project_module_tasks', {
   id: primaryId(),
+  segmentId: uuid('segment_id').references(() => projectModuleSegments.id, { onDelete: 'set null' }),
   moduleId: uuid('module_id')
     .notNull()
     .references(() => projectModules.id, { onDelete: 'cascade' }),
@@ -374,6 +410,7 @@ export const projectModuleTasks = pgTable('project_module_tasks', {
   status: projectModuleTaskStatusEnum('status').notNull().default('todo'),
   scope: projectModuleTaskScopeEnum('scope').notNull().default('desarrollo'),
   completedAt: timestamp('completed_at', { withTimezone: true, mode: 'date' }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'date' }),
   /** Motivo del último rechazo del líder — se limpia al aprobar o al volver a marcarla en revisión. */
   rejectionReason: text('rejection_reason'),
   ...timestamps,
@@ -453,6 +490,19 @@ export const projectPaymentMilestones = pgTable('project_payment_milestones', {
   /** Solo con `trigger_type = 'date'`: desde esta fecha el tramo queda por facturar. */
   triggerDate: date('trigger_date', { mode: 'date' }),
   ...timestamps,
+});
+
+export const projectInvoiceAttachments = pgTable('project_invoice_attachments', {
+  milestoneId: uuid('milestone_id').primaryKey().references(() => projectPaymentMilestones.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  content: text('content').notNull(),
+});
+
+export const projectPaymentReceipts = pgTable('project_payment_receipts', {
+  milestoneId: uuid('milestone_id').primaryKey().references(() => projectPaymentMilestones.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  mimeType: varchar('mime_type', { length: 32 }).notNull(),
+  content: text('content').notNull(),
 });
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({

@@ -79,6 +79,27 @@ export class SupportInvoiceAlreadyExistsForPeriodError extends ConflictError {
   }
 }
 
+/** Agregar facturas o cerrar un período solo aplica a uno "facturado parcial" — con saldo por facturar. */
+export class SupportInvoicePeriodNotPendingError extends ConflictError {
+  constructor(periodKey: string) {
+    super(`El período ${periodKey} no tiene saldo por facturar.`, 'SUPPORT_INVOICE_PERIOD_NOT_PENDING');
+  }
+}
+
+/** Al agregar facturas a un período, el folio no puede repetir uno ya registrado en él. */
+export class SupportInvoiceFolioAlreadyInPeriodError extends ConflictError {
+  constructor(folio: string) {
+    super(`El folio ${folio} ya está registrado en este período.`, 'SUPPORT_INVOICE_FOLIO_ALREADY_IN_PERIOD');
+  }
+}
+
+/** El tope de facturas por período cuenta también las ya registradas. */
+export class SupportInvoiceTooManyForPeriodError extends ValidationError {
+  constructor(max: number) {
+    super(`Un período admite ${max} facturas como máximo.`, 'SUPPORT_INVOICE_TOO_MANY_FOR_PERIOD');
+  }
+}
+
 /** No tiene sentido registrar una factura de un contrato que no debe nada este período — evita facturas "fantasma" con monto 0. */
 export class SupportPlanNothingToInvoiceError extends ConflictError {
   constructor() {
@@ -89,5 +110,16 @@ export class SupportPlanNothingToInvoiceError extends ConflictError {
 export class SupportInvoiceAlreadyPaidError extends ConflictError {
   constructor() {
     super('Esta factura ya está marcada como pagada.', 'SUPPORT_INVOICE_ALREADY_PAID');
+  }
+}
+
+/**
+ * Una factura pagada ya movió dinero: anularla en Kora dejaría el pago sin
+ * respaldo. Cada factura se anula por separado, así que solo cuenta la que se
+ * pidió anular — las pagadas del mismo período no lo impiden.
+ */
+export class SupportInvoicePaidCannotBeVoidedError extends ConflictError {
+  constructor() {
+    super('No se puede anular una factura que ya está pagada.', 'SUPPORT_INVOICE_PAID_CANNOT_BE_VOIDED');
   }
 }

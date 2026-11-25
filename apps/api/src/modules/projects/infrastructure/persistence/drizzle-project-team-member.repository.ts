@@ -69,6 +69,19 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
     return id;
   }
 
+  async block(id: string, when: Date, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.update(projectTeamMembers).set({ blockedAt: when, assignedHours: '0', updatedAt: when })
+      .where(eq(projectTeamMembers.id, id));
+  }
+
+  async reactivate(id: string, record: Pick<AssignProjectTeamMemberRecord, 'activity' | 'assignedHours'>, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db.update(projectTeamMembers).set({
+      blockedAt: null, activity: record.activity, assignedHours: String(record.assignedHours), updatedAt: new Date(),
+    }).where(eq(projectTeamMembers.id, id));
+  }
+
   async unassign(id: string, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     await db.delete(projectTeamMembers).where(eq(projectTeamMembers.id, id));
@@ -104,6 +117,7 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
         // al aprobar horas — solo trae el dato congelado del ETL de v1. Las horas no
         // guardan equipo: si la persona estuviera en dos equipos del mismo proyecto,
         // ambas filas mostrarían el mismo total.
+        blockedAt: projectTeamMembers.blockedAt,
         consumedHours: sql<string>`coalesce((
           select sum(${hourEntries.hours}) from ${hourEntries}
           where ${hourEntries.projectId} = ${projectTeamMembers.projectId}
@@ -130,6 +144,7 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
     activity: string | null;
     assignedHours: string;
     consumedHours: string;
+    blockedAt: Date | null;
   }): ProjectTeamMemberRecord {
     return {
       id: row.id,
@@ -143,6 +158,7 @@ export class DrizzleProjectTeamMemberRepository implements ProjectTeamMemberRepo
       activity: row.activity,
       assignedHours: Number(row.assignedHours),
       consumedHours: Number(row.consumedHours),
+      blockedAt: row.blockedAt,
     };
   }
 }

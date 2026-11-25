@@ -9,6 +9,7 @@ export interface ClientProps {
   taxId: TaxId;
   website: string | null;
   address: string | null;
+  logoDataUrl: string | null;
   countryId: string | null;
   comunaId: string | null;
   industryId: string | null;
@@ -32,6 +33,7 @@ export interface CreateClientProps {
   readonly taxId: TaxId;
   readonly website?: string | null;
   readonly address?: string | null;
+  readonly logoDataUrl?: string | null;
   readonly countryId?: string | null;
   readonly comunaId?: string | null;
   readonly industryId?: string | null;
@@ -70,6 +72,7 @@ export class Client extends AggregateRoot<string> {
       taxId: props.taxId,
       website: props.website?.trim() || null,
       address: props.address?.trim() || null,
+      logoDataUrl: props.logoDataUrl ?? null,
       countryId: props.countryId ?? null,
       comunaId: props.comunaId ?? null,
       industryId: props.industryId ?? null,
@@ -154,6 +157,7 @@ export class Client extends AggregateRoot<string> {
         | 'taxId'
         | 'website'
         | 'address'
+        | 'logoDataUrl'
         | 'countryId'
         | 'comunaId'
         | 'industryId'

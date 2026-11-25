@@ -57,6 +57,8 @@ export const quotationTransferPreviewSchema = z.object({
     aiReviewStatus: quotationVersionSchema.shape.aiReviewStatus,
     currency: quotationCurrencySchema,
     totalHours: z.number().nonnegative(),
+    phaseZeroBillableHours: z.number().nonnegative().default(0),
+    billableHours: z.number().nonnegative().optional(),
     netAmount: z.number().nullable(),
     totalAmount: z.number().nullable(),
     hourlyRateDefined: z.boolean(),

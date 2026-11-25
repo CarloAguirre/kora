@@ -77,6 +77,8 @@
   --kora-badge-danger-text: #b4232c;
   --kora-badge-neutral-bg: #eef2f6;
   --kora-badge-neutral-text: #66758a;
+  --kora-badge-unassigned-bg: #ede9fe;
+  --kora-badge-unassigned-text: #6d28d9;
 
   /* ── Tipografía ──────────────────────────────────────────────────────── */
   --kora-font: 'Red Hat Display', -apple-system, Roboto, Helvetica, sans-serif;

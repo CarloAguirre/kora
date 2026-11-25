@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { SupportBillingRow } from '@kora/contracts';
+import type { SupportBillingRow, SupportInvoiceBillingStatus } from '@kora/contracts';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import { SUPPORT_PLAN_REPOSITORY, type SupportPlanRecord, type SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
 import { SUPPORT_INVOICE_REPOSITORY, type SupportInvoiceRecord, type SupportInvoiceRepository } from '../../domain/repositories/support-invoice.repository';
@@ -10,7 +10,7 @@ import { SupportMonthlyPeriodReconciler } from './support-monthly-period-reconci
 import { SupportPlanCurrentBillingResolver, type CurrentBillingStatus } from './support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from './support-plan-naming';
 import { resolveSupportPlanHourProjectIds } from './support-plan-linked-projects';
-import { paymentStatusOf } from './support-invoice-payment-status';
+import { aggregatePaymentStatusOf, paymentStatusOf, periodBillingOf, toInvoiceRefs } from './support-invoice-payment-status';
 
 /**
  * Cuántos contratos se calculan a la vez. Cada uno abre varias consultas (y
@@ -21,9 +21,13 @@ const ROW_CONCURRENCY = 5;
 
 /** Sin "Sin movimiento": un contrato sin nada pendiente se muestra "Por facturar" con monto 0. */
 interface BillingCell {
+  /** Facturado parcial: el total esperado del período. */
   readonly amountUf: number;
-  readonly billingStatus: 'to_invoice' | 'invoiced';
+  readonly pendingAmountUf: number;
+  readonly billingStatus: SupportInvoiceBillingStatus;
   readonly paymentStatus: SupportBillingRow['paymentStatus'];
+  /** Las facturas del período de la fila — vacío si no se facturó. */
+  readonly invoices: readonly SupportInvoiceRecord[];
 }
 
 /**
@@ -98,14 +102,15 @@ export class SupportBillingRowBuilder {
       this.usedHoursForAlerts(record, linkedIds),
     ]);
     // Mismo criterio que la ficha del contrato (`SupportPlanBillingAction`): una alerta solo pide revisión mientras el período en curso siga por facturar — una vez registrada la factura, queda resuelta y no debe seguir contando acá.
-    const hasAlert = current.billingStatus === 'to_invoice' && computeSupportPlanAlerts(record, periods, usedHours, now).length > 0;
+    const alerts = current.billingStatus === 'to_invoice' ? computeSupportPlanAlerts(record, periods, usedHours, now).map((alert) => alert.type) : [];
+    const hasAlert = alerts.length > 0;
     const isOverdue = planInvoices.some((invoice) => paymentStatusOf(invoice, now) === 'overdue');
 
     // Migrados por el ETL antes de que `name` existiera como columna — sin este fallback, el panel mostraría el nombre en blanco para los 30 contratos legados.
     const linkedProjects = record.name ? [] : await this.projects.findManyByIds(linkedIds);
     const planName = resolveSupportPlanName(record.name, record.scope, linkedProjects.map((p) => p.name), clientName);
 
-    const { amountUf, billingStatus, paymentStatus } = isLivePeriod
+    const { amountUf, pendingAmountUf, billingStatus, paymentStatus, invoices } = isLivePeriod
       ? currentPeriodCell(current, planInvoices, now)
       : pastPeriodCell(planInvoices, period, now);
 
@@ -117,10 +122,15 @@ export class SupportBillingRowBuilder {
       scope: record.scope,
       planType: record.planType,
       amountUf,
+      pendingAmountUf,
       currency: record.currency,
       billingStatus,
       paymentStatus,
+      invoices: toInvoiceRefs(invoices, now),
+      // Un período "facturado parcial" acepta las facturas que faltan en cualquier mes, no solo en el vigente.
+      canInvoice: (isLivePeriod && billingStatus === 'to_invoice' && amountUf > 0) || billingStatus === 'partially_invoiced',
       hasAlert,
+      alerts,
       isOverdue,
     };
   }
@@ -140,17 +150,30 @@ export class SupportBillingRowBuilder {
 }
 
 function currentPeriodCell(current: CurrentBillingStatus, planInvoices: readonly SupportInvoiceRecord[], now: Date): BillingCell {
-  if (current.billingStatus === 'invoiced') {
-    const invoice = planInvoices.find((item) => item.periodKey === periodKeyOf(now));
-    return { amountUf: current.amountUf, billingStatus: 'invoiced', paymentStatus: invoice ? paymentStatusOf(invoice, now) : null };
+  if (current.billingStatus === 'invoiced' || current.billingStatus === 'partially_invoiced') {
+    const invoices = planInvoices.filter((item) => item.periodKey === periodKeyOf(now));
+    return {
+      amountUf: current.amountUf,
+      pendingAmountUf: current.pendingAmountUf,
+      billingStatus: current.billingStatus,
+      paymentStatus: aggregatePaymentStatusOf(invoices, now),
+      invoices,
+    };
   }
-  return { amountUf: current.amountUf, billingStatus: 'to_invoice', paymentStatus: null };
+  return { amountUf: current.amountUf, pendingAmountUf: 0, billingStatus: 'to_invoice', paymentStatus: null, invoices: [] };
 }
 
 function pastPeriodCell(planInvoices: readonly SupportInvoiceRecord[], period: string, now: Date): BillingCell {
-  const invoice = planInvoices.find((item) => item.periodKey === period);
-  if (!invoice) return { amountUf: 0, billingStatus: 'to_invoice', paymentStatus: null };
-  return { amountUf: invoice.amountUf, billingStatus: 'invoiced', paymentStatus: paymentStatusOf(invoice, now) };
+  const invoices = planInvoices.filter((item) => item.periodKey === period);
+  const billing = periodBillingOf(invoices);
+  if (!billing) return { amountUf: 0, pendingAmountUf: 0, billingStatus: 'to_invoice', paymentStatus: null, invoices: [] };
+  return {
+    amountUf: billing.totalAmountUf,
+    pendingAmountUf: billing.pendingAmountUf,
+    billingStatus: billing.status,
+    paymentStatus: aggregatePaymentStatusOf(invoices, now),
+    invoices,
+  };
 }
 
 function groupBy<T>(items: readonly T[], keyOf: (item: T) => string): Map<string, T[]> {

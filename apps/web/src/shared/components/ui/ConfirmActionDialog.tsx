@@ -26,6 +26,8 @@ export interface ConfirmActionDialogProps {
   /** Aviso destacado bajo la descripción — no bloquea la acción, solo advierte. */
   warning?: string | null;
   confirmLabel: string;
+  cancelLabel?: string;
+  confirmVariant?: 'primary' | 'secondary' | 'danger';
   /** Presenta la acción como destructiva. */
   destructive?: boolean;
   onConfirm: () => Promise<void>;
@@ -38,6 +40,8 @@ export function ConfirmActionDialog({
   description,
   warning,
   confirmLabel,
+  cancelLabel = 'Cancelar',
+  confirmVariant,
   destructive = false,
   onConfirm,
   onClose,
@@ -77,10 +81,10 @@ export function ConfirmActionDialog({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={running}>
-            Cancelar
+            {cancelLabel}
           </Button>
           <Button
-            variant={destructive ? 'danger' : 'primary'}
+            variant={confirmVariant ?? (destructive ? 'danger' : 'primary')}
             onClick={() => void handleConfirm()}
             loading={running}
             loadingText="Procesando…"

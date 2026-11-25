@@ -1,6 +1,14 @@
 /* Navegación lateral — navy con esquina redondeada, igual que la v1. */
 
 .sidebar {
+  /* El dashboard puede desplazar el documento completo. Sin un alto de viewport
+     y posición sticky el sidebar termina antes que el contenido, dejando un
+     rectángulo claro visible en su parte inferior. */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   width: var(--kora-sidebar-width);
   min-width: var(--kora-sidebar-width);
@@ -25,6 +33,9 @@
 
 .nav {
   display: flex;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
   padding-top: var(--kora-space-4);
   flex-direction: column;
   align-items: center;

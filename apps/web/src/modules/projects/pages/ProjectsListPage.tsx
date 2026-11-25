@@ -1,26 +1,27 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import {
+  PROJECT_KINDS,
+  PROJECT_KIND_LABELS,
   PROJECT_PHASES,
   PROJECT_PHASE_LABELS,
-  PROJECT_SALES_STAGES,
-  PROJECT_SALES_STAGE_LABELS,
-  PROJECT_QUOTATION_LIST_STATUSES,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABELS,
+  SUPPORT_PLAN_TYPE_LABELS,
+  projectKindOf,
+  type ProjectKind,
   type ProjectPhase,
-  type ProjectSalesStage,
-  type ProjectQuotationListStatus,
   type ProjectSortField,
   type ProjectStatus,
   type ProjectSummary,
+  type SupportProjectUsage,
 } from '@kora/contracts';
 import styles from './ProjectsListPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
-import { DataTable, type Column, type SortState } from '@/shared/components/ui/DataTable';
-import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
+import { DataTable, type Column } from '@/shared/components/ui/DataTable';
+import { Pagination } from '@/shared/components/ui/Pagination';
 import { TextField } from '@/shared/components/ui/TextField';
 import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { Tabs } from '@/shared/components/ui/Tabs';
@@ -30,43 +31,66 @@ import { SearchIcon, PlusIcon, DownloadIcon, TrashIcon } from '@/shared/componen
 import { ProjectStatusBadge } from '../components/ProjectStatusBadge';
 import { ProjectsSummaryChart } from '../components/ProjectsSummaryChart';
 import { getProjectStageLabel } from '../lib/project-stage-display';
-import { formatProgressPercent } from '../lib/project-progress-display';
+import { calculateScheduleElapsedPercent, formatProgressPercent } from '../lib/project-progress-display';
 import { exportDevelopmentProjects, exportSupportProjects } from '../lib/project-export';
+import {
+  DEFAULT_PROJECTS_SORT,
+  SUPPORT_SUB_TABS,
+  supportSubTabStatuses,
+  initialProjectsListSearch,
+  rememberProjectsListSearch,
+  type ProjectsListSearch,
+  type SupportSubTab,
+} from '../lib/projects-list-search';
 import { useDeleteProject, useProjectsList } from '../api/projects.queries';
+import { useSupportProjectUsage } from '../api/support-plan.queries';
+import { supportPlanApi } from '../api/support-plan.api';
+import { supportHoursOf } from '../lib/support-hours-display';
 import { projectsApi } from '../api/projects.api';
 import { useClientsList } from '@/modules/clients/api/clients.queries';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { projectPath } from '@/app/router/paths';
 
-const STATUS_OPTIONS = PROJECT_STATUSES.map((status) => ({ value: status, label: PROJECT_STATUS_LABELS[status] }));
-const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
-const SALES_STAGE_OPTIONS = PROJECT_SALES_STAGES.map((stage) => ({
-  value: stage, label: PROJECT_SALES_STAGE_LABELS[stage],
+// Finalizado y Cancelado no se ofrecen como filtro: el listado de desarrollo se filtra solo por los estados en curso.
+const HIDDEN_STATUS_FILTERS: readonly ProjectStatus[] = ['finished', 'cancelled'];
+const STATUS_OPTIONS = PROJECT_STATUSES.filter((status) => !HIDDEN_STATUS_FILTERS.includes(status)).map((status) => ({
+  value: status,
+  label: PROJECT_STATUS_LABELS[status],
 }));
-const QUOTATION_LABELS: Record<ProjectQuotationListStatus, string> = {
-  none: 'Sin cotización',
-  draft: 'En cotización',
-  sent: 'Enviada al cliente',
-  approved_pending: 'Traspaso pendiente',
-  transferred: 'Traspasada',
-  planning_applied: 'Planificación preliminar aplicada',
-};
-const QUOTATION_OPTIONS = PROJECT_QUOTATION_LIST_STATUSES.map((status) => ({
-  value: status, label: QUOTATION_LABELS[status],
+const PHASE_OPTIONS = PROJECT_PHASES.map((phase) => ({ value: phase, label: PROJECT_PHASE_LABELS[phase] }));
+// Igual que en Estado, "Finalizado" no se ofrece como filtro de Tipo de proyecto.
+const KIND_OPTIONS = PROJECT_KINDS.filter((kind) => kind !== 'finished').map((kind) => ({
+  value: kind,
+  label: PROJECT_KIND_LABELS[kind],
 }));
 const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },
   { id: 'support', label: 'Soporte' },
 ] as const;
-const SUPPORT_SUB_TABS = [
-  { id: 'active', label: 'Activos' },
-  { id: 'finished', label: 'Terminados' },
-] as const;
+// Tope de página del API (`MAX_PAGE_SIZE`) y de ids por consulta de consumo de soporte.
 const EXPORT_PAGE_SIZE = 200;
 
-// Por defecto, primero los proyectos con más horas desviadas.
-const DEFAULT_SORT: SortState<ProjectSortField> = { field: 'deviationHours', direction: 'desc' };
+/** Todas las páginas del tipo: con una sola página de 200, los proyectos que pasaban de ese tope no salían en el Excel. */
+async function fetchAllProjectsOfType(type: 'development' | 'support'): Promise<ProjectSummary[]> {
+  const first = await projectsApi.list({ type, page: 1, pageSize: EXPORT_PAGE_SIZE });
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(first.pageCount - 1, 0) }, (_, index) =>
+      projectsApi.list({ type, page: index + 2, pageSize: EXPORT_PAGE_SIZE }),
+    ),
+  );
+  return [first, ...rest].flatMap((page) => page.items);
+}
+
+/** `/support-plans/usage` acepta hasta 200 ids por llamada — se pide en lotes. */
+async function fetchSupportUsage(projectIds: readonly string[]): Promise<SupportProjectUsage[]> {
+  const chunks: string[][] = [];
+  for (let start = 0; start < projectIds.length; start += EXPORT_PAGE_SIZE) {
+    chunks.push(projectIds.slice(start, start + EXPORT_PAGE_SIZE));
+  }
+  const results = await Promise.all(chunks.map((ids) => supportPlanApi.listUsage(ids)));
+  return results.flat();
+}
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 // Restantes y desviadas se separan: si el proyecto ya consumió todo lo vendido, restantes queda en 0
@@ -83,10 +107,10 @@ const DATE_COLUMN_WIDTH = '120px';
 /**
  * Listado de proyectos: tabs Desarrollo/Soporte, gráfico resumen y tabla
  * completa, siguiendo la misma disposición que `Proyectos/index.tsx` en la
- * v1. La tab Desarrollo lleva los filtros Líder/Estado/Etapa/Buscar, los tres
- * primeros con selección múltiple (`MultiSelect`, checkboxes + búsqueda),
+ * v1. La tab Desarrollo lleva los filtros Líder/Tipo de proyecto/Estado/Etapa/Buscar, todos
+ * menos Buscar con selección múltiple (`MultiSelect`, checkboxes + búsqueda),
  * igual que en la v1; la tab Soporte, igual que en la v1, no lleva esos filtros — solo el
- * sub-selector Activos/Terminados y Buscar. Sin el filtro de
+ * sub-selector Activos/Terminados/Inactivos y Buscar. Sin el filtro de
  * Período/Detalle del gráfico, que depende de datos que aún no existen
  * (registro de horas por fecha — M4). La creación y la ficha completa se
  * abordan en la ficha de detalle.
@@ -94,17 +118,17 @@ const DATE_COLUMN_WIDTH = '120px';
 export function ProjectsListPage() {
   const { can } = usePermissions();
   const toast = useToast();
-  const [tab, setTab] = useState<'development' | 'support'>('development');
-  const [supportSubTab, setSupportSubTab] = useState<'active' | 'finished'>('active');
-  const [search, setSearch] = useState('');
-  const [leaderUserIds, setLeaderUserIds] = useState<string[]>([]);
-  const [statuses, setStatuses] = useState<ProjectStatus[]>([]);
-  const [phases, setPhases] = useState<ProjectPhase[]>([]);
-  const [salesStages, setSalesStages] = useState<ProjectSalesStage[]>([]);
-  const [quotationStatuses, setQuotationStatuses] = useState<ProjectQuotationListStatus[]>([]);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [sort, setSort] = useState<SortState<ProjectSortField>>(DEFAULT_SORT);
+  const location = useLocation();
+  const [listSearch, setListSearch] = useState(() => initialProjectsListSearch(location.state));
+  const { tab, supportSubTab, search, leaderUserIds, kinds, statuses, phases, page, pageSize, sort } = listSearch;
+  const updateListSearch = (patch: Partial<ProjectsListSearch>) => setListSearch((current) => ({ ...current, ...patch }));
+  const setPage = (next: number) => updateListSearch({ page: next });
+
+  // Se guarda en cada cambio para que "Volver a proyectos" desde la ficha restaure lo que había.
+  useEffect(() => {
+    rememberProjectsListSearch(listSearch);
+  }, [listSearch]);
+
   const [deleteTarget, setDeleteTarget] = useState<ProjectSummary | null>(null);
   const [exporting, setExporting] = useState(false);
   const deleteProject = useDeleteProject();
@@ -115,15 +139,14 @@ export function ProjectsListPage() {
           type: tab,
           search: search || undefined,
           leaderUserId: leaderUserIds.length > 0 ? leaderUserIds : undefined,
+          kind: kinds.length > 0 ? kinds : undefined,
           status: statuses.length > 0 ? statuses : undefined,
           phase: phases.length > 0 ? phases : undefined,
-          salesStage: salesStages.length > 0 ? salesStages : undefined,
-          quotationStatus: quotationStatuses.length > 0 ? quotationStatuses : undefined,
         }
       : {
           type: tab,
           search: search || undefined,
-          status: [supportSubTab],
+          status: supportSubTabStatuses(supportSubTab),
         };
 
   const { data, isLoading, error } = useProjectsList({
@@ -133,7 +156,18 @@ export function ProjectsListPage() {
     sortField: sort.field,
     sortDirection: sort.direction,
   });
-  // Totales de las sub-pestañas Activos/Terminados de Soporte: solo interesa
+  // Las columnas de horas de Soporte salen del contrato (mismo cálculo que la ficha), no de sold/used del proyecto.
+  const pageProjectIds = useMemo(() => (data?.items ?? []).map((project) => project.id), [data]);
+  const { data: supportUsage, isLoading: supportUsageLoading } = useSupportProjectUsage(pageProjectIds, {
+    enabled: tab === 'support',
+  });
+  const usageByProject = useMemo(
+    () => new Map<string, SupportProjectUsage>((supportUsage ?? []).map((usage) => [usage.projectId, usage])),
+    [supportUsage],
+  );
+  const supportHours = (project: ProjectSummary) => supportHoursOf(project, usageByProject.get(project.id));
+
+  // Totales de Activos/Terminados/Inactivos de Soporte: solo interesa
   // `total`, así que basta con una página de 1. Respetan el Buscar para que
   // coincidan con lo que muestra la tabla al cambiar de pestaña.
   const supportCountQuery = { type: 'support' as const, search: search || undefined, page: 1, pageSize: 1 };
@@ -145,8 +179,17 @@ export function ProjectsListPage() {
     { ...supportCountQuery, status: ['finished'] },
     { enabled: tab === 'support' },
   );
+  const { data: supportInactiveCount } = useProjectsList(
+    { ...supportCountQuery, status: supportSubTabStatuses('inactive') },
+    { enabled: tab === 'support' },
+  );
+  const supportCountByTab = {
+    active: supportActiveCount?.total,
+    finished: supportFinishedCount?.total,
+    inactive: supportInactiveCount?.total,
+  };
   const supportSubTabs = SUPPORT_SUB_TABS.map((subTab) => {
-    const total = (subTab.id === 'active' ? supportActiveCount : supportFinishedCount)?.total;
+    const total = supportCountByTab[subTab.id];
     return { id: subTab.id, label: total === undefined ? subTab.label : `${subTab.label} (${total})` };
   });
   const { data: clients } = useClientsList({ page: 1, pageSize: 200, sortField: 'companyName' });
@@ -161,25 +204,19 @@ export function ProjectsListPage() {
     [leaders],
   );
 
-  const changeTab = (id: string) => {
-    setTab(id as 'development' | 'support');
-    setSort(DEFAULT_SORT);
-    setPage(1);
-  };
+  const changeTab = (id: string) =>
+    updateListSearch({ tab: id as 'development' | 'support', sort: DEFAULT_PROJECTS_SORT, page: 1 });
 
-  const changeSupportSubTab = (id: string) => {
-    setSupportSubTab(id as 'active' | 'finished');
-    setPage(1);
-  };
+  const changeSupportSubTab = (id: string) => updateListSearch({ supportSubTab: id as SupportSubTab, page: 1 });
 
-  const toggleSort = (field: string) => {
-    setSort((current) =>
-      current.field === field
-        ? { field: current.field, direction: current.direction === 'asc' ? 'desc' : 'asc' }
-        : { field: field as ProjectSortField, direction: 'asc' },
-    );
-    setPage(1);
-  };
+  const toggleSort = (field: string) =>
+    updateListSearch({
+      sort:
+        sort.field === field
+          ? { field: sort.field, direction: sort.direction === 'asc' ? 'desc' : 'asc' }
+          : { field: field as ProjectSortField, direction: 'asc' },
+      page: 1,
+    });
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -209,8 +246,15 @@ export function ProjectsListPage() {
   // Sin `projects:manage` (p. ej. el líder) no hay ninguna acción disponible, así que la columna no se muestra.
   const managementColumns = can('projects:manage') ? [actionsColumn] : [];
 
+  const renderNotApplicable = () => <span className={styles.empty}>No aplica</span>;
+
   const renderDeviation = (deviation: number) =>
     deviation > 0 ? <span className={styles.deviated}>{formatHours(deviation)}</span> : <span className={styles.empty}>{formatHours(deviation)}</span>;
+
+  // Mientras llega el consumo del contrato no se muestran las cifras del proyecto (podían ser muy distintas).
+  const renderSupportHours = (render: () => ReactNode) =>
+    supportUsageLoading ? <span className={styles.empty}>…</span> : render();
+  const renderEmptyHours = () => <span className={styles.empty}>—</span>;
 
   const developmentColumns: Column<ProjectSummary>[] = [
     {
@@ -225,21 +269,14 @@ export function ProjectsListPage() {
     },
     { key: 'client', header: 'Cliente', sortable: true, render: (p) => p.client?.companyName ?? <span className={styles.empty}>—</span> },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
-    {
-      key: 'salesStage', header: 'Tipo de proyecto', sortable: true,
-      render: (p) => p.salesStage
-        ? PROJECT_SALES_STAGE_LABELS[p.salesStage]
-        : <span className={styles.empty}>—</span>,
-    },
+    // Tipo, Estado y Etapa muestran cada uno su propio dato — los mismos valores que ofrecen sus filtros.
+    { key: 'kind', header: 'Tipo de proyecto', sortable: true, render: (p) => PROJECT_KIND_LABELS[projectKindOf(p)] },
     { key: 'status', header: 'Estado', sortable: true, render: (p) => <ProjectStatusBadge status={p.status} /> },
-    { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
     {
-      key: 'quotationStatus', header: 'Cotización', sortable: true,
-      render: (p) => p.quotationStatus
-        ? <span className={styles.quotationStatus} data-state={p.quotationStatus}>
-            {QUOTATION_LABELS[p.quotationStatus]}
-          </span>
-        : <span className={styles.empty}>—</span>,
+      key: 'stage',
+      header: 'Etapa',
+      sortable: true,
+      render: (p) => (p.phase ? PROJECT_PHASE_LABELS[p.phase] : <span className={styles.empty}>—</span>),
     },
     {
       key: 'startDate',
@@ -259,8 +296,15 @@ export function ProjectsListPage() {
       key: 'progress',
       header: '% Avance',
       sortable: true,
-      render: (p) =>
-        p.progress.actual != null ? formatProgressPercent(p.progress.actual) : <span className={styles.empty}>Sin plan</span>,
+      render: (p) => {
+        if (p.progress.actual != null) return formatProgressPercent(p.progress.actual);
+        const elapsed = calculateScheduleElapsedPercent(p.startDate, p.endDate);
+        return elapsed != null
+          ? <span title="Plazo calendario transcurrido; no representa trabajo completado.">
+              {elapsed}% <span className={styles.empty}>(plazo)</span>
+            </span>
+          : <span className={styles.empty}>Sin plan</span>;
+      },
     },
     { key: 'soldHours', header: 'HH vendidas', sortable: true, render: (p) => formatHours(p.soldHours) },
     { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
@@ -290,18 +334,73 @@ export function ProjectsListPage() {
       key: 'supportPlan',
       header: 'Tipo de Soporte',
       sortable: true,
-      render: (p) => p.supportPlanDescription || <span className={styles.empty}>—</span>,
+      // Sale del contrato de soporte (`plan_type`), no del texto libre heredado de la v1.
+      render: (p) => (p.supportPlanType ? SUPPORT_PLAN_TYPE_LABELS[p.supportPlanType] : <span className={styles.empty}>—</span>),
     },
     { key: 'leader', header: 'Líder', sortable: true, render: (p) => p.leader?.fullName ?? <span className={styles.empty}>—</span> },
     { key: 'stage', header: 'Etapa', render: (p) => getProjectStageLabel(p) },
-    { key: 'supportHours', header: 'HH Vendidas', sortable: true, render: (p) => formatHours(p.supportHours) },
-    { key: 'usedHours', header: 'HH Consumidas', sortable: true, render: (p) => formatHours(p.usedHours) },
-    { key: 'remainingHours', header: 'HH Restantes', sortable: true, render: (p) => formatHours(remainingHoursOf(p.supportHours, p.usedHours)) },
+    // Mismo cálculo que "Estado del proyecto" de la ficha (ver `supportHoursOf`): en planes mensuales, el MES en
+    // curso; en bolsa / a demanda, la vigencia del contrato. "A demanda" no tiene tope: solo aplican las consumidas.
+    // No son ordenables: el orden del servidor usa sold/used del proyecto y no calzaría con lo que se ve.
+    {
+      key: 'soldHours',
+      header: 'HH Vendidas',
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          if (hours.notApplicable) return renderNotApplicable();
+          if (hours.sold === null) return renderEmptyHours();
+          return (
+            <div className={styles.hoursCell}>
+              <span>
+                {formatHours(hours.sold)}
+                {hours.soldUnit && <span className={styles.hoursUnit}> {hours.soldUnit}</span>}
+              </span>
+              {hours.priorSurplus > 0 && (
+                <span className={styles.hoursHint}>+{formatHours(hours.priorSurplus)} acumuladas</span>
+              )}
+            </div>
+          );
+        }),
+    },
+    {
+      key: 'usedHours',
+      header: 'HH Consumidas',
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          return (
+            <div className={styles.hoursCell}>
+              <span>{formatHours(hours.used)}</span>
+              {/* Dato informativo: en mensual la cifra principal es el mes; en bolsa, todo el contrato. */}
+              {hours.usedBreakdown && (
+                <span className={styles.hoursHint}>
+                  Mes {formatHours(hours.usedBreakdown.month)} · Total {formatHours(hours.usedBreakdown.total)}
+                </span>
+              )}
+            </div>
+          );
+        }),
+    },
+    {
+      key: 'remainingHours',
+      header: 'HH Restantes',
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          if (hours.notApplicable) return renderNotApplicable();
+          return hours.remaining === null ? renderEmptyHours() : formatHours(hours.remaining);
+        }),
+    },
     {
       key: 'deviationHours',
       header: 'HH desviadas',
-      sortable: true,
-      render: (p) => renderDeviation(deviationHoursOf(p.supportHours, p.usedHours)),
+      render: (p) =>
+        renderSupportHours(() => {
+          const hours = supportHours(p);
+          if (hours.notApplicable) return renderNotApplicable();
+          return hours.deviation === null ? renderEmptyHours() : renderDeviation(hours.deviation);
+        }),
     },
     ...managementColumns,
   ];
@@ -315,12 +414,12 @@ export function ProjectsListPage() {
       // del tipo activo, sin los filtros de la tabla ni del gráfico — y se pide
       // recién al descargar. El delay artificial es para que se alcance a ver
       // el estado "Generando…" antes de que el navegador dispare la descarga.
-      const [{ items }] = await Promise.all([
-        projectsApi.list({ type: tab, page: 1, pageSize: EXPORT_PAGE_SIZE }),
+      const [items] = await Promise.all([
+        fetchAllProjectsOfType(tab),
         new Promise((resolve) => setTimeout(resolve, 1000)),
       ]);
       if (tab === 'development') exportDevelopmentProjects(items);
-      else exportSupportProjects(items);
+      else exportSupportProjects(items, await fetchSupportUsage(items.map((project) => project.id)));
     } finally {
       setExporting(false);
     }
@@ -372,22 +471,16 @@ export function ProjectsListPage() {
                   searchPlaceholder="Buscar líder"
                   options={leaderOptions}
                   value={leaderUserIds}
-                  onChange={(next) => {
-                    setLeaderUserIds(next);
-                    setPage(1);
-                  }}
+                  onChange={(next) => updateListSearch({ leaderUserIds: next, page: 1 })}
                 />
                 <MultiSelect
                   className={styles.filter}
                   label="Tipo de proyecto"
                   placeholder="Todos"
                   searchPlaceholder="Buscar tipo"
-                  options={SALES_STAGE_OPTIONS}
-                  value={salesStages}
-                  onChange={(next) => {
-                    setSalesStages(next as ProjectSalesStage[]);
-                    setPage(1);
-                  }}
+                  options={KIND_OPTIONS}
+                  value={kinds}
+                  onChange={(next) => updateListSearch({ kinds: next as ProjectKind[], page: 1 })}
                 />
                 <MultiSelect
                   className={styles.filter}
@@ -396,10 +489,7 @@ export function ProjectsListPage() {
                   searchPlaceholder="Buscar estado"
                   options={STATUS_OPTIONS}
                   value={statuses}
-                  onChange={(next) => {
-                    setStatuses(next as ProjectStatus[]);
-                    setPage(1);
-                  }}
+                  onChange={(next) => updateListSearch({ statuses: next as ProjectStatus[], page: 1 })}
                 />
                 <MultiSelect
                   className={styles.filter}
@@ -408,22 +498,7 @@ export function ProjectsListPage() {
                   searchPlaceholder="Buscar etapa"
                   options={PHASE_OPTIONS}
                   value={phases}
-                  onChange={(next) => {
-                    setPhases(next as ProjectPhase[]);
-                    setPage(1);
-                  }}
-                />
-                <MultiSelect
-                  className={styles.filter}
-                  label="Cotización"
-                  placeholder="Todas"
-                  searchPlaceholder="Buscar cotización"
-                  options={QUOTATION_OPTIONS}
-                  value={quotationStatuses}
-                  onChange={(next) => {
-                    setQuotationStatuses(next as ProjectQuotationListStatus[]);
-                    setPage(1);
-                  }}
+                  onChange={(next) => updateListSearch({ phases: next as ProjectPhase[], page: 1 })}
                 />
               </>
             )}
@@ -433,10 +508,7 @@ export function ProjectsListPage() {
               type="search"
               placeholder={tab === 'development' ? 'Buscar Proyecto' : 'Buscar por nombre'}
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
+              onChange={(event) => updateListSearch({ search: event.target.value, page: 1 })}
               iconLeft={<SearchIcon size={16} />}
             />
           </div>
@@ -462,10 +534,7 @@ export function ProjectsListPage() {
               total={data.total}
               pageSize={data.pageSize}
               onPageChange={setPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setPage(1);
-              }}
+              onPageSizeChange={(size) => updateListSearch({ pageSize: size, page: 1 })}
             />
           )}
         </Card>

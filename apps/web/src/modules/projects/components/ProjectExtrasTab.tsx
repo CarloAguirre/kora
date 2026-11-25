@@ -29,6 +29,8 @@ import {
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { formatMoney } from '@/shared/lib/format-money';
 import { IssueProjectMilestoneInvoiceDialog } from './IssueProjectMilestoneInvoiceDialog';
+import { ProjectInvoiceDocumentButton } from './ProjectInvoiceDocumentButton';
+import { ProjectPaymentReceiptButton } from './ProjectPaymentReceiptButton';
 import { MarkProjectMilestonePaidDialog } from './MarkProjectMilestonePaidDialog';
 import { EditProjectMilestoneDialog } from './EditProjectMilestoneDialog';
 import { PaymentTriggerFields } from './PaymentTriggerFields';
@@ -138,7 +140,8 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
   /** Sin `projects:manage`, el líder DE ESTE PROYECTO también configura el cronograma de cobro. */
   const canManageMilestones = can('projects:manage') || (user !== null && project.leader?.id === user.id);
   const canManageBillingActions = can('billing:manage');
-  const canViewBilling = canManageMilestones || canManageBillingActions || can('billing:read');
+  // Un proyecto interno no se cobra: no hay cronograma de tramos que mostrar.
+  const canViewBilling = !project.isInternal && (canManageMilestones || canManageBillingActions || can('billing:read'));
 
   const createMilestone = useCreateProjectPaymentMilestone();
   const updateMilestone = useUpdateProjectPaymentMilestone();
@@ -493,6 +496,22 @@ export function ProjectExtrasTab({ project, canManage }: { project: ProjectDetai
                   </Badge>
 
                   <div className={styles.milestoneActions}>
+                    {milestone.status === 'paid' && (
+                      <ProjectPaymentReceiptButton
+                        projectId={project.id}
+                        milestoneId={milestone.id}
+                        hasPaymentReceipt={milestone.hasPaymentReceipt}
+                        canManageBilling={canManageBillingActions}
+                      />
+                    )}
+                    {!isNotInvoiced(milestone.status) && (
+                      <ProjectInvoiceDocumentButton
+                        projectId={project.id}
+                        milestoneId={milestone.id}
+                        hasAttachment={milestone.hasAttachment}
+                        canManageBilling={canManageBillingActions}
+                      />
+                    )}
                     {canManageMilestones && (
                       <Button variant="ghost" size="icon" onClick={() => setEditingMilestone(milestone)} aria-label={`Editar ${milestone.name}`}>
                         <PencilIcon size={16} />

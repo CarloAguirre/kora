@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiModule } from '../ai/ai.module';
+import { ProjectsModule } from '../projects/projects.module';
 import { DOCUMENT_SOURCE_READER } from './application/ports/document-source-reader.port';
 import { DRIVE_FOLDER_CLIENT } from './application/ports/drive-folder-client.port';
 import { AnalyzeEstimationPocUseCase } from './application/use-cases/analyze-estimation-poc.use-case';
@@ -23,7 +24,7 @@ import { QuotationController } from './presentation/quotation.controller';
  * caso de uso de negocio; no conoce SDKs ni proveedores LLM concretos.
  */
 @Module({
-  imports: [AiModule],
+  imports: [AiModule, ProjectsModule],
   controllers: [EstimationController, QuotationController],
   providers: [
     GetEstimationQuestionnaireDefinitionUseCase,

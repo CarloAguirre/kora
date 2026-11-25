@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   TICKET_STATUSES,
   TICKET_STATUS_LABELS,
+  isAdminTier,
   type ListTicketsQuery,
   type TicketSortField,
   type TicketStatus,
@@ -17,19 +18,24 @@ import { MultiSelect } from '@/shared/components/ui/MultiSelect';
 import { TextField } from '@/shared/components/ui/TextField';
 import { DEFAULT_PAGE_SIZE, Pagination } from '@/shared/components/ui/Pagination';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
-import { DownloadIcon, EyeIcon, SearchIcon } from '@/shared/components/icons/Icons';
+import { DownloadIcon, SearchIcon } from '@/shared/components/icons/Icons';
+import { DropdownMenu, type DropdownMenuItem } from '@/shared/components/ui/DropdownMenu';
+import { ConfirmActionDialog } from '@/shared/components/ui/ConfirmActionDialog';
+import { useToast } from '@/shared/components/ui/Toast';
 import { TicketStatusBadge } from '../components/TicketStatusBadge';
 import { TicketPriorityBadge } from '../components/TicketPriorityBadge';
 import { TicketServiceTypeIcon } from '../components/TicketServiceTypeIcon';
 import { TicketDetailModal } from '../components/TicketDetailModal';
-import { useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
+import { useDeleteTicket, useTicketLinkableClients, useTicketsList } from '../api/tickets.queries';
 import { ticketsApi } from '../api/tickets.api';
-import { exportTicketHistory } from '../lib/ticket-history-export';
+import { assertTicketHistoryExportComplete, exportTicketHistory } from '../lib/ticket-history-export';
+import { formatTicketReportDate } from '../lib/ticket-history-dates';
 import { useUsersList } from '@/modules/users/api/users.queries';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
 import { ApiRequestError } from '@/shared/lib/api-client';
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL');
+const formatDate = formatTicketReportDate;
 
 /**
  * Listado histórico de tickets — réplica de `HistorialTickets/index.tsx` (v1):
@@ -40,11 +46,20 @@ const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CL'
 export function TicketHistoryPage() {
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const { user } = useAuth();
+  const toast = useToast();
+  const deleteTicket = useDeleteTicket();
+  // Admin/PMO pueden eliminar desde el historial cualquier ticket, cerrado incluido — `DeleteTicketUseCase` es quien decide.
+  const canDelete = Boolean(user && isAdminTier(user.role));
   const [search, setSearch] = useState('');
   const [clientIds, setClientIds] = useState<string[]>([]);
   const [assigneeUserIds, setAssigneeUserIds] = useState<string[]>([]);
   const [leaderUserIds, setLeaderUserIds] = useState<string[]>([]);
   const [status,setStatus] = useState<TicketStatus | ''>('');
+  // Rango de FECHA TRABAJADA (la de las HH aprobadas), no de reporte.
+  const [workedFrom, setWorkedFrom] = useState('');
+  const [workedTo, setWorkedTo] = useState('');
+  const workedRangeError = workedFrom && workedTo && workedFrom > workedTo ? 'Debe ser posterior a la fecha inicio.' : null;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sort, setSort] = useState<{ field: TicketSortField; direction: 'asc' | 'desc' }>({
@@ -52,11 +67,13 @@ export function TicketHistoryPage() {
     direction: 'desc',
   });
   const [openTicketId, setOpenTicketId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TicketSummary | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const { data: clients } = useTicketLinkableClients();
   const { data: users } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName' });
+  const { data: leaders } = useUsersList({ page: 1, pageSize: 200, sortField: 'firstName', role: 'leader' });
 
   const query: Partial<ListTicketsQuery> = {
     page,
@@ -66,6 +83,9 @@ export function TicketHistoryPage() {
     assigneeUserId: assigneeUserIds.length > 0 ? assigneeUserIds : undefined,
     leaderUserId: leaderUserIds.length > 0 ? leaderUserIds : undefined,
     status: status || undefined,
+    // Con el rango inválido no se filtra por fecha (el campo ya muestra el error).
+    workedFrom: (!workedRangeError && workedFrom) || undefined,
+    workedTo: (!workedRangeError && workedTo) || undefined,
     sortField: sort.field,
     sortDirection: sort.direction,
   };
@@ -90,20 +110,37 @@ export function TicketHistoryPage() {
       // entera, así que pagina hasta juntar `total` filas en vez de asumir
       // que todo cabe en una página.
       const EXPORT_PAGE_SIZE = 200;
-      const first = await ticketsApi.list({ ...query, page: 1, pageSize: EXPORT_PAGE_SIZE });
-      const rows = [...first.items];
-      const pageCount = Math.ceil(first.total / EXPORT_PAGE_SIZE);
-      for (let currentPage = 2; currentPage <= pageCount; currentPage += 1) {
-        const next = await ticketsApi.list({ ...query, page: currentPage, pageSize: EXPORT_PAGE_SIZE });
-        rows.push(...next.items);
-      }
-      exportTicketHistory(rows);
+      const fetchAllTickets = async () => {
+        const first = await ticketsApi.list({ ...query, page: 1, pageSize: EXPORT_PAGE_SIZE });
+        const rows = [...first.items];
+        const pageCount = Math.ceil(first.total / EXPORT_PAGE_SIZE);
+        for (let currentPage = 2; currentPage <= pageCount; currentPage += 1) {
+          const next = await ticketsApi.list({ ...query, page: currentPage, pageSize: EXPORT_PAGE_SIZE });
+          rows.push(...next.items);
+        }
+        assertTicketHistoryExportComplete(rows, first.total);
+        return rows;
+      };
+      // El desglose por día viene de un endpoint aparte (sin paginar, mismos filtros) — en paralelo con las páginas.
+      const [rows, dailyHours, contracts] = await Promise.all([
+        fetchAllTickets(),
+        ticketsApi.dailyHours(query),
+        ticketsApi.contractConsumption(query),
+      ]);
+      exportTicketHistory(rows, dailyHours, contracts, { from: query.workedFrom, to: query.workedTo });
     } catch (exportErr) {
-      setExportError(exportErr instanceof ApiRequestError ? exportErr.message : 'No se pudo generar el Excel.');
+      setExportError(exportErr instanceof Error ? exportErr.message : 'No se pudo generar el Excel.');
     } finally {
       setExporting(false);
     }
   };
+
+  const rowActions = (ticket: TicketSummary): DropdownMenuItem[] => [
+    { key: 'ver', label: 'Ver detalle', onSelect: () => setOpenTicketId(ticket.id) },
+    ...(canDelete
+      ? [{ key: 'eliminar', label: 'Eliminar', tone: 'danger' as const, onSelect: () => setDeleteTarget(ticket) }]
+      : []),
+  ];
 
   const columns: ReadonlyArray<Column<TicketSummary>> = [
     {
@@ -132,9 +169,14 @@ export function TicketHistoryPage() {
       header: 'Acción',
       align: 'right',
       render: (ticket) => (
-        <Button variant="ghost" size="icon" aria-label={`Ver ${ticket.code ?? ticket.title}`} onClick={() => setOpenTicketId(ticket.id)}>
-          <EyeIcon size={20} />
-        </Button>
+        <DropdownMenu
+          items={rowActions(ticket)}
+          trigger={({ onClick }) => (
+            <Button variant="ghost" size="icon" onClick={onClick} aria-label={`Acciones — ${ticket.code ?? ticket.title}`} title="Acciones">
+              ⋮
+            </Button>
+          )}
+        />
       ),
     },
   ];
@@ -214,7 +256,7 @@ export function TicketHistoryPage() {
               label="Líder"
               placeholder="Todos"
               searchPlaceholder="Buscar líder"
-              options={(users?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
+              options={(leaders?.items ?? []).map((user) => ({ value: user.id, label: user.fullName }))}
               value={leaderUserIds}
               onChange={(next) => {
                 setLeaderUserIds(next);
@@ -229,6 +271,27 @@ export function TicketHistoryPage() {
               value={status}
               onChange={(event) => {
                 setStatus(event.target.value as TicketStatus | '');
+                setPage(1);
+              }}
+            />
+            <TextField
+              className={styles.date}
+              label="Fecha trabajada inicio"
+              type="date"
+              value={workedFrom}
+              onChange={(event) => {
+                setWorkedFrom(event.target.value);
+                setPage(1);
+              }}
+            />
+            <TextField
+              className={styles.date}
+              label="Fecha trabajada fin"
+              type="date"
+              value={workedTo}
+              errorText={workedRangeError ?? undefined}
+              onChange={(event) => {
+                setWorkedTo(event.target.value);
                 setPage(1);
               }}
             />
@@ -271,6 +334,21 @@ export function TicketHistoryPage() {
       </div>
 
       {openTicketId && <TicketDetailModal ticketId={openTicketId} onClose={() => setOpenTicketId(null)} />}
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        title="Eliminar ticket"
+        description={`¿Eliminar el ticket "${deleteTarget?.title ?? ''}"? Esta acción no se puede deshacer.`}
+        warning={deleteTarget && deleteTarget.usedHours > 0 ? 'También se eliminarán las HH registradas en este ticket.' : null}
+        confirmLabel="Eliminar"
+        destructive
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await deleteTicket.mutateAsync(deleteTarget.id);
+          toast.success('Se eliminó el ticket.');
+          setDeleteTarget(null);
+        }}
+      />
     </DashboardLayout>
   );
 }

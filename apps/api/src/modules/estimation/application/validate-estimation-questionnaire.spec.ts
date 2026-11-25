@@ -81,4 +81,57 @@ describe('R4-a · respuestas de cuestionario F01–F05', () => {
     ], [dynamic])).toThrow(/D01/);
   });
 
+  it('acepta D03 con «Otro (especificar)» tal como lo envía el wizard', () => {
+    const base = {
+      id: 'D03', kind: 'dynamic' as const,
+      category: 'Integraciones', question: '¿Qué canales se requieren?',
+      reason: 'Determina el alcance de integraciones',
+      impact: 'high' as const, required: true,
+      canPrefill: false, priorityScore: 5, dependsOn: [],
+      sourceRefs: [{ sourceId: 'drive-scope', fileName: 'Alcance.pdf' }],
+      options: [
+        { value: 'web', label: 'Web' }, { value: 'mobile', label: 'Móvil' },
+        { value: 'other', label: 'Otro (especificar)' },
+      ],
+    };
+    const answer = (value: string | string[]) => [
+      ...complete(), { questionId: 'D03', value, usedAssumption: false },
+    ];
+    expect(() => validateQuestionnaireAnswers(definition, answer(
+      'other:Conector SFTP por lotes',
+    ), [{ ...base, answerType: 'single_choice' }])).not.toThrow();
+    expect(() => validateQuestionnaireAnswers(definition, answer(
+      ['web', 'other:Aplicación de terreno offline'],
+    ), [{ ...base, answerType: 'multi_choice' }])).not.toThrow();
+  });
+
+  it('mantiene protección contra opciones inventadas o texto «Otro» inválido', () => {
+    const base = {
+      id: 'D03', kind: 'dynamic' as const, category: 'Integraciones',
+      question: '¿Qué canal?', reason: 'Impacta esfuerzo',
+      impact: 'high' as const, required: true,
+      canPrefill: false, priorityScore: 5, dependsOn: [],
+      sourceRefs: [{ sourceId: 'drive-scope', fileName: 'Alcance.pdf' }],
+      answerType: 'multi_choice' as const,
+      options: [
+        { value: 'web', label: 'Web' }, { value: 'mobile', label: 'Móvil' },
+        { value: 'other', label: 'Otro (especificar)' },
+      ],
+    };
+    const submit = (value: string[]) => validateQuestionnaireAnswers(definition, [
+      ...complete(), { questionId: 'D03', value, usedAssumption: false },
+    ], [base]);
+    expect(() => submit(['other:'])).toThrow(/D03/);
+    expect(() => submit(['other:   '])).toThrow(/D03/);
+    expect(() => submit(['other'])).toThrow(/D03/);
+    expect(() => submit(['other:' + 'a'.repeat(301)])).toThrow(/D03/);
+    expect(() => submit(['web', 'other:ABC', 'other:DEF'])).toThrow(/D03/);
+    expect(() => submit(['none', 'other:ABC'])).toThrow(/D03/);
+    expect(() => submit(['inventado'])).toThrow(/D03/);
+    expect(() => validateQuestionnaireAnswers(definition, [
+      ...complete(), { questionId: 'D03', value: 'other:ABC', usedAssumption: false },
+    ], [{ ...base, answerType: 'single_choice', options: base.options.slice(0, 2) }]))
+      .toThrow(/D03/);
+  });
+
 });

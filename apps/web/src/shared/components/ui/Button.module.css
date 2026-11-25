@@ -67,6 +67,9 @@
   color: var(--kora-navy);
   border: 1px solid var(--kora-border-soft);
 }
+.outline:not(:disabled):hover {
+  background: var(--kora-lime-hover);
+}
 .outline:disabled {
   opacity: 0.6;
 }
@@ -110,6 +113,9 @@
   background: var(--kora-surface);
   color: var(--kora-danger);
   border: 1px solid var(--kora-danger);
+}
+.dangerOutline:not(:disabled):hover {
+  background: var(--kora-badge-danger-bg);
 }
 .dangerOutline:disabled {
   opacity: 0.5;

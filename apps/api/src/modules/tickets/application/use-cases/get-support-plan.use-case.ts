@@ -10,11 +10,12 @@ import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket
 import { TICKET_USER_READER, type TicketUserReader } from '../ports/ticket-user-reader.port';
 import { computeSupportPlanAlerts } from '../services/support-plan-alerts';
 import { SupportMonthlyPeriodReconciler } from '../services/support-monthly-period-reconciler';
+import { buildMonthlyBillingSchedule } from '../services/support-monthly-billing-schedule';
 import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import type { UseCase } from '../../../../shared/application/use-case';
-import { paymentStatusOf } from '../services/support-invoice-payment-status';
+import { listPendingPeriods, paymentStatusOf } from '../services/support-invoice-payment-status';
 
 export interface GetSupportPlanQuery {
   readonly planId: string;
@@ -81,6 +82,7 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
       currency: record.currency,
       currentBillingStatus: current.billingStatus,
       currentAmountUf: current.amountUf,
+      currentPendingAmountUf: current.pendingAmountUf,
       alerts,
       clientId: record.clientId,
       clientName: client?.companyName ?? '',
@@ -109,13 +111,18 @@ export class GetSupportPlanUseCase implements UseCase<GetSupportPlanQuery, Suppo
         amountUf: invoice.amountUf,
         currency: invoice.currency,
         hoursBilled: invoice.hoursBilled,
+        position: invoice.position,
+        targetAmountUf: invoice.targetAmountUf,
         folio: invoice.folio,
         invoicedAt: toIsoDate(invoice.invoicedAt),
         dueAt: invoice.dueAt ? toIsoDate(invoice.dueAt) : null,
         paidAt: invoice.paidAt ? toIsoDate(invoice.paidAt) : null,
         attachmentName: invoice.attachmentName,
+        hasAttachment: invoice.hasAttachment ?? false,
         paymentStatus: paymentStatusOf(invoice, now),
       })),
+      billingPeriods: buildMonthlyBillingSchedule(record, periods, invoiceRows, now),
+      pendingPeriods: listPendingPeriods(invoiceRows, now),
     });
   }
 

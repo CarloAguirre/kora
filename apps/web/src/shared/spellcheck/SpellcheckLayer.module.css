@@ -1,0 +1,96 @@
+/* Corrector ortográfico: subrayado de las palabras mal escritas y menú de sugerencias. */
+
+/* Zona visible del campo; recorta el espejo. No intercepta clics: el campo de
+   abajo sigue recibiendo todo. */
+.box {
+  position: fixed;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Copia del texto del campo, letra por letra en el mismo lugar. El texto es
+   transparente: solo se ve el subrayado. */
+.mirror {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  border: 0;
+  color: transparent;
+}
+
+/* Rojo: la palabra no existe. Azul: existe, pero no en este contexto ("como estas" → "cómo estás"). */
+.spelling,
+.grammar,
+::highlight(kora-spelling) {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--kora-danger);
+  text-decoration-thickness: 1px;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+}
+
+.grammar {
+  text-decoration-color: var(--kora-info);
+}
+
+.panel {
+  position: fixed;
+  z-index: var(--kora-z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 180px;
+  max-width: min(320px, calc(100vw - 16px));
+  margin: 0;
+  padding: var(--kora-space-2);
+  border-radius: var(--kora-radius);
+  border: 1px solid var(--kora-border-soft);
+  background: var(--kora-surface);
+  box-shadow: var(--kora-shadow-lg);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--kora-space-2);
+  border: none;
+  border-radius: var(--kora-radius-sm);
+  background: none;
+  color: var(--kora-text);
+  font-family: var(--kora-font);
+  font-size: var(--kora-text-sm);
+  font-weight: var(--kora-weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--kora-surface-muted);
+}
+
+.suggestion {
+  font-weight: var(--kora-weight-semibold);
+}
+
+.message {
+  margin: 0;
+  padding: var(--kora-space-1) var(--kora-space-2) var(--kora-space-2);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+  line-height: 1.4;
+}
+
+.empty {
+  padding: var(--kora-space-2);
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-sm);
+}
+
+.divider {
+  width: 100%;
+  margin: var(--kora-space-1) 0;
+  border: none;
+  border-top: 1px solid var(--kora-border-soft);
+}

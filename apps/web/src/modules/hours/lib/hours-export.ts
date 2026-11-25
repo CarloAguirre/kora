@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { CapacityReportRow, HourEntrySummary, ProjectStatus } from '@kora/contracts';
 import { HOUR_ENTRY_STATUS_LABELS, PROJECT_STATUS_LABELS } from '@kora/contracts';
 import { resolvedApprover } from './approver';
+import { hourEntryAssignmentLabel } from './assignment-label';
 
 const MONTH_LABELS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -32,12 +33,12 @@ const COLUMNS: ReadonlyArray<{ label: string; getValue: (row: CapacityReportRow)
 ];
 
 /** Exporta el reporte "Capacity" completo (no solo la página visible) — igual que `downloadCapacityXlsx` en la v1. */
-export function exportCapacityReport(rows: readonly CapacityReportRow[], periodStart: string) {
+export function exportCapacityReport(rows: readonly CapacityReportRow[], dateFrom: string, dateTo: string) {
   const sheetRows = [COLUMNS.map((c) => c.label), ...rows.map((row) => COLUMNS.map((c) => c.getValue(row)))];
   const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, 'Capacity');
-  XLSX.writeFile(workbook, `capacity-${periodStart.slice(0, 7)}.xlsx`);
+  XLSX.writeFile(workbook, `capacity-${dateFrom}_${dateTo}.xlsx`);
 }
 
 function formatEntryDate(value: string): string {
@@ -53,7 +54,7 @@ const HOUR_ENTRY_COLUMNS: ReadonlyArray<{ label: string; getValue: (row: HourEnt
   { label: 'Autor', getValue: (r) => r.user.fullName },
   { label: 'Equipo', getValue: (r) => r.team?.name ?? '' },
   { label: 'Proyecto', getValue: (r) => r.project?.name ?? '' },
-  { label: 'Asignación', getValue: (r) => r.assignment ?? '' },
+  { label: 'Asignación', getValue: (r) => hourEntryAssignmentLabel(r, '') },
   { label: 'Actividad', getValue: (r) => r.category },
   { label: 'Horas', getValue: (r) => r.hours },
   { label: 'Horas extra', getValue: (r) => (r.isOvertime ? 'Sí' : 'No') },

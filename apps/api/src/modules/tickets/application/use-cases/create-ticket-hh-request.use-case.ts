@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ID_GENERATOR, err, ok, type ApplicationError, type Clock, type IdGenerator, type Result } from '@kora/core';
-import type { CreateTicketHhRequestInput, RoleCode } from '@kora/contracts';
+import { hourEntryRequiresApproval, type CreateTicketHhRequestInput, type RoleCode } from '@kora/contracts';
 import { TicketHhRequest } from '../../domain/entities/ticket-hh-request.entity';
 import { TicketNotFoundError } from '../../domain/errors/ticket.errors';
 import { CannotSubmitTicketHhRequestError, TicketProjectMissingForHhRequestError } from '../../domain/errors/ticket-hh-request.errors';
@@ -9,34 +9,14 @@ import { TICKET_HISTORY_REPOSITORY, type TicketHistoryRepository } from '../../d
 import { TICKET_HH_REQUEST_REPOSITORY, type TicketHhRequestRepository } from '../../domain/repositories/ticket-hh-request.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import { HOUR_ENTRY_PROJECT_READER, type HourEntryProjectReader } from '../../../hours/application/ports/hour-entry-project-reader.port';
 import { buildTicketHourEntry } from '../support/build-ticket-hour-entry';
+import { splitByDailyCap, type HoursTranche } from '../../../hours/domain/services/daily-cap';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../../shared/application/ports/audit-recorder.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
 
-/** Jornada diaria — sobre este total, las horas de una solicitud de ticket se registran como horas extra. */
-const DAILY_CAP_HOURS = 8;
-
-interface HoursTranche {
-  readonly hours: number;
-  readonly isOvertime: boolean;
-}
-
 const roundHours = (value: number) => Math.round(value * 100) / 100;
 const sumHours = (tranches: readonly HoursTranche[]) => roundHours(tranches.reduce((sum, tranche) => sum + tranche.hours, 0));
-
-/**
- * Divide las horas pedidas en el tramo que aún cabe en la jornada de
- * `DAILY_CAP_HOURS` (normales) y el resto (horas extra). Devuelve uno o dos
- * tramos, nunca uno de 0h.
- */
-export function splitByDailyCap(requestedHours: number, regularHoursForDate: number): HoursTranche[] {
-  const regularHours = roundHours(Math.min(requestedHours, Math.max(0, DAILY_CAP_HOURS - regularHoursForDate)));
-  const overtimeHours = roundHours(requestedHours - regularHours);
-  const tranches: HoursTranche[] = [];
-  if (regularHours > 0) tranches.push({ hours: regularHours, isOvertime: false });
-  if (overtimeHours > 0) tranches.push({ hours: overtimeHours, isOvertime: true });
-  return tranches;
-}
 
 export interface CreateTicketHhRequestCommand {
   readonly ticketId: string;
@@ -60,7 +40,11 @@ export interface CreateTicketHhRequestCommand {
  * su propia solicitud aprobada al instante — igual que en la v1, donde el
  * líder del proyecto de soporte registra HH ya aprobadas directamente
  * (`createApprovedTicketHHRegistration`) en vez de quedar pendiente de
- * revisión. Cualquier otro responsable sigue quedando `pending`.
+ * revisión. Fuera de eso rige lo mismo que en Horas
+ * (`CreateHourEntryUseCase`): solo el colaborador necesita aprobación para
+ * sus horas normales — un líder que no decide en este proyecto (p. ej. el
+ * soporte lo lidera otra persona) también las ve aprobadas al instante,
+ * incluido su tramo de horas extra (`hourEntryRequiresApproval`).
  */
 @Injectable()
 export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhRequestCommand, { id: string }, ApplicationError> {
@@ -70,6 +54,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     @Inject(TICKET_HH_REQUEST_REPOSITORY) private readonly requests: TicketHhRequestRepository,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
+    @Inject(HOUR_ENTRY_PROJECT_READER) private readonly hourProjects: HourEntryProjectReader,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(ID_GENERATOR) private readonly ids: IdGenerator,
@@ -89,6 +74,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     // proyecto si no tiene uno) — mismo criterio EXCLUYENTE que Horas.
     const isApprover = isAdminTier ? true : await this.projects.isProjectApprover(ticket.projectId, actor.userId, actor.userId);
     if (!isAdminTier && !isAssignee && !isApprover) return err(new CannotSubmitTicketHhRequestError());
+    const autoApproves = (tranche: HoursTranche) => isApprover || !hourEntryRequiresApproval(actorRole, tranche.isOvertime);
 
     const requestDate = new Date(`${data.date}T00:00:00.000Z`);
     // Solo las horas normales ya registradas ese día (cualquier ticket/proceso)
@@ -100,6 +86,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
     const now = this.clock.now();
     const created: TicketHhRequest[] = [];
     for (const tranche of tranches) {
+      const approvesNow = autoApproves(tranche);
       const requestCreated = TicketHhRequest.create({
         id: this.ids.generate(),
         ticketId,
@@ -127,13 +114,13 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
         note: request.note,
         isOvertime: request.isOvertime,
         ticketDisplayId: ticket.legacyId ?? ticket.id,
-        ownerRequiresApproval: !isApprover,
+        ownerRequiresApproval: !approvesNow,
         now,
       });
       if (entryCreated.isErr()) return err(entryCreated.error);
       const entry = entryCreated.value;
 
-      if (isApprover) {
+      if (approvesNow) {
         const approved = request.approve(actor.userId, entry.id, now);
         if (approved.isErr()) return err(approved.error);
       } else {
@@ -147,18 +134,26 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
 
     const overtimeHours = sumHours(tranches.filter((tranche) => tranche.isOvertime));
     const overtimeNote = overtimeHours > 0 ? ` (${overtimeHours} HH como horas extra)` : '';
+    const approvedHours = sumHours(tranches.filter(autoApproves));
+    const pendingHours = roundHours(data.hours - approvedHours);
 
-    if (isApprover) {
-      ticket.recordUsedHours(ticket.usedHours + data.hours, now);
+    if (approvedHours > 0) {
+      ticket.recordUsedHours(ticket.usedHours + approvedHours, now);
       await this.tickets.save(ticket);
+      // Las horas nacen aprobadas: cuentan ya en el consumo del proyecto, igual que al aprobar en Horas.
+      const usedHours = await this.hourEntries.sumApprovedHoursForProject(ticket.projectId);
+      await this.hourProjects.recalculateUsedHours(ticket.projectId, usedHours);
     }
 
     await this.history.append({
       ticketId,
-      eventType: isApprover ? 'ticket_hh_direct_approved' : 'ticket_hh_requested',
-      description: isApprover
-        ? `Se registraron ${data.hours} HH aprobadas directamente para el ${data.date}${overtimeNote}.`
-        : `Se solicitaron ${data.hours} HH para el ${data.date}${overtimeNote}.`,
+      eventType: pendingHours === 0 ? 'ticket_hh_direct_approved' : 'ticket_hh_requested',
+      description:
+        pendingHours === 0
+          ? `Se registraron ${data.hours} HH aprobadas directamente para el ${data.date}${overtimeNote}.`
+          : approvedHours > 0
+            ? `Se registraron ${approvedHours} HH aprobadas directamente y se solicitaron ${pendingHours} HH como horas extra para el ${data.date}.`
+            : `Se solicitaron ${data.hours} HH para el ${data.date}${overtimeNote}.`,
       actorUserId: actor.userId,
       occurredAt: now,
     });
@@ -169,7 +164,7 @@ export class CreateTicketHhRequestUseCase implements UseCase<CreateTicketHhReque
         action: 'create',
         entityType: 'ticket_hh_request',
         entityId: request.id,
-        metadata: { ticketId, hours: request.hours, date: data.date, isOvertime: request.isOvertime, directlyApproved: isApprover },
+        metadata: { ticketId, hours: request.hours, date: data.date, isOvertime: request.isOvertime, directlyApproved: request.status === 'approved' },
       });
     }
 

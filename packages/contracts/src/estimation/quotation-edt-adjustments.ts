@@ -9,18 +9,27 @@ const round = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
  * No se aceptan WBS/roles inventados ni ajustes que no puedan conciliarse.
  */
 export function effectiveQuotationEdt(
-  draft: Pick<QuotationDraftData, 'aiPoc' | 'edtHourAdjustments'>,
+  draft: Pick<QuotationDraftData, 'aiPoc' | 'edtHourAdjustments' | 'edtExcludedWbs'>,
 ): QuotationReferenceEdt | null {
   const source = draft.aiPoc?.edt;
   const overrides = draft.edtHourAdjustments ?? [];
+  const excluded = draft.edtExcludedWbs ?? [];
   if (!source) {
-    if (overrides.length) throw new Error('No se pueden ajustar HH sin una EDT de origen.');
+    if (overrides.length || excluded.length) throw new Error('No se pueden modificar tareas sin una EDT de origen.');
     return null;
+  }
+  const allWbs = new Set(source.modules.flatMap((module) =>
+    module.tasks.map((task) => task.wbs)));
+  const excludedWbs = new Set(excluded);
+  if (excludedWbs.size !== excluded.length ||
+      excluded.some((wbs) => !allWbs.has(wbs))) {
+    throw new Error('La exclusión contiene tareas de Gemini inexistentes o repetidas.');
   }
   const rows = new Map<string, number>();
   const all = new Set<string>();
   for (const module of source.modules) {
     for (const task of module.tasks) {
+      if (excludedWbs.has(task.wbs)) continue;
       const efforts = task.roleEffort ?? [{ role: task.role, hours: task.hours }];
       for (const effort of efforts) all.add(JSON.stringify([task.wbs, effort.role]));
     }
@@ -38,6 +47,17 @@ export function effectiveQuotationEdt(
     rows.set(key, change.hours);
   }
   const copy = structuredClone(source);
+  copy.modules = copy.modules.map((module) => ({
+    ...module, tasks: module.tasks.filter((task) => !excludedWbs.has(task.wbs)),
+  })).filter((module) => module.tasks.length > 0);
+  if (!copy.modules.length) {
+    throw new Error('La cotización debe conservar al menos una actividad de la EDT original.');
+  }
+  if (copy.schemaVersion === 'kora.quotation.reference-edt.v2') {
+    const usedStages = new Set(copy.modules.flatMap((module) =>
+      module.tasks.map((task) => task.stageCode)));
+    copy.stages = copy.stages?.filter((stage) => usedStages.has(stage.code));
+  }
   let total = 0;
   const byStage = new Map<string, number>();
   for (const module of copy.modules) {

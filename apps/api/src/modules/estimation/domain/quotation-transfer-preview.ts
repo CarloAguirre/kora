@@ -55,7 +55,7 @@ export function buildQuotationTransferPreview(
 
   const findings: QuotationTransferPreview['findings'] = [
     { code: 'TRANSFER_PREVIEW_NOT_AUTHORIZATION', severity: 'review',
-      message: 'Esta comparación no autoriza el traspaso. Kora admite la aplicación inicial a proyectos sin ejecución; las recotizaciones con historial requieren conciliación explícita.' },
+      message: 'La vista previa es informativa y no autoriza cambios por sí sola. El traspaso aprobado agrega fases y HH sin modificar los registros históricos.' },
   ];
   if (version.status !== 'approved') findings.push({
     code: 'VERSION_NOT_APPROVED', severity: 'blocker',
@@ -145,6 +145,8 @@ export function buildQuotationTransferPreview(
       status: version.status, origin: version.origin,
       aiReviewStatus: version.aiReviewStatus,
       currency: version.currency, totalHours: totals.totalHours,
+      phaseZeroBillableHours: version.draft.phaseZeroBillableHours ?? 0,
+      billableHours: totals.billableHours,
       netAmount: totals.netAmount, totalAmount: totals.totalAmount,
       hourlyRateDefined: version.hourlyRate !== null,
       paymentPercent,
@@ -158,7 +160,8 @@ export function buildQuotationTransferPreview(
       segmentCount: project.segmentCount, milestoneCounts,
     },
     difference: {
-      soldHoursDelta: round(totals.totalHours - project.soldHours),
+      // La transferencia es aditiva, no reemplazo del presupuesto existente.
+      soldHoursDelta: totals.billableHours,
       remainingComparedToUsed: round(totals.totalHours - project.usedHours),
       netAmountDelta: comparable && totals.netAmount !== null && project.contractAmount !== null
         ? round(totals.netAmount - project.contractAmount) : null,

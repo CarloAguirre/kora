@@ -92,13 +92,59 @@ export const supportProjectSummarySchema = z.object({
   currentPeriod: z
     .object({
       usedHours: z.number(),
+      /** `planHours + priorSurplusHours`. */
       capacityHours: z.number(),
       remainingHours: z.number(),
+      /** HH que el plan entrega este mes (`support_monthly_periods.contracted_hours`). */
+      planHours: z.number(),
+      /** Saldo acumulado de meses anteriores (solo política acumulable; 0 si vence). */
+      priorSurplusHours: z.number(),
     })
     .nullable(),
   history: z.array(supportPlanHistoryPointSchema),
 });
 export type SupportProjectSummary = z.infer<typeof supportProjectSummarySchema>;
+
+/**
+ * Consumo del contrato activo de un proyecto de soporte, para las columnas de
+ * horas de la tabla de Soporte. Sale del mismo `SupportPlanSummaryBuilder`
+ * que "Estado del proyecto" en la ficha, así que ambos muestran lo mismo:
+ * - `month` (mensual con período vigente): cifras del MES en curso — plan del
+ *   mes + saldo acumulado vs. lo usado este mes.
+ * - `contract` (bolsa / a demanda, o mensual sin período vigente): toda la
+ *   vigencia del contrato; las horas anteriores a su inicio no cuentan.
+ */
+export const supportProjectUsageSchema = z.object({
+  projectId: uuidSchema,
+  planType: supportPlanTypeSchema,
+  scope: z.enum(['month', 'contract']),
+  /** HH vendidas: las del plan del mes (mensual) o la bolsa contratada. `null` en "a demanda" (sin tope). */
+  planHours: z.number().nullable(),
+  /** Saldo acumulado de meses anteriores (solo mensual acumulable; 0 en otro caso). */
+  priorSurplusHours: z.number(),
+  usedHours: z.number(),
+  /** `null` cuando no hay tope con qué comparar (a demanda, mensual sin período vigente). */
+  remainingHours: z.number().nullable(),
+  deviationHours: z.number().nullable(),
+  /**
+   * Desglose informativo de las consumidas — solo mensual y bolsa (`null` en a demanda):
+   * - `monthUsedHours`: lo usado en el mes en curso (mensual: período vigente, `null` si no hay;
+   *   bolsa: mes calendario dentro de la vigencia).
+   * - `contractUsedHours`: lo usado en toda la vigencia del contrato.
+   */
+  monthUsedHours: z.number().nullable(),
+  contractUsedHours: z.number().nullable(),
+});
+export type SupportProjectUsage = z.infer<typeof supportProjectUsageSchema>;
+
+export const listSupportProjectUsageSchema = z.object({
+  projectIds: z.array(uuidSchema).max(200),
+});
+export type ListSupportProjectUsageInput = z.infer<typeof listSupportProjectUsageSchema>;
+
+/** Resumen de la ficha de proyecto con el identificador del contrato activo que se puede cerrar. */
+export const supportProjectDetailSummarySchema = supportProjectSummarySchema.extend({ planId: uuidSchema });
+export type SupportProjectDetailSummary = z.infer<typeof supportProjectDetailSummarySchema>;
 
 /**
  * Las 3 alertas de negocio del contrato — no existían en ningún lado antes de
@@ -112,7 +158,8 @@ export type SupportPlanAlertType = z.infer<typeof supportPlanAlertTypeSchema>;
 export const SUPPORT_PLAN_ALERT_LABELS: Readonly<Record<SupportPlanAlertType, string>> = {
   deviated_hours: 'Horas desviadas sin facturar',
   quota_expiring: 'Cupo acumulado por vencer',
-  last_period_overage: 'Último mes con excedente de horas',
+  /** El id quedó de cuando el excedente solo se cobraba en el último mes — hoy aplica a cualquier mes sin política acumulable. */
+  last_period_overage: 'Mes con excedente de horas',
 };
 
 export const supportPlanAlertSchema = z.object({
@@ -148,8 +195,11 @@ export const supportPlanListItemSchema = z.object({
   planValueUf: z.number(),
   currency: supportPlanCurrencySchema,
   /** Estado de facturación del período EN CURSO — no de todo el historial. `null` si el monto a facturar hoy es 0. */
-  currentBillingStatus: z.enum(['to_invoice', 'invoiced']).nullable(),
+  currentBillingStatus: z.enum(['to_invoice', 'partially_invoiced', 'invoiced']).nullable(),
+  /** Facturado parcial: el total esperado del período (el saldo va en `currentPendingAmountUf`). */
   currentAmountUf: z.number(),
+  /** Saldo por facturar del período en curso — solo > 0 si está "facturado parcial". */
+  currentPendingAmountUf: z.number(),
   alerts: z.array(supportPlanAlertSchema),
 });
 export type SupportPlanListItem = z.infer<typeof supportPlanListItemSchema>;
@@ -216,11 +266,21 @@ export const createSupportPlanSchema = z.object({
 });
 export type CreateSupportPlanInput = z.infer<typeof createSupportPlanSchema>;
 
-/** A diferencia de crear, editar acepta `developmentProjectIds: []`: el contrato deja de cubrir proyectos terminados y queda solo con su contenedor de soporte. */
+/**
+ * A diferencia de crear, editar acepta `developmentProjectIds: []`: el contrato deja de cubrir proyectos terminados y queda solo con su contenedor de soporte.
+ * Los campos con `.default()` se redefinen sin él: en Zod 4 `.partial()` igual aplica el default a lo omitido, y cualquier
+ * edición (nombre, SLA, proyectos cubiertos) dejaba las HH y los valores del plan en 0.
+ */
 export const updateSupportPlanSchema = createSupportPlanSchema
   .partial()
   .omit({ clientId: true })
-  .extend({ developmentProjectIds: z.array(uuidSchema).optional() });
+  .extend({
+    developmentProjectIds: z.array(uuidSchema).optional(),
+    contractedHours: z.coerce.number().min(0).optional(),
+    planValueUf: z.coerce.number().min(0).optional(),
+    extraHourValueUf: z.coerce.number().min(0).optional(),
+    currency: supportPlanCurrencySchema.optional(),
+  });
 export type UpdateSupportPlanInput = z.infer<typeof updateSupportPlanSchema>;
 
 export const closeSupportPlanSchema = z.object({

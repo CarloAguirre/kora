@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   PROJECT_PAYMENT_DEFAULT_TERM_DAYS,
+  MAX_SUPPORT_INVOICE_PDF_BYTES,
   type IssueProjectPaymentMilestoneInvoiceInput,
   type ProjectContractCurrency,
 } from '@kora/contracts';
@@ -20,7 +21,7 @@ export interface IssueProjectMilestoneInvoiceDialogProps {
   /** Moneda del contrato del proyecto. */
   currency?: ProjectContractCurrency;
   onClose: () => void;
-  onConfirm: (input: IssueProjectPaymentMilestoneInvoiceInput) => Promise<void>;
+  onConfirm: (input: IssueProjectPaymentMilestoneInvoiceInput & { file?: File }) => Promise<void>;
   /**
    * true si este es el primer tramo de un proyecto `aprobado` — facturarlo
    * dispara Hito 0 (ver `IssueProjectPaymentMilestoneInvoiceUseCase`). Lo
@@ -60,6 +61,7 @@ export function IssueProjectMilestoneInvoiceDialog({
   // Mientras no se toque a mano, el vencimiento sigue a la emisión (+30 días).
   const [dueAtTouched, setDueAtTouched] = useState(false);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
+  const [file, setFile] = useState<File | undefined>();
   const [pauseForManagementApproval, setPauseForManagementApproval] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -72,12 +74,17 @@ export function IssueProjectMilestoneInvoiceDialog({
       setDueAt(addDays(today, PROJECT_PAYMENT_DEFAULT_TERM_DAYS));
       setDueAtTouched(false);
       setAttachmentName(null);
+      setFile(undefined);
       setPauseForManagementApproval(false);
       setError(null);
     }
   }, [open]);
 
   const handleConfirm = async () => {
+    if (file && (file.type !== 'application/pdf' || file.size > MAX_SUPPORT_INVOICE_PDF_BYTES)) {
+      setError('Adjunta un archivo PDF de hasta 5 MB.');
+      return;
+    }
     if (!folio.trim() || !issuedAt) {
       setError('Ingresa el folio y la fecha de emisión.');
       return;
@@ -94,6 +101,7 @@ export function IssueProjectMilestoneInvoiceDialog({
         issuedAt,
         ...(dueAt ? { dueAt } : {}),
         attachmentName: attachmentName ?? undefined,
+        file,
         ...(showHito0Notice ? { pauseForManagementApproval } : {}),
       });
       onClose();
@@ -152,8 +160,9 @@ export function IssueProjectMilestoneInvoiceDialog({
         <FileField
           label="Adjuntar factura (PDF, opcional)"
           fileName={attachmentName}
-          onChange={setAttachmentName}
+          onChange={(name, selected) => { setAttachmentName(name); setFile(selected ?? undefined); }}
           accept="application/pdf"
+          disabled={running}
         />
       </div>
 

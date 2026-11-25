@@ -50,6 +50,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
         url: request.url,
         error: exception instanceof Error ? exception.stack : String(exception),
       });
+    } else if (body.code === 'VALIDATION_ERROR') {
+      // En `warn` para que quede en el log de producción (nivel info): sin
+      // esto, un "Los datos enviados no son válidos." no deja rastro de qué
+      // campo falló. Solo van los mensajes de Zod, no los valores enviados.
+      this.logger.warn('Petición rechazada por validación', {
+        requestId,
+        method: request.method,
+        url: request.url,
+        issues: body.details?.issues,
+      });
     } else {
       this.logger.debug('Petición rechazada', {
         requestId,

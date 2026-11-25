@@ -61,6 +61,20 @@
   font-weight: var(--kora-weight-bold);
 }
 
+/* Celdas de horas de Soporte: la cifra y, debajo, el saldo acumulado o el desglose mes / total. */
+.hoursCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.hoursUnit,
+.hoursHint {
+  color: var(--kora-text-muted);
+  font-size: var(--kora-text-xs);
+}
+
 /* Encabezados sin mayúsculas forzadas: los ordenables ya se ven así (el <button> no hereda
    `text-transform`), y los no ordenables (Etapa, Acciones) salían en MAYÚSCULAS. */
 .table th {
@@ -85,18 +99,3 @@
   }
 }
 
-/* Estados obtenidos de versiones/eventos persistidos; sin suponer aprobación por
-   etapa comercial. Tonos neutros, acordes con el sistema de diseño Kora. */
-.quotationStatus {
-  display: inline-block;
-  padding: var(--kora-space-1) var(--kora-space-2);
-  border-radius: 999px;
-  font-size: 12px;
-  white-space: nowrap;
-  background: var(--kora-surface-muted, #f1f5f9);
-  color: var(--kora-text-muted, #667085);
-}
-.quotationStatus[data-state="sent"] { background: #e7f1ff; color: #225588; }
-.quotationStatus[data-state="approved_pending"] { background: #fff1d6; color: #855c10; }
-.quotationStatus[data-state="transferred"] { background: #e1f6e8; color: #176b45; }
-.quotationStatus[data-state="planning_applied"] { background: #eeeafd; color: #6346a1; }

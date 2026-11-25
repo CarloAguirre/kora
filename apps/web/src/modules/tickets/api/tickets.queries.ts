@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ChangeTicketStatusInput, CreateTicketInput, ListTicketsQuery, ProjectType, UpdateTicketInput } from '@kora/contracts';
 import { ticketKeys, ticketsApi } from './tickets.api';
+import { hourKeys } from '@/modules/hours/api/hours.api';
 
 export function useTicketsList(query: Partial<ListTicketsQuery>) {
   return useQuery({
@@ -86,8 +87,13 @@ export function useChangeTicketStatus() {
 
 export function useDeleteTicket() {
   const invalidate = useInvalidateTickets();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (ticketId: string) => ticketsApi.remove(ticketId),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      // Eliminar el ticket borra también las HH registradas en él.
+      void queryClient.invalidateQueries({ queryKey: hourKeys.all });
+    },
   });
 }

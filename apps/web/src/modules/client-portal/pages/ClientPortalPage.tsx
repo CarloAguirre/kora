@@ -4,8 +4,9 @@ import type { SupportPlanType } from '@kora/contracts';
 import styles from './ClientPortalPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Tabs } from '@/shared/components/ui/Tabs';
+import { TextField } from '@/shared/components/ui/TextField';
 import { KabeliLogo } from '@/shared/components/layout/KabeliLogo';
-import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
+import { ChevronLeftIcon, SearchIcon } from '@/shared/components/icons/Icons';
 import { useClientDetail } from '@/modules/clients/api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { useSupportPlansForClient } from '@/modules/projects/api/support-plan.queries';
@@ -37,8 +38,9 @@ const HEALTH_LABEL: Readonly<Record<ClientProjectHealth, string>> = {
   quoted: 'Cotización',
   not_started: 'No iniciado',
   active: 'Activo',
-  at_risk: 'En riesgo',
+  on_hold: 'Detenido',
   finished: 'Finalizado',
+  cancelled: 'Cancelado',
 };
 
 const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
@@ -46,8 +48,9 @@ const HEALTH_TONE: Readonly<Record<ClientProjectHealth, StatusPillTone>> = {
   quoted: 'info',
   not_started: 'neutral',
   active: 'success',
-  at_risk: 'warning',
+  on_hold: 'warning',
   finished: 'neutral',
+  cancelled: 'neutral',
 };
 
 const PLAN_TYPE_LABEL: Readonly<Record<SupportPlanType, string>> = {
@@ -120,7 +123,7 @@ export function ClientPortalPage({
         />
 
         {activeTab === 'proyectos' ? (
-          <ClientProjectsSection clientId={clientId} clientOwnerName={company.contactName} getProjectPath={getProjectPath} />
+          <ClientProjectsSection clientId={clientId} getProjectPath={getProjectPath} />
         ) : (
           <ClientSupportSection clientId={clientId} getContractPath={getContractPath} />
         )}
@@ -136,57 +139,58 @@ export function ClientPortalPage({
 
 function ClientProjectsSection({
   clientId,
-  clientOwnerName,
   getProjectPath,
 }: {
   clientId: string | undefined;
-  clientOwnerName: string;
   getProjectPath: (project: ClientProjectRow) => string;
 }) {
   const { data } = useProjectsList({ clientId: clientId ?? undefined, pageSize: 100 });
-  const projects = useMemo(
-    () => (data?.items ?? []).map((project) => toClientProjectRow(project, clientOwnerName)),
-    [data, clientOwnerName],
-  );
+  const projects = useMemo(() => (data?.items ?? []).map(toClientProjectRow), [data]);
+  const [search, setSearch] = useState('');
   const activeCount = projects.filter((p) => p.health === 'active').length;
-  const attentionCount = projects.filter((p) => p.health === 'at_risk').length;
+  const attentionCount = projects.filter((p) => p.health === 'on_hold').length;
+
+  const query = search.trim().toLowerCase();
+  const filtered = query
+    ? projects.filter((p) => p.name.toLowerCase().includes(query) || p.leaderName.toLowerCase().includes(query))
+    : projects;
 
   const columns: PortalTableColumn<ClientProjectRow>[] = [
     {
       key: 'name',
       header: 'Proyecto',
+      sortValue: (p) => p.name,
       render: (project) => (
-        <div className={styles.projectCell}>
-          <Link className={styles.projectLink} to={getProjectPath(project)}>
-            {project.name}
-          </Link>
-          <span className={styles.projectMeta}>{project.typeLabel}</span>
-        </div>
+        <Link className={styles.projectLink} to={getProjectPath(project)}>
+          {project.name}
+        </Link>
       ),
     },
-    { key: 'kabeliOwner', header: 'Responsable Kabeli', render: (p) => p.kabeliOwnerName },
-    { key: 'clientOwner', header: 'Responsable cliente', render: (p) => p.clientOwnerName },
-    {
-      key: 'dates',
-      header: 'Inicio – Fin',
-      render: (p) => `${p.startDate} / ${p.endDate ?? '--'}`,
-    },
+    { key: 'leader', header: 'Líder Kabeli', sortValue: (p) => p.leaderName, render: (p) => p.leaderName },
+    { key: 'startDate', header: 'Inicio', sortValue: (p) => p.startDateIso, render: (p) => p.startDate },
+    { key: 'endDate', header: 'Fin', sortValue: (p) => p.endDateIso, render: (p) => p.endDate ?? '--' },
     {
       key: 'health',
       header: 'Estado',
+      sortValue: (p) => HEALTH_LABEL[p.health],
       render: (p) => <StatusPill tone={HEALTH_TONE[p.health]}>{HEALTH_LABEL[p.health]}</StatusPill>,
     },
     {
       key: 'stage',
       header: 'Etapa',
-      render: (p) => (
-        <div className={styles.stageCell}>
-          <span className={styles.stageLabel}>{p.stageLabel}</span>
-          <div className={styles.stageBarTrack}>
-            <div className={styles.stageBarFill} style={{ width: `${p.stageProgressPercent}%` }} />
-          </div>
-        </div>
-      ),
+      sortValue: (p) => p.stageLabel,
+      render: (p) => <span className={styles.stageLabel}>{p.stageLabel}</span>,
+    },
+    {
+      key: 'progress',
+      header: 'Avance',
+      sortValue: (p) => p.progressPercent,
+      // El plazo transcurrido es un fallback informativo, nunca avance real.
+      render: (p) => (p.progressPercent != null
+        ? <span title={p.progressIsSchedule ? 'Porcentaje del plazo calendario, no del trabajo completado' : undefined}>
+            {p.progressPercent}%{p.progressIsSchedule ? ' (plazo)' : ''}
+          </span>
+        : '--'),
     },
   ];
 
@@ -196,9 +200,18 @@ function ClientProjectsSection({
         <StatPill value={projects.length} label="proyectos totales" />
         <StatPill value={activeCount} label="activos" />
         <StatPill value={attentionCount} label="con puntos de atención" />
+        <TextField
+          className={styles.search}
+          type="search"
+          placeholder="Buscar proyecto o líder"
+          aria-label="Buscar proyecto"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          iconLeft={<SearchIcon size={16} />}
+        />
       </div>
 
-      <PortalTable columns={columns} items={projects} getRowKey={(p) => p.id} />
+      <PortalTable columns={columns} items={filtered} getRowKey={(p) => p.id} />
     </>
   );
 }
@@ -229,26 +242,29 @@ function ClientSupportSection({
       // contrato de soporte (`ClientSupportContractDetailPage`) con su lista
       // de tickets — ver docs/DECISION-PORTAL-CLIENTE.md.
       header: 'Contrato',
+      sortValue: (c) => c.name,
       render: (c) => (
         <Link className={styles.contractName} to={getContractPath(c)}>
           {c.name}
         </Link>
       ),
     },
-    { key: 'kabeliOwner', header: 'Responsable Kabeli', render: (c) => c.kabeliOwnerName },
-    { key: 'planType', header: 'Tipo', render: (c) => PLAN_TYPE_LABEL[c.planType] },
+    { key: 'kabeliOwner', header: 'Responsable Kabeli', sortValue: (c) => c.kabeliOwnerName, render: (c) => c.kabeliOwnerName },
+    { key: 'planType', header: 'Tipo', sortValue: (c) => PLAN_TYPE_LABEL[c.planType], render: (c) => PLAN_TYPE_LABEL[c.planType] },
     {
       key: 'dates',
       header: 'Inicio - Término',
+      sortValue: (c) => c.startDateIso,
       render: (c) => `${c.startDate} / ${c.endDate ?? '--'}`,
     },
-    { key: 'contractedHours', header: 'N° horas', render: (c) => c.contractedHours ?? '--' },
-    { key: 'consumedHours', header: 'HH consumidas', render: (c) => c.consumedHours != null ? `${c.consumedHours} UF` : '--' },
-    { key: 'hourValue', header: 'Valor HH', render: (c) => c.hourValueUf != null ? formatMoney(c.hourValueUf, c.currency) : '--' },
-    { key: 'billingState', header: 'Por facturar', render: (c) => c.billingState },
+    { key: 'contractedHours', header: 'N° horas', sortValue: (c) => c.contractedHours, render: (c) => c.contractedHours ?? '--' },
+    { key: 'consumedHours', header: 'HH consumidas', sortValue: (c) => c.consumedHours, render: (c) => c.consumedHours != null ? `${c.consumedHours} UF` : '--' },
+    { key: 'hourValue', header: 'Valor HH', sortValue: (c) => c.hourValueUf, render: (c) => c.hourValueUf != null ? formatMoney(c.hourValueUf, c.currency) : '--' },
+    { key: 'billingState', header: 'Por facturar', sortValue: (c) => (c.billingState === '--' ? null : c.billingState), render: (c) => c.billingState },
     {
       key: 'status',
       header: 'Estado del contrato',
+      sortValue: (c) => c.contractStatus,
       render: (c) => (
         <StatusPill tone={c.contractStatus === 'active' ? 'success' : 'neutral'}>
           {c.contractStatus === 'active' ? 'Vigente' : 'Finalizado'}

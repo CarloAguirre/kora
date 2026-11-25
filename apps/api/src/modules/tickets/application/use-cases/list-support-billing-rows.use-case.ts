@@ -15,7 +15,7 @@ import type { UseCase } from '../../../../shared/application/use-case';
 type SortValue = string | number | null;
 
 /** Los estados se ordenan por su avance en el flujo de cobro, no alfabéticamente. */
-const BILLING_STATUS_ORDER: Readonly<Record<SupportInvoiceBillingStatus, number>> = { to_invoice: 0, invoiced: 1 };
+const BILLING_STATUS_ORDER: Readonly<Record<SupportInvoiceBillingStatus, number>> = { to_invoice: 0, partially_invoiced: 1, invoiced: 2 };
 const PAYMENT_STATUS_ORDER: Readonly<Record<SupportInvoicePaymentStatus, number>> = { pending: 0, overdue: 1, paid: 2 };
 
 const ROW_SORT_VALUE: Record<SupportBillingRowSortField, (row: SupportBillingRow) => SortValue> = {

@@ -166,6 +166,7 @@ export function Combobox({
           aria-expanded={open}
           aria-autocomplete="list"
           autoComplete="off"
+          spellCheck={false}
           disabled={disabled}
           className={styles.input}
           placeholder={placeholder}

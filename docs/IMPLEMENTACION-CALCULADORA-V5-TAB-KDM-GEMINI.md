@@ -20,7 +20,7 @@ Se utiliza `kora-proyectos-v5.html` **solo como referencia funcional** para ubic
 
 La ficha de un proyecto de desarrollo muestra **Cotizaciones** como pestaña si el actor tiene `projects:manage` o es el líder asignado con `projects:read_assigned`. Un líder de otro equipo en vista restringida no accede por este tab.
 
-Si no existen cotizaciones: mensaje de estado vacío y **+ Nueva cotización** solamente cuando `isQuotationDraftEligibleProject` permite crear. El listado carga versiones **reales de PostgreSQL**, con versión, fecha, estado, HH y monto. Versiones históricas son consulta, no edición.
+Si no existen cotizaciones: mensaje de estado vacío y **+ Nueva cotización** solamente cuando `isQuotationDraftEligibleProject` permite crear. Desde el 10-11-2026, los botones **+ Nueva cotización** y **+ Nueva versión** de esta pestaña se muestran deshabilitados y no abren el modal de creación. Este bloqueo es exclusivo de la pestaña del proyecto; no modifica la Calculadora ni la API. El listado carga versiones **reales de PostgreSQL**, con versión, fecha, estado, HH y monto. Versiones históricas son consulta, no edición.
 
 ### 2. Modal de nueva cotización
 

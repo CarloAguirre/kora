@@ -8,6 +8,8 @@ import { ChevronRightIcon } from '@/shared/components/icons/Icons';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import { teamPath } from '@/app/router/paths';
 
+const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 1 });
+
 function mondayOf(date: Date): Date {
   const result = new Date(date);
   const day = result.getDay();
@@ -87,9 +89,9 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
                   </div>
                   <div className={styles.teamStatsGroup}>
                     <span className={styles.teamStats}>
-                      {team.assignedHours}/{team.capacityHours} hrs ·{' '}
+                      {formatHours(team.assignedHours)}/{formatHours(team.capacityHours)} hrs ·{' '}
                       <span className={[styles.freeHours, team.freeHours > 0 ? styles.freeHoursAvailable : styles.freeHoursLimited].join(' ')}>
-                        {team.freeHours} hrs libres
+                        {formatHours(team.freeHours)} hrs libres
                       </span>
                     </span>
                     {can('teams:read') && (
@@ -113,7 +115,7 @@ export function CapacityPlanningSection({ capacity, loading, weekStart, onWeekSt
 
       <div className={styles.banner}>
         <span>
-          Disponibilidad global de los equipos durante el período: <strong>{totalFreeHours} horas libres</strong>
+          Disponibilidad global de los equipos durante el período: <strong>{formatHours(totalFreeHours)} horas libres</strong>
         </span>
       </div>
     </Card>

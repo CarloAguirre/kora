@@ -14,6 +14,8 @@ import {
   type ListTicketsQuery,
   type ListTicketsResponse,
   type RejectTicketHhRequestInput,
+  type TicketContractConsumptionResponse,
+  type TicketDailyHours,
   type TicketDetail,
   type TicketHhRequest,
   type TicketLinkableClient,
@@ -30,6 +32,8 @@ import { ListLinkableTicketProjectsUseCase } from '../application/use-cases/list
 import { ListLinkableTicketClientsUseCase } from '../application/use-cases/list-linkable-ticket-clients.use-case';
 import { UpdateTicketUseCase } from '../application/use-cases/update-ticket.use-case';
 import { ListTicketsUseCase } from '../application/use-cases/list-tickets.use-case';
+import { ListTicketDailyHoursUseCase } from '../application/use-cases/list-ticket-daily-hours.use-case';
+import { ListTicketContractConsumptionUseCase } from '../application/use-cases/list-ticket-contract-consumption.use-case';
 import { GetTicketUseCase } from '../application/use-cases/get-ticket.use-case';
 import { ChangeTicketStatusUseCase } from '../application/use-cases/change-ticket-status.use-case';
 import { DeleteTicketUseCase } from '../application/use-cases/delete-ticket.use-case';
@@ -44,6 +48,8 @@ export class TicketsController {
     private readonly createTicket: CreateTicketUseCase,
     private readonly updateTicket: UpdateTicketUseCase,
     private readonly listTickets: ListTicketsUseCase,
+    private readonly listDailyHours: ListTicketDailyHoursUseCase,
+    private readonly listContractConsumption: ListTicketContractConsumptionUseCase,
     private readonly getTicket: GetTicketUseCase,
     private readonly changeStatus: ChangeTicketStatusUseCase,
     private readonly deleteTicket: DeleteTicketUseCase,
@@ -65,6 +71,38 @@ export class TicketsController {
       await this.listTickets.execute({ query, actor: toActorContext(actor), actorPermissions: actor.permissions }),
     );
     return { ...page, items: [...page.items] };
+  }
+
+  /**
+   * Desglose por día de las HH de los tickets del filtro, para el Excel del
+   * historial. Mismos filtros que `GET /tickets` (sin paginar). Debe
+   * declararse antes de `:id`.
+   */
+  @Get('daily-hours')
+  @RequireAnyPermission('tickets:read', 'tickets:read_assigned')
+  async dailyHours(
+    @Query(new ZodValidationPipe(listTicketsQuerySchema)) query: ListTicketsQuery,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<TicketDailyHours[]> {
+    return unwrapOrThrow(
+      await this.listDailyHours.execute({ query, actor: toActorContext(actor), actorPermissions: actor.permissions }),
+    );
+  }
+
+  /**
+   * Total de los contratos de soporte de los tickets del filtro y sus horas
+   * sin ticket, para que el Excel del historial cuadre con la ficha del
+   * contrato. Mismos filtros que `GET /tickets`. Debe declararse antes de `:id`.
+   */
+  @Get('contract-consumption')
+  @RequireAnyPermission('tickets:read', 'tickets:read_assigned')
+  async contractConsumption(
+    @Query(new ZodValidationPipe(listTicketsQuerySchema)) query: ListTicketsQuery,
+    @CurrentUser() actor: RequestUser,
+  ): Promise<TicketContractConsumptionResponse> {
+    return unwrapOrThrow(
+      await this.listContractConsumption.execute({ query, actor: toActorContext(actor), actorPermissions: actor.permissions }),
+    );
   }
 
   /**
@@ -164,8 +202,15 @@ export class TicketsController {
 
   @Get(':id/hh-requests')
   @RequireAnyPermission('tickets:read', 'tickets:read_assigned')
-  async listHhRequestsForTicket(@Param('id') id: string): Promise<TicketHhRequest[]> {
-    return unwrapOrThrow(await this.listHhRequests.execute({ ticketId: id }));
+  async listHhRequestsForTicket(@Param('id') id: string, @CurrentUser() actor: RequestUser): Promise<TicketHhRequest[]> {
+    return unwrapOrThrow(
+      await this.listHhRequests.execute({
+        ticketId: id,
+        actorUserId: actor.id,
+        actorRole: actor.role,
+        actorPermissions: actor.permissions,
+      }),
+    );
   }
 
   @Post(':id/hh-requests')

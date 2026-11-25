@@ -28,6 +28,8 @@ export interface TicketHhRequestRepository {
   /** Más recientes primero. */
   listForTicket(ticketId: string, context?: TransactionContext): Promise<TicketHhRequestListItem[]>;
   save(request: TicketHhRequest, context?: TransactionContext): Promise<void>;
+  /** Borra todas las solicitudes del ticket — al eliminarlo (ver `DeleteTicketUseCase`). */
+  deleteForTicket(ticketId: string, context?: TransactionContext): Promise<void>;
 }
 
 export const TICKET_HH_REQUEST_REPOSITORY = Symbol('TicketHhRequestRepository');

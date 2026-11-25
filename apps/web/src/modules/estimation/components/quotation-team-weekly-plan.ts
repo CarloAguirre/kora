@@ -1,4 +1,4 @@
-import { quotationEdtAssignments, type QuotationDraftData } from '@kora/contracts';
+import { effectiveQuotationEdt, quotationEdtAssignments, type QuotationDraftData } from '@kora/contracts';
 
 export type QuotationTeamWeeklyRow = {
   teamKey: string;
@@ -8,6 +8,8 @@ export type QuotationTeamWeeklyRow = {
   activeWeeks: number;
   averageHoursPerWeek: number;
   weeklyHours: ReadonlyMap<number, number>;
+  /** Carga por media semana para evitar ocultar picos en períodos de 0,5. */
+  halfWeekHours?: ReadonlyMap<number, number>;
 };
 export type QuotationTeamWeeklyPlan = {
   lastWeek: number;
@@ -34,25 +36,32 @@ const hours = (value: number) => value / 100;
 export function quotationTeamWeeklyPlan(
   draft: QuotationDraftData,
 ): QuotationTeamWeeklyPlan | null {
-  const edt = draft.aiPoc?.edt;
+  const edt = effectiveQuotationEdt(draft);
   if (!edt && (draft.mode !== 'phases' || !draft.phases.length)) return null;
   const overrides = new Map((draft.edtStageSettings ?? []).map((setting) =>
     [setting.stageCode, setting]));
   const isV2 = edt?.schemaVersion === 'kora.quotation.reference-edt.v2';
+  // Incluir las fases comerciales añadidas por el usuario: sin ellas
+  // los picos y totales de capacidad omitirían tareas KT- (falsa holgura).
+  const commercialStages = (draft.edtCommercialStages ?? []).map((stage) => ({
+    code: stage.code, startWeek: stage.startWeek,
+    durationWeeks: stage.durationWeeks,
+  }));
   const stages = edt
-    ? isV2
-      ? (edt.stages ?? []).map((stage) => ({
+    ? [
+        ...(isV2 ? (edt.stages ?? []).map((stage) => ({
           code: stage.code,
           startWeek: overrides.get(stage.code)?.startWeek ?? stage.startWeek,
           durationWeeks: overrides.get(stage.code)?.durationWeeks ?? stage.durationWeeks,
-        }))
-      : edt.modules.map((module) => {
+        })) : edt.modules.map((module) => {
           const code = 'module:' + module.name;
           const explicit = overrides.get(code);
           return explicit ? {
             code, startWeek: explicit.startWeek, durationWeeks: explicit.durationWeeks,
           } : null;
-        })
+        })),
+        ...commercialStages,
+      ]
     : draft.phases.map((phase, index) => ({
         code: 'phase:' + index,
         startWeek: phase.startWeek,
@@ -70,7 +79,10 @@ export function quotationTeamWeeklyPlan(
   const assignments = edt
     ? quotationEdtAssignments(draft).map((row) => ({
         teamKey: row.teamKey,
-        stageCode: isV2 ? row.stageCode : 'module:' + row.module,
+        // Las tareas comerciales usan su fase KS- en EDT v1 y v2;
+        // las originales v1 se calendarizan por módulo explícito.
+        stageCode: row.wbs.startsWith('KT-') ? row.stageCode
+          : isV2 ? row.stageCode : 'module:' + row.module,
         hours: row.hours,
       }))
     : draft.phases.flatMap((phase, index) =>
@@ -95,32 +107,40 @@ export function quotationTeamWeeklyPlan(
   let totalCents = 0;
   for (const [teamKey, stageHours] of byTeamStage) {
     const teamWeekCents = new Map<number, number>();
-    const activeWeeks = new Set<number>();
+    const halfWeekCents = new Map<number, number>();
+    const activeSlots = new Set<number>();
     let teamTotalCents = 0;
     for (const [stageCode, amount] of stageHours) {
       const stage = stageByCode.get(stageCode)!;
       teamTotalCents += amount;
-      const base = Math.floor(amount / stage.durationWeeks);
-      const remainder = amount % stage.durationWeeks;
-      for (let offset = 0; offset < stage.durationWeeks; offset++) {
-        const week = stage.startWeek + offset;
+      const halfCount = Math.round(stage.durationWeeks * 2);
+      const startSlot = Math.round((stage.startWeek - 1) * 2);
+      const base = Math.floor(amount / halfCount);
+      const remainder = amount % halfCount;
+      for (let offset = 0; offset < halfCount; offset++) {
+        const slot = startSlot + offset;
+        const week = Math.floor(slot / 2) + 1;
         const allocated = base + (offset < remainder ? 1 : 0);
+        halfWeekCents.set(slot, (halfWeekCents.get(slot) ?? 0) + allocated);
         teamWeekCents.set(week, (teamWeekCents.get(week) ?? 0) + allocated);
         weekTotalsCents.set(week, (weekTotalsCents.get(week) ?? 0) + allocated);
-        activeWeeks.add(week);
+        activeSlots.add(slot);
       }
     }
     totalCents += teamTotalCents;
-    const weeks = [...activeWeeks].sort((a, b) => a - b);
+    const halfSlots = [...activeSlots].sort((a, b) => a - b);
+    const activeDuration = halfSlots.length / 2;
     rows.push({
       teamKey,
       totalHours: hours(teamTotalCents),
-      firstWeek: weeks[0] ?? 1,
-      lastWeek: weeks[weeks.length - 1] ?? 1,
-      activeWeeks: weeks.length,
-      averageHoursPerWeek: weeks.length ? hours(teamTotalCents) / weeks.length : 0,
+      firstWeek: halfSlots.length ? 1 + halfSlots[0]! / 2 : 1,
+      lastWeek: halfSlots.length ? 0.5 + halfSlots[halfSlots.length - 1]! / 2 : 1,
+      activeWeeks: activeDuration,
+      averageHoursPerWeek: activeDuration ? hours(teamTotalCents) / activeDuration : 0,
       weeklyHours: new Map([...teamWeekCents].map(([week, amount]) =>
         [week, hours(amount)])),
+      halfWeekHours: new Map([...halfWeekCents].map(([slot, amount]) =>
+        [1 + slot / 2, hours(amount)])),
     });
   }
   return {

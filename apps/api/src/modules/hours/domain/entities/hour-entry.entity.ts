@@ -16,6 +16,9 @@ export interface HourEntryProps {
   userId: string;
   projectId: string | null;
   moduleId: string | null;
+  /** Tiempo de ejecución (tramo) de `moduleId` — siempre `null` sin fase. */
+  segmentId: string | null;
+  taskId?: string | null;
   assignment: string | null;
   category: string;
   description: string;
@@ -40,6 +43,8 @@ export interface CreateHourEntryProps {
   readonly userId: string;
   readonly projectId?: string | null;
   readonly moduleId?: string | null;
+  readonly segmentId?: string | null;
+  readonly taskId?: string | null;
   readonly assignment: string;
   readonly category?: string;
   readonly description?: string;
@@ -105,6 +110,8 @@ export class HourEntry extends AggregateRoot<string> {
       userId: props.userId,
       projectId,
       moduleId: projectId ? (props.moduleId ?? null) : null,
+      segmentId: projectId && props.moduleId ? (props.segmentId ?? null) : null,
+      taskId: projectId && props.moduleId ? (props.taskId ?? null) : null,
       assignment: props.assignment,
       category: (props.category ?? '').trim(),
       description: (props.description ?? '').trim(),
@@ -151,6 +158,10 @@ export class HourEntry extends AggregateRoot<string> {
     return this.props.designatedApproverUserId;
   }
 
+  get date(): Date {
+    return this.props.date;
+  }
+
   get hours(): number {
     return this.props.hours;
   }
@@ -192,9 +203,10 @@ export class HourEntry extends AggregateRoot<string> {
   }
 
   /**
-   * Solo el dueño (o un admin, decidido fuera del dominio) puede editar, y
-   * solo mientras esté pendiente o rechazado — un registro aprobado ya
-   * pudo haber afectado el consumo del proyecto.
+   * Quién puede editar se decide fuera del dominio. Un registro aprobado solo
+   * se edita con `editApproved` (quien puede aprobarlo, o admin/PMO): ya
+   * cuenta en el consumo del proyecto, así que sigue aprobado — es una
+   * corrección de quien decide, no un registro nuevo que revisar.
    */
   updateDetails(
     data: Partial<
@@ -203,6 +215,8 @@ export class HourEntry extends AggregateRoot<string> {
         | 'assignment'
         | 'projectId'
         | 'moduleId'
+        | 'segmentId'
+        | 'taskId'
         | 'category'
         | 'description'
         | 'hours'
@@ -215,8 +229,10 @@ export class HourEntry extends AggregateRoot<string> {
     >,
     ownerRequiresApproval: boolean,
     now: Date,
+    { editApproved = false }: { editApproved?: boolean } = {},
   ): Result<void, CreateHourEntryError | HourEntryNotEditableError> {
-    if (this.props.status === 'approved') return err(new HourEntryNotEditableError());
+    const wasApproved = this.props.status === 'approved';
+    if (wasApproved && !editApproved) return err(new HourEntryNotEditableError());
 
     if (data.hours !== undefined && (!(data.hours > 0) || data.hours > 24)) {
       return err(new InvalidHourEntryHoursError('Las horas deben estar entre 0 y 24.'));
@@ -238,10 +254,14 @@ export class HourEntry extends AggregateRoot<string> {
     assignDefined(this.props, data);
     this.props.designatedApproverUserId = projectId ? null : designatedApproverUserId;
     if (!projectId) this.props.moduleId = null;
+    if (!this.props.moduleId) {
+      this.props.segmentId = null;
+      this.props.taskId = null;
+    }
     if (!this.props.hasBlocker) this.props.blockerDescription = null;
 
     const wasRejected = this.props.status === 'rejected';
-    this.props.status = ownerRequiresApproval ? 'pending' : 'approved';
+    if (!wasApproved) this.props.status = ownerRequiresApproval ? 'pending' : 'approved';
     if (wasRejected) {
       this.props.rejectionReason = null;
       this.props.decisionUserId = null;

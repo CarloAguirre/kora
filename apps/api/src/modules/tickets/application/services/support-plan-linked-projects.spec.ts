@@ -14,9 +14,9 @@ describe('proyectos de un contrato de soporte', () => {
     expect(await resolveSupportPlanHourProjectIds(repo([]), plan('support-1'))).toEqual(['support-1']);
   });
 
-  it('con enlaces y contenedor: muestra los cubiertos, pero consume también las HH del contenedor', async () => {
+  it('con enlaces y contenedor: muestra los cubiertos, pero consume solo las HH del contenedor (no el desarrollo de los cubiertos)', async () => {
     expect(await resolveSupportPlanProjectIds(repo(['app-2', 'app-3']), plan('support-1'))).toEqual(['app-2', 'app-3']);
-    expect(await resolveSupportPlanHourProjectIds(repo(['app-2', 'app-3']), plan('support-1'))).toEqual(['support-1', 'app-2', 'app-3']);
+    expect(await resolveSupportPlanHourProjectIds(repo(['app-2', 'app-3']), plan('support-1'))).toEqual(['support-1']);
   });
 
   it('con enlaces y sin contenedor: consume solo los cubiertos', async () => {

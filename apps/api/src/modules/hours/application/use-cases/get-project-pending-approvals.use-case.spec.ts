@@ -17,6 +17,8 @@ function buildItem(overrides: Partial<HourEntryListItem>): HourEntryListItem {
     projectName: 'Proyecto',
     moduleId: null,
     moduleName: null,
+    segmentId: null,
+    segmentName: null,
     teamId: null,
     teamName: null,
     assignment: 'Proyecto',
@@ -67,10 +69,13 @@ class FakeEntryRepository implements HourEntryRepository {
   async sumRegularHoursForUserAndDate(): Promise<number> {
     return 0;
   }
+  async summarize(): Promise<{ entries: number; hours: number }> {
+    return { entries: 0, hours: 0 };
+  }
   async sumOvertimeHoursByUserForProjects(): Promise<never[]> {
     return [];
   }
-  async sumOvertimeHoursByProjectAndUser(): Promise<never[]> {
+  async sumOvertimeHoursByDayProjectAndUser(): Promise<never[]> {
     return [];
   }
 }
@@ -89,6 +94,18 @@ class FakeProjectReader implements HourEntryProjectReader {
   }
   async findModuleById(): Promise<null> {
     return null;
+  }
+  // El caso probado solo lee/autoriza HH: no configura bloques operativos.
+  // Implementar el puerto completo mantiene los dobles compatibles con 0054.
+  async findSegmentsForModule(): Promise<[]> {
+    return [];
+  }
+  async hasProjectPhases(): Promise<boolean> { return false; }
+  async hasAttributableWorkBlocks(): Promise<boolean> {
+    return false;
+  }
+  async isUserOnSegmentTeam(): Promise<boolean> {
+    return false;
   }
   async recalculateUsedHours(): Promise<void> {}
   async isProjectApprover(): Promise<boolean> {

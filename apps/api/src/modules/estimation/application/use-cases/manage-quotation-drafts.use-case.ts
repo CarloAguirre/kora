@@ -1,10 +1,11 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { buildReconciliationReview, isQuotationDraftEligibleProject } from '@kora/contracts';
 import { isDeepStrictEqual } from 'node:util';
 import type {
   QuotationRevisionActionInput, ApproveClientQuotationInput, TransferApprovedQuotationInput, QuotationTransferResult, ApplyQuotationPlanningInput, AppliedQuotationPlanning, CreateQuotationVersionInput, EstimationPocProposal, EstimationQuestion, QuotationReferenceEdt, SubmitEstimationAnswerInput, Permission, ProjectQuotation, QuotationVersion, UpdateQuotationDraftInput, QuotationTransferPreview, QuotationCommercialPreflight, QuotationCommercialDossier, QuotationOperationalSnapshot, QuotationTeamCatalogEntry, QuotationReconciliationReview, SavedQuotationReconciliationReview, AssessQuotationReconciliationInput, SavedQuotationReviewAssessment,
 } from '@kora/contracts';
 import { buildQuotationTransferPreview } from '../../domain/quotation-transfer-preview';
+import { APPROVED_PROJECT_CALENDAR, type ApprovedProjectCalendar } from '../../../projects/application/ports/approved-project-calendar.port';
 import { buildQuotationCommercialPreflight } from '../../domain/quotation-commercial-preflight';
 import { buildQuotationCommercialDossier } from '../../domain/quotation-commercial-dossier';
 import { QUOTATION_REPOSITORY, type QuotationProjectScope, type QuotationRepository } from '../../domain/repositories/quotation.repository';
@@ -16,7 +17,11 @@ export interface QuotationActor {
 
 @Injectable()
 export class ManageQuotationDraftsUseCase {
-  constructor(@Inject(QUOTATION_REPOSITORY) private readonly repository: QuotationRepository) {}
+  private readonly logger = new Logger(ManageQuotationDraftsUseCase.name);
+  constructor(
+    @Inject(QUOTATION_REPOSITORY) private readonly repository: QuotationRepository,
+    @Optional() @Inject(APPROVED_PROJECT_CALENDAR) private readonly calendar?: ApprovedProjectCalendar,
+  ) {}
 
   private async authorize(projectId: string, actor: QuotationActor, write: boolean): Promise<QuotationProjectScope> {
     const project = await this.repository.getProjectScope(projectId);
@@ -26,6 +31,9 @@ export class ManageQuotationDraftsUseCase {
     if (!allowed) throw new ForbiddenException('No tienes acceso comercial a esta cotización.');
     if (write && !isQuotationDraftEligibleProject(project)) {
       throw new ConflictException('El proyecto no admite borradores comerciales en esta etapa y estado.');
+    }
+    if (write && (await this.repository.getByProjectId(projectId))?.transferredVersionId) {
+      throw new ConflictException('Cotización cerrada: ya fue traspasada al proyecto. Solo puedes consultar sus versiones históricas.');
     }
     return project;
   }
@@ -256,7 +264,9 @@ export class ManageQuotationDraftsUseCase {
 
   /** Consultar el catálogo solo DESPUÉS de autorizar el proyecto. */
   async listActiveQuotationTeams(projectId: string, actor: QuotationActor): Promise<QuotationTeamCatalogEntry[]> {
-    await this.authorizeAiPoc(projectId, actor);
+    // El catálogo se usa también para mostrar versiones históricas cerradas.
+    // Crear un borrador IA sigue exigiendo authorizeAiPoc (escritura).
+    await this.authorize(projectId, actor, false);
     return this.repository.listActiveQuotationTeams();
   }
 
@@ -266,13 +276,14 @@ export class ManageQuotationDraftsUseCase {
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
     confirmedUnderstanding?: string,
     roleTeamIds?: Readonly<Record<string, string>>,
+    selectedTeamIds: readonly string[] = [],
   ): Promise<QuotationVersion> {
     await this.authorizeAiPoc(projectId, actor);
-    if (proposal.projectId !== projectId || proposal.provider !== 'gemini' ||
-        proposal.sourceMode !== 'poc_simulated') {
+    if (proposal.projectId !== projectId || !['gemini', 'openai'].includes(proposal.provider) ||
+        !['poc_simulated', 'drive'].includes(proposal.sourceMode)) {
       throw new BadRequestException('El proyecto y el origen de la propuesta IA no coinciden.');
     }
-    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds);
+    return this.repository.createAiPocDraft(projectId, actor.id, proposal, answers, dynamicQuestions, edt, confirmedUnderstanding, roleTeamIds, selectedTeamIds);
   }
 
   /** Aceptación del baseline técnico KDM: NO es aprobación del cliente ni
@@ -326,7 +337,23 @@ export class ManageQuotationDraftsUseCase {
   async transferApproved(projectId: string, versionId: string, actor: QuotationActor,
     input: TransferApprovedQuotationInput): Promise<QuotationTransferResult> {
     await this.authorize(projectId, actor, true);
-    return this.repository.transferApproved(projectId, versionId, actor.id, input);
+    const result = await this.repository.transferApproved(projectId, versionId, actor.id, input);
+    // El repositorio comercial acaba de CONFIRMAR su transacción. Reconciliar
+    // calendario inmediatamente, no esperar a que alguien edite start_date o
+    // vuelva a consultar la ficha. ensure() es idempotente (evento por versión).
+    // Si el calendario falla, NUNCA reportar traspaso fallido: el presupuesto
+    // y los pagos ya están comprometidos en BD.
+    if (this.calendar) {
+      try {
+        await this.calendar.ensure(projectId);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : 'Error desconocido';
+        this.logger.error('Traspaso registrado pero calendario pendiente: ' + message);
+        return { ...result, calendarWarning:
+          'La cotización se traspasó correctamente, pero los bloques quedaron pendientes: ' + message };
+      }
+    }
+    return result;
   }
 
   async create(projectId: string, actor: QuotationActor, input: CreateQuotationVersionInput): Promise<QuotationVersion> {

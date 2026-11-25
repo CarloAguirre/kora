@@ -8,12 +8,23 @@ import type {
   UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { supportPlanApi, supportPlanKeys } from './support-plan.api';
+import { projectKeys } from './projects.api';
+import { ticketKeys } from '@/modules/tickets/api/tickets.api';
 
 export function useSupportPlanSummary(projectId: string | null) {
   return useQuery({
     queryKey: supportPlanKeys.summary(projectId ?? ''),
     queryFn: () => supportPlanApi.getSummaryForProject(projectId as string),
     enabled: Boolean(projectId),
+  });
+}
+
+/** Consumo del contrato de cada proyecto de la página visible de la tabla de Soporte. */
+export function useSupportProjectUsage(projectIds: readonly string[], options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: supportPlanKeys.usage(projectIds),
+    queryFn: () => supportPlanApi.listUsage(projectIds),
+    enabled: (options.enabled ?? true) && projectIds.length > 0,
   });
 }
 
@@ -46,6 +57,8 @@ function useInvalidateSupportPlans(clientId?: string) {
     // El resumen de la ficha de proyecto se cachea por proyecto, no por contrato — cambiar horas o
     // proyectos cubiertos lo deja desactualizado.
     void queryClient.invalidateQueries({ queryKey: ['support-plan', 'summary'] });
+    // Registrar o anular una factura enlaza/desenlaza tickets ("Facturado"/"Por facturar").
+    void queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
   };
 }
 
@@ -72,9 +85,15 @@ export function useUpdateSupportPlan(planId: string, clientId?: string) {
 
 export function useCloseSupportPlan(planId: string, clientId?: string) {
   const invalidate = useInvalidateSupportPlans(clientId);
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CloseSupportPlanInput) => supportPlanApi.close(planId, input),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      // El cierre también termina el proyecto contenedor si no queda otro contrato activo.
+      void queryClient.invalidateQueries({ queryKey: projectKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 
@@ -91,6 +110,32 @@ export function useMarkSupportInvoicePaid(planId: string, clientId?: string) {
   return useMutation({
     mutationFn: ({ invoiceId, input }: { invoiceId: string; input: MarkSupportInvoicePaidInput }) =>
       supportPlanApi.markInvoicePaid(invoiceId, input),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useUploadSupportInvoiceAttachment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, file }: { invoiceId: string; file: File }) =>
+      supportPlanApi.uploadInvoiceAttachment(invoiceId, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: supportPlanKeys.details() }),
+  });
+}
+
+/** "Cerrar mes por lo facturado" — el saldo de un período "facturado parcial" deja de cobrarse. */
+export function useCloseSupportInvoicePeriod(planId: string, clientId?: string) {
+  const invalidate = useInvalidateSupportPlans(clientId);
+  return useMutation({
+    mutationFn: (periodKey: string) => supportPlanApi.closeInvoicePeriod(planId, { periodKey }),
+    onSuccess: () => invalidate(),
+  });
+}
+
+export function useVoidSupportInvoice(clientId?: string) {
+  const invalidate = useInvalidateSupportPlans(clientId);
+  return useMutation({
+    mutationFn: (invoiceId: string) => supportPlanApi.voidInvoice(invoiceId),
     onSuccess: () => invalidate(),
   });
 }

@@ -2,18 +2,28 @@ import type {
   CloseSupportPlanInput,
   CreateProjectInput,
   CreateSupportPlanInput,
+  CloseSupportInvoicePeriodInput,
   MarkSupportInvoiceIssuedInput,
   MarkSupportInvoicePaidInput,
   SupportPlanListItem,
   SupportPlanWithInvoices,
-  SupportProjectSummary,
+  SupportProjectDetailSummary,
+  SupportProjectUsage,
   UpdateSupportPlanInput,
 } from '@kora/contracts';
 import { api } from '@/shared/lib/api-client';
 
+export type SupportInvoiceUploadInput = Omit<MarkSupportInvoiceIssuedInput, 'invoices'> & {
+  invoices: (MarkSupportInvoiceIssuedInput['invoices'][number] & { file?: File })[];
+};
+
 export const supportPlanApi = {
-  getSummaryForProject(projectId: string): Promise<SupportProjectSummary | null> {
-    return api.get<SupportProjectSummary | null>(`/support-plans/project/${projectId}`);
+  getSummaryForProject(projectId: string): Promise<SupportProjectDetailSummary | null> {
+    return api.get<SupportProjectDetailSummary | null>(`/support-plans/project/${projectId}`);
+  },
+  /** Columnas de horas de la tabla de Soporte — mismo cálculo que "Estado del proyecto" de la ficha. */
+  listUsage(projectIds: readonly string[]): Promise<SupportProjectUsage[]> {
+    return api.post<SupportProjectUsage[]>('/support-plans/usage', { projectIds });
   },
   listForClient(clientId: string): Promise<SupportPlanListItem[]> {
     return api.get<SupportPlanListItem[]>(`/support-plans/client/${clientId}`);
@@ -34,16 +44,44 @@ export const supportPlanApi = {
   close(planId: string, input: CloseSupportPlanInput): Promise<void> {
     return api.patch<void>(`/support-plans/${planId}/close`, input);
   },
-  issueInvoice(planId: string, input: MarkSupportInvoiceIssuedInput): Promise<{ id: string }> {
-    return api.post<{ id: string }>(`/support-plans/${planId}/invoices`, input);
+  issueInvoice(planId: string, input: SupportInvoiceUploadInput): Promise<{ ids: string[] }> {
+    if (input.invoices.some((invoice) => invoice.file)) {
+      const body = new FormData();
+      body.append('metadata', JSON.stringify({
+        ...input,
+        invoices: input.invoices.map(({ file: _file, ...invoice }) => invoice),
+      }));
+      input.invoices.forEach((invoice, index) => {
+        if (invoice.file) body.append(`file_${index}`, invoice.file);
+      });
+      return api.postFormData<{ ids: string[] }>(`/support-plans/${planId}/invoices/upload`, body);
+    }
+    return api.post<{ ids: string[] }>(`/support-plans/${planId}/invoices`, input);
+  },
+  invoiceAttachment(invoiceId: string): Promise<Blob> {
+    return api.getBlob(`/support-invoices/${invoiceId}/attachment`);
+  },
+  uploadInvoiceAttachment(invoiceId: string, file: File): Promise<void> {
+    const body = new FormData();
+    body.append('file', file);
+    return api.postFormData<void>(`/support-invoices/${invoiceId}/attachment`, body);
   },
   markInvoicePaid(invoiceId: string, input: MarkSupportInvoicePaidInput): Promise<void> {
     return api.patch<void>(`/support-invoices/${invoiceId}/paid`, input);
+  },
+  /** "Anular factura" — solo pendientes de pago; el período vuelve a quedar por facturar. */
+  closeInvoicePeriod(planId: string, input: CloseSupportInvoicePeriodInput): Promise<void> {
+    return api.post<void>(`/support-plans/${planId}/invoices/close-period`, input);
+  },
+  voidInvoice(invoiceId: string): Promise<void> {
+    return api.delete<void>(`/support-invoices/${invoiceId}`);
   },
 };
 
 export const supportPlanKeys = {
   summary: (projectId: string) => ['support-plan', 'summary', projectId] as const,
+  /** Bajo el prefijo `summary` para que lo invaliden las mismas mutaciones que el resumen de la ficha. */
+  usage: (projectIds: readonly string[]) => ['support-plan', 'summary', 'usage', ...projectIds] as const,
   forClient: (clientId: string) => ['support-plan', 'client', clientId] as const,
   /** Prefijo de todos los detalles — el detalle se cachea bajo el slug de la URL, no bajo el UUID que usan las mutaciones. */
   details: () => ['support-plan', 'detail'] as const,

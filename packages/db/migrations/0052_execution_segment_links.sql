@@ -1,0 +1,6 @@
+ALTER TABLE "project_module_deliveries" ADD COLUMN "segment_id" uuid;--> statement-breakpoint
+ALTER TABLE "project_module_tasks" ADD COLUMN "segment_id" uuid;--> statement-breakpoint
+ALTER TABLE "hour_entries" ADD COLUMN "segment_id" uuid;--> statement-breakpoint
+ALTER TABLE "project_module_deliveries" ADD CONSTRAINT "project_module_deliveries_segment_id_project_module_segments_id_fk" FOREIGN KEY ("segment_id") REFERENCES "public"."project_module_segments"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_module_tasks" ADD CONSTRAINT "project_module_tasks_segment_id_project_module_segments_id_fk" FOREIGN KEY ("segment_id") REFERENCES "public"."project_module_segments"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "hour_entries" ADD CONSTRAINT "hour_entries_segment_id_project_module_segments_id_fk" FOREIGN KEY ("segment_id") REFERENCES "public"."project_module_segments"("id") ON DELETE set null ON UPDATE no action;

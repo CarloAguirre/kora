@@ -14,8 +14,17 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { ChevronDownIcon, UserIcon } from '@/shared/components/icons/Icons';
 import { HourEntryFormDialog } from './HourEntryFormDialog';
-import { useApproveHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
-import { resolvedApprover } from '../lib/approver';
+import {
+  useApproveHourEntries,
+  useApproveHourEntry,
+  useHourEntriesList,
+  useRejectHourEntries,
+  type BulkDecisionResult,
+} from '../api/hours.queries';
+import { canDecideHourEntry, resolvedApprover } from '../lib/approver';
+import { canEditAnyMonth, isInCurrentMonth } from '../lib/edit-window';
+import { useAuth } from '@/modules/auth/hooks/useAuth';
+import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 
 const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: 'short' });
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
@@ -62,6 +71,8 @@ export function HourEntriesApprovalTable({
   showTeamColumn?: boolean;
   groupByUser?: boolean;
 }) {
+  const { user } = useAuth();
+  const { can } = usePermissions();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [collapsedLeaders, setCollapsedLeaders] = useState<Set<string>>(new Set());
@@ -87,17 +98,23 @@ export function HourEntriesApprovalTable({
   // vacía, se retrocede a la que ahora es la última.
   if (data && data.pageCount > 0 && page > data.pageCount) setPage(data.pageCount);
   const approveEntry = useApproveHourEntry();
-  const rejectEntry = useRejectHourEntry();
+  const approveEntries = useApproveHourEntries();
+  const rejectEntries = useRejectHourEntries();
+  // Mientras corre una tanda los botones quedan bloqueados: un segundo clic
+  // relanzaba la misma tanda en paralelo y cada registro fallaba con 409.
+  const bulkRunning = approveEntries.isPending || rejectEntries.isPending;
 
   const entries = data?.items ?? [];
-  const allSelected = entries.length > 0 && entries.every((entry) => selected.has(entry.id));
+  const canActOn = (entry: HourEntrySummary) => canDecideHourEntry(entry, user, can('hours:approve'));
+  const approvableEntries = entries.filter(canActOn);
+  const allSelected = approvableEntries.length > 0 && approvableEntries.every((entry) => selected.has(entry.id));
   // `selected` puede arrastrar IDs que ya no están en la cola (aprobados en una
   // tanda que falló a medias, de otra página, o resueltos por otro aprobador):
   // las acciones masivas solo actúan sobre lo seleccionado que sigue visible.
-  const selectedEntries = entries.filter((entry) => selected.has(entry.id));
+  const selectedEntries = approvableEntries.filter((entry) => selected.has(entry.id));
   const selectedHours = selectedEntries.reduce((sum, entry) => sum + entry.hours, 0);
 
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(entries.map((entry) => entry.id)));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(approvableEntries.map((entry) => entry.id)));
   const toggleOne = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
@@ -106,10 +123,12 @@ export function HourEntriesApprovalTable({
       return next;
     });
   const toggleGroup = (groupEntries: HourEntrySummary[]) => {
-    const allGroupSelected = groupEntries.every((entry) => selected.has(entry.id));
+    const allowedEntries = groupEntries.filter(canActOn);
+    if (allowedEntries.length === 0) return;
+    const allGroupSelected = allowedEntries.every((entry) => selected.has(entry.id));
     setSelected((prev) => {
       const next = new Set(prev);
-      for (const entry of groupEntries) {
+      for (const entry of allowedEntries) {
         if (allGroupSelected) next.delete(entry.id);
         else next.add(entry.id);
       }
@@ -171,39 +190,34 @@ export function HourEntriesApprovalTable({
   };
 
   /**
-   * Procesa cada registro seleccionado sin cortar en el primer error (uno ya
-   * resuelto por otro aprobador no debe bloquear al resto) y deja seleccionados
-   * solo los que fallaron. Devuelve si todos salieron bien.
+   * Procesa los registros seleccionados y deja seleccionados solo los que
+   * fallaron. Devuelve si todos salieron bien.
    */
-  const runBulk = async (action: (id: string) => Promise<unknown>, done: [string, string], failed: string) => {
+  const runBulk = async (
+    action: (ids: string[]) => Promise<BulkDecisionResult>,
+    done: [string, string],
+    failed: string,
+  ) => {
+    if (bulkRunning) return false;
     const ids = selectedEntries.map((entry) => entry.id);
-    const failedIds = new Set<string>();
-    let firstError: unknown = null;
-    for (const id of ids) {
-      try {
-        await action(id);
-      } catch (error) {
-        failedIds.add(id);
-        firstError ??= error;
-      }
-    }
-    const succeeded = ids.length - failedIds.size;
-    setSelected(failedIds);
-    if (failedIds.size === 0) {
+    const { failedIds, firstError } = await action(ids);
+    const succeeded = ids.length - failedIds.length;
+    setSelected(new Set(failedIds));
+    if (failedIds.length === 0) {
       toast.success(`${succeeded} ${pluralize(succeeded, done[0], done[1])}.`);
       return true;
     }
     const detail = firstError instanceof ApiRequestError ? ` ${firstError.message}` : '';
-    toast.error(`${succeeded} de ${ids.length} ${pluralize(ids.length, done[0], done[1])}; ${failedIds.size} ${failed}.${detail}`);
+    toast.error(`${succeeded} de ${ids.length} ${pluralize(ids.length, done[0], done[1])}; ${failedIds.length} ${failed}.${detail}`);
     return false;
   };
 
   const approveSelected = () =>
-    runBulk((id) => approveEntry.mutateAsync(id), ['registro aprobado', 'registros aprobados'], 'no se pudieron aprobar');
+    runBulk((ids) => approveEntries.mutateAsync(ids), ['registro aprobado', 'registros aprobados'], 'no se pudieron aprobar');
 
   const confirmReject = async () => {
     const ok = await runBulk(
-      (id) => rejectEntry.mutateAsync({ entryId: id, input: { reason } }),
+      (ids) => rejectEntries.mutateAsync({ entryIds: ids, input: { reason } }),
       ['registro rechazado', 'registros rechazados'],
       'no se pudieron rechazar',
     );
@@ -218,7 +232,7 @@ export function HourEntriesApprovalTable({
       header: '',
       width: '40px',
       render: (entry) => (
-        <input type="checkbox" checked={selected.has(entry.id)} onChange={() => toggleOne(entry.id)} aria-label={`Seleccionar ${entry.user.fullName}`} />
+        <input type="checkbox" checked={selected.has(entry.id) && canActOn(entry)} disabled={!canActOn(entry)} onChange={() => toggleOne(entry.id)} aria-label={`Seleccionar ${entry.user.fullName}`} />
       ),
     },
     ...(groupByUser
@@ -292,17 +306,20 @@ export function HourEntriesApprovalTable({
           <DropdownMenu
             items={[
               { key: 'ver', label: 'Ver detalle', onSelect: () => setViewing(entry) },
-              { key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) },
-              { key: 'aprobar', label: 'Aprobar', tone: 'success', onSelect: () => void approveOne(entry) },
-              {
-                key: 'rechazar',
-                label: 'Rechazar',
-                tone: 'danger',
-                onSelect: () => {
-                  setSelected(new Set([entry.id]));
-                  setRejecting(true);
+              ...(canActOn(entry) ? [
+                ...(canEditAnyMonth(user?.role) || isInCurrentMonth(entry.date)
+                  ? [{ key: 'editar', label: 'Editar', onSelect: () => setEditing(entry) }] : []),
+                { key: 'aprobar', label: 'Aprobar', tone: 'success' as const, onSelect: () => void approveOne(entry) },
+                {
+                  key: 'rechazar',
+                  label: 'Rechazar',
+                  tone: 'danger' as const,
+                  onSelect: () => {
+                    setSelected(new Set([entry.id]));
+                    setRejecting(true);
+                  },
                 },
-              },
+              ] : []),
             ]}
             trigger={({ onClick }) => (
               <Button variant="ghost" size="icon" onClick={onClick} aria-label={`Acciones — ${entry.user.fullName}`} title="Acciones">
@@ -317,7 +334,7 @@ export function HourEntriesApprovalTable({
 
   return (
     <div className={styles.wrapper}>
-      {entries.length > 0 && (
+      {approvableEntries.length > 0 && (
         <button type="button" className={styles.selectAll} onClick={toggleAll}>
           {allSelected ? 'Quitar selección' : 'Seleccionar todas'}
         </button>
@@ -337,7 +354,8 @@ export function HourEntriesApprovalTable({
         <div className={styles.leaderGroups}>
           {leaderGroups.map((leader) => {
             const leaderHours = leader.entries.reduce((sum, entry) => sum + entry.hours, 0);
-            const leaderSelected = leader.entries.every((entry) => selected.has(entry.id));
+            const allowedLeaderEntries = leader.entries.filter(canActOn);
+            const leaderSelected = allowedLeaderEntries.length > 0 && allowedLeaderEntries.every((entry) => selected.has(entry.id));
             const collapsed = collapsedLeaders.has(leader.key);
             return (
               <div key={leader.key} className={styles.leaderGroup}>
@@ -345,6 +363,7 @@ export function HourEntriesApprovalTable({
                   <input
                     type="checkbox"
                     checked={leaderSelected}
+                    disabled={allowedLeaderEntries.length === 0}
                     onChange={() => toggleGroup(leader.entries)}
                     aria-label={`Seleccionar todas las horas que aprueba ${leader.leaderName}`}
                   />
@@ -402,10 +421,15 @@ export function HourEntriesApprovalTable({
         <span className={styles.bulkSummary} aria-live="polite">
           {selectedEntries.length > 0 ? `Seleccionadas: ${selectedEntries.length} · ${formatHours(selectedHours)} hrs` : ''}
         </span>
-        <Button variant="outlineDark" disabled={selectedEntries.length === 0} onClick={() => setRejecting(true)}>
+        <Button variant="outlineDark" disabled={selectedEntries.length === 0 || bulkRunning} onClick={() => setRejecting(true)}>
           Rechazar las HH seleccionadas
         </Button>
-        <Button disabled={selectedEntries.length === 0} onClick={() => void approveSelected()}>
+        <Button
+          disabled={selectedEntries.length === 0 || bulkRunning}
+          loading={approveEntries.isPending}
+          loadingText="Aprobando…"
+          onClick={() => void approveSelected()}
+        >
           Aprobar las HH seleccionadas
         </Button>
       </div>
@@ -441,7 +465,7 @@ export function HourEntriesApprovalTable({
             <Button variant="outline" onClick={() => setRejecting(false)}>
               Cancelar
             </Button>
-            <Button variant="danger" disabled={!reason.trim()} onClick={() => void confirmReject()}>
+            <Button variant="danger" disabled={!reason.trim()} loading={rejectEntries.isPending} onClick={() => void confirmReject()}>
               Rechazar {selectedEntries.length} registro{selectedEntries.length === 1 ? '' : 's'}
             </Button>
           </div>

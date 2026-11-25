@@ -27,7 +27,16 @@ export function assertQuotationReadyForClient(
       'Primero revisa y acepta la propuesta IA, incluidos los ajustes manuales de HH.',
     );
   }
-  if (version.origin === 'ai' && version.draft.aiPoc?.edt &&
+  // Las copias comerciales del mismo proyecto conservan la EDT de Drive.
+  // Exigir la misma reconciliación de HH antes de aprobar o traspasar v2.
+  if (version.origin === 'copy' && version.draft.aiPoc?.edt &&
+      version.draft.analysisProjectionStatus !== 'synced') {
+    throw new InvalidCommercialQuotation(
+      'Concilia la planificación IA y las HH antes de aprobar esta copia.',
+    );
+  }
+  if ((version.origin === 'ai' || version.origin === 'copy') &&
+      version.draft.aiPoc?.edt &&
       version.draft.analysisProjectionStatus === 'synced') {
     const effective = effectiveQuotationEdt(version.draft);
     const additional = (version.draft.edtCommercialTasks ?? [])

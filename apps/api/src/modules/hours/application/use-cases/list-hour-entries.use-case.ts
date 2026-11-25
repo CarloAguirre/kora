@@ -58,8 +58,12 @@ export class ListHourEntriesUseCase implements UseCase<ListHourEntriesCommand, P
       {
         userId,
         projectId: project?.id,
+        projectIds: query.projectIds,
         search: query.search,
         teamId: query.teamId,
+        // Los propios también quedan fuera: los decide otro.
+        outsideTeamsLedByUserId: query.outsideLedTeams ? actor.userId : undefined,
+        excludeUserId: query.outsideLedTeams || query.excludeOwn ? actor.userId : undefined,
         status: query.status,
         dateFrom: query.dateFrom ? new Date(query.dateFrom) : undefined,
         dateTo: query.dateTo ? new Date(query.dateTo) : undefined,

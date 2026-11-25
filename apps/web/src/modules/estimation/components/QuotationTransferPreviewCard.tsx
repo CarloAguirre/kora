@@ -44,8 +44,15 @@ export function QuotationTransferPreviewCard({
               </div>
               <div className={styles.metrics}>
                 <div><span>HH vendidas actuales</span><strong>{number(preview.operational.soldHours)}</strong></div>
-                <div><span>HH de la versión</span><strong>{number(preview.proposed.totalHours)}</strong></div>
-                <div><span>Variación propuesta</span><strong>{delta(preview.difference.soldHoursDelta)}</strong></div>
+                <div><span>HH futuras de la versión</span><strong>{number(preview.proposed.totalHours)}</strong></div>
+                {preview.proposed.phaseZeroBillableHours > 0 && (
+                  <div><span>Fase 0 · HH ya consumidas a cobrar</span>
+                    <strong>{number(preview.proposed.phaseZeroBillableHours)}</strong></div>
+                )}
+                <div><span>HH cobrables de la versión</span>
+                  <strong>{number(preview.proposed.billableHours ?? preview.proposed.totalHours)}</strong></div>
+                <div><span>HH adicionales a vender</span>
+                  <strong>{delta(preview.difference.soldHoursDelta)}</strong></div>
                 <div><span>HH consumidas</span><strong>{number(preview.operational.usedHours)}</strong></div>
               </div>
               <p className={styles.helper}>

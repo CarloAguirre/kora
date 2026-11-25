@@ -1,5 +1,12 @@
 <!doctype html>
-<html lang="es">
+<!--
+  La app trae su propio corrector ortográfico (src/shared/spellcheck), que
+  funciona igual en cualquier navegador y configuración. El del navegador se
+  apaga aquí (`spellcheck` se hereda) para que no haya doble subrayado. Los
+  campos donde el corrector es ruido (buscadores, RUT, URLs) siguen
+  excluyéndose con `spellCheck={false}`, que el propio respeta.
+-->
+<html lang="es" spellcheck="false">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

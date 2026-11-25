@@ -1,0 +1,92 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import type { MarkSupportInvoiceIssuedInput, SupportPlanCurrency } from '@kora/contracts';
+import styles from './SupportPlanActionDialog.module.css';
+import { Modal } from '@/shared/components/ui/Modal';
+import { Button } from '@/shared/components/ui/Button';
+import { AlertIcon } from '@/shared/components/icons/Icons';
+import { ApiRequestError } from '@/shared/lib/api-client';
+import { SupportInvoiceSplitFields, useSupportInvoiceSplit, type SupportInvoiceSplitReference } from './SupportInvoiceSplitFields';
+
+export interface IssueSupportInvoiceDialogProps {
+  open: boolean;
+  /** Ej. "Octubre 2026 · USD 250,00" — qué mes se está facturando. */
+  description: string;
+  /** Monto a facturar: el calculado del período, o el saldo pendiente si se agregan facturas a uno "facturado parcial". */
+  totalAmount: number;
+  /** `pending` al agregar facturas a un período "facturado parcial" — cambia los textos de la referencia. */
+  reference?: SupportInvoiceSplitReference;
+  currency: SupportPlanCurrency;
+  /** Período seleccionado en Facturación (por ejemplo, noviembre de 2026). */
+  periodLabel?: string;
+  /** Ruta al historial de meses del contrato, usada desde /facturacion. */
+  historyPath?: string;
+  onClose: () => void;
+  onConfirm: (input: Pick<MarkSupportInvoiceIssuedInput, 'invoices' | 'closePeriod'>) => Promise<void>;
+}
+
+/** Registrar la(s) factura(s) de un período — mismos campos que el formulario de `SupportPlanBillingAction`. */
+export function IssueSupportInvoiceDialog({ open, description, totalAmount, reference, currency, periodLabel, historyPath, onClose, onConfirm }: IssueSupportInvoiceDialogProps) {
+  const split = useSupportInvoiceSplit(totalAmount, reference);
+  const { reset } = split;
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      reset();
+      setError(null);
+    }
+  }, [open, reset]);
+
+  const handleConfirm = async () => {
+    const problem = split.validate();
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setError(null);
+    setRunning(true);
+    try {
+      await onConfirm({ invoices: split.toInput(), closePeriod: split.closePeriodInput });
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof ApiRequestError ? caught.message : 'No se pudo registrar la factura. Inténtalo de nuevo.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      title={`${split.isSplit ? 'Registrar facturas' : 'Registrar factura'}${periodLabel ? ` · ${periodLabel}` : ''}`}
+      description={description}
+      onClose={onClose}
+      wide={split.isSplit}
+      dismissible={!running}
+      footer={
+        <>
+          {historyPath && !running && (
+            <Link className={styles.historyLink} to={historyPath}>Ver facturas</Link>
+          )}
+          <Button variant="outline" onClick={onClose} disabled={running}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={() => void handleConfirm()} loading={running} loadingText="Guardando…">
+            Guardar
+          </Button>
+        </>
+      }
+    >
+      <SupportInvoiceSplitFields split={split} currency={currency} disabled={running} />
+
+      {error && (
+        <div className={styles.alert} role="alert">
+          <AlertIcon size={18} className={styles.alertIcon} />
+          <span>{error}</span>
+        </div>
+      )}
+    </Modal>
+  );
+}

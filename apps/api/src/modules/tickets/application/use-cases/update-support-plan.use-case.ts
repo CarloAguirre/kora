@@ -129,7 +129,8 @@ export class UpdateSupportPlanUseCase implements UseCase<UpdateSupportPlanComman
         ...(data.leaderUserId !== undefined ? { leaderUserId: data.leaderUserId ?? null } : {}),
         ...(data.startDate !== undefined ? { startDate: new Date(data.startDate) } : {}),
         ...(data.endDate !== undefined ? { estimatedDeliveryDate: data.endDate ? new Date(data.endDate) : null } : {}),
-        ...(data.contractedHours !== undefined ? { supportHours: data.contractedHours } : {}),
+        // Igual que al crear: en el contenedor, HH vendidas = HH de soporte = HH del plan (listado, ficha y dashboard leen `soldHours`).
+        ...(data.contractedHours !== undefined ? { soldHours: data.contractedHours, supportHours: data.contractedHours } : {}),
         ...(data.quotationLink !== undefined ? { quotationLink: data.quotationLink ?? null } : {}),
         ...(data.contractLink !== undefined ? { contractLink: data.contractLink ?? null } : {}),
       },

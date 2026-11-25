@@ -258,6 +258,43 @@ describe('Project', () => {
     });
   });
 
+  describe('consumo de HH con ajuste histórico', () => {
+    const create = () => Project.create({
+      id: 'p-historical', name: 'Dashboard Alertas', slug: 'dashboard-alertas',
+      type: 'development', salesStage: 'approved', soldHours: 110, now: NOW,
+    }).unwrap();
+
+    it('sin saldo histórico conserva exactamente el total de entradas aprobadas', () => {
+      const project = create();
+      project.recordUsedHours(34, NOW);
+      expect(project.toSnapshot().usedHours).toBe(34);
+      expect(project.toSnapshot().historicalHoursAdjustment).toBe(0);
+    });
+
+    it('suma +32 una sola vez y conserva el ajuste tras cada recálculo', () => {
+      const original = create();
+      const project = Project.restore({
+        ...original.toSnapshot(),
+        historicalHoursAdjustment: 32,
+        usedHours: 66,
+      });
+      project.recordUsedHours(34, NOW);
+      expect(project.toSnapshot().usedHours).toBe(66);
+      project.recordUsedHours(39, NOW);
+      expect(project.toSnapshot().usedHours).toBe(71);
+      project.recordUsedHours(39, NOW);
+      expect(project.toSnapshot().usedHours).toBe(71);
+      expect(project.toSnapshot().historicalHoursAdjustment).toBe(32);
+      expect(project.toSnapshot().soldHours).toBe(110);
+    });
+
+    it('respeta precisión de centésimas al recalcular', () => {
+      const project = Project.restore({ ...create().toSnapshot(), historicalHoursAdjustment: 32.5 });
+      project.recordUsedHours(34.75, NOW);
+      expect(project.toSnapshot().usedHours).toBe(67.25);
+    });
+  });
+
   describe('borrado lógico', () => {
     it('conserva el nombre y las horas: no es destructivo', () => {
       const project = Project.create({

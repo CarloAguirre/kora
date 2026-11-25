@@ -34,6 +34,7 @@ export class DrizzleNotificationInbox implements NotificationInbox {
       title: input.title,
       data: input.data as Record<string, unknown>,
       createdByUserId: input.createdByUserId,
+      ...(input.emailedAt ? { emailedAt: input.emailedAt } : {}),
     });
   }
 

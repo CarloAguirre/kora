@@ -59,13 +59,10 @@ export function SidePanel({
     return () => dialog.removeEventListener('cancel', handleCancel);
   }, [dismissible, onClose]);
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDialogElement>) => {
-    if (!dismissible) return;
-    if (event.target === dialogRef.current) onClose();
-  };
-
+  // Igual que `Modal`: no se cierra con un clic en el fondo, solo con el botón
+  // de cierre (o Escape).
   return (
-    <dialog ref={dialogRef} className={styles.dialog} onClick={handleBackdropClick} aria-labelledby={titleId}>
+    <dialog ref={dialogRef} className={styles.dialog} aria-labelledby={titleId}>
       <header className={styles.header}>
         <div className={styles.titles}>
           <h2 className={styles.title} id={titleId}>

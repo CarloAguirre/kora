@@ -49,3 +49,6 @@
   background: var(--kora-lime-surface);
   color: var(--kora-navy);
 }
+
+/* Estado sin asignación, compartido por los módulos de Kora. */
+.unassigned { background: var(--kora-badge-unassigned-bg); color: var(--kora-badge-unassigned-text); }

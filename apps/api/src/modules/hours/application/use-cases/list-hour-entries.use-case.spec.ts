@@ -25,10 +25,13 @@ class FakeEntryRepository implements HourEntryRepository {
   async sumRegularHoursForUserAndDate(): Promise<number> {
     return 0;
   }
+  async summarize(): Promise<{ entries: number; hours: number }> {
+    return { entries: 0, hours: 0 };
+  }
   async sumOvertimeHoursByUserForProjects(): Promise<never[]> {
     return [];
   }
-  async sumOvertimeHoursByProjectAndUser(): Promise<never[]> {
+  async sumOvertimeHoursByDayProjectAndUser(): Promise<never[]> {
     return [];
   }
 }
@@ -50,6 +53,18 @@ class FakeProjectReader implements HourEntryProjectReader {
   }
   async findModuleById(): Promise<null> {
     return null;
+  }
+  // El caso probado solo lee/autoriza HH: no configura bloques operativos.
+  // Implementar el puerto completo mantiene los dobles compatibles con 0054.
+  async findSegmentsForModule(): Promise<[]> {
+    return [];
+  }
+  async hasProjectPhases(): Promise<boolean> { return false; }
+  async hasAttributableWorkBlocks(): Promise<boolean> {
+    return false;
+  }
+  async isUserOnSegmentTeam(): Promise<boolean> {
+    return false;
   }
   async recalculateUsedHours(): Promise<void> {}
 }
@@ -118,6 +133,49 @@ describe('ListHourEntriesUseCase — alcance de visibilidad', () => {
     expect(filters.leaderScopeUserId).toBe('leader-1');
   });
 
+  it('outsideLedTeams: deja fuera a los equipos que lidera el actor y sus propios registros', async () => {
+    const repo = new FakeEntryRepository();
+    const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());
+
+    await useCase.execute({
+      query: { ...baseQuery(), outsideLedTeams: true },
+      actor: { userId: 'leader-1', email: 'l@kabeli.cl' },
+      actorPermissions: ['hours:read_team'],
+    });
+
+    const filters: HourEntryFilters = repo.search.mock.calls[0]![0];
+    expect(filters.outsideTeamsLedByUserId).toBe('leader-1');
+    expect(filters.excludeUserId).toBe('leader-1');
+    expect(filters.leaderScopeUserId).toBe('leader-1');
+  });
+
+  it('excludeOwn: deja fuera solo los registros propios, sin tocar los equipos', async () => {
+    const repo = new FakeEntryRepository();
+    const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());
+
+    await useCase.execute({
+      query: { ...baseQuery(), teamId: 'team-1', excludeOwn: true },
+      actor: { userId: 'leader-1', email: 'l@kabeli.cl' },
+      actorPermissions: ['hours:read_team'],
+    });
+
+    const filters: HourEntryFilters = repo.search.mock.calls[0]![0];
+    expect(filters.excludeUserId).toBe('leader-1');
+    expect(filters.outsideTeamsLedByUserId).toBeUndefined();
+    expect(filters.teamId).toBe('team-1');
+  });
+
+  it('sin outsideLedTeams: no excluye equipos ni registros propios', async () => {
+    const repo = new FakeEntryRepository();
+    const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());
+
+    await useCase.execute({ query: baseQuery(), actor: { userId: 'leader-1', email: 'l@kabeli.cl' }, actorPermissions: ['hours:read_team'] });
+
+    const filters: HourEntryFilters = repo.search.mock.calls[0]![0];
+    expect(filters.outsideTeamsLedByUserId).toBeUndefined();
+    expect(filters.excludeUserId).toBeUndefined();
+  });
+
   it('sin hours:read_all ni hours:read_team: solo lo propio, ignora userId de la query', async () => {
     const repo = new FakeEntryRepository();
     const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());
@@ -176,5 +234,20 @@ describe('ListHourEntriesUseCase — resolución de slug en projectId', () => {
 
     expect(result.isOk() && result.value.items).toEqual([]);
     expect(repo.search).not.toHaveBeenCalled();
+  });
+
+  it('projectIds (filtro Proyecto del historial de equipo): pasa los UUID tal cual al repositorio', async () => {
+    const repo = new FakeEntryRepository();
+    const useCase = new ListHourEntriesUseCase(repo, new FakeProjectReader());
+
+    await useCase.execute({
+      query: { ...baseQuery(), projectIds: ['project-uuid-1', 'project-uuid-2'] },
+      actor: { userId: 'leader-1', email: 'l@kabeli.cl' },
+      actorPermissions: ['hours:read_team'],
+    });
+
+    const filters: HourEntryFilters = repo.search.mock.calls[0]![0];
+    expect(filters.projectIds).toEqual(['project-uuid-1', 'project-uuid-2']);
+    expect(filters.leaderScopeUserId).toBe('leader-1');
   });
 });

@@ -69,6 +69,7 @@ export const tokenStore = new TokenStore();
 const BASE_URL = '/api';
 
 interface RequestOptions {
+  readonly responseType?: 'blob';
   readonly method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   readonly body?: unknown;
   readonly query?: Record<string, string | number | boolean | readonly string[] | undefined>;
@@ -125,11 +126,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       const retried = await send(path, options);
-      return handleResponse<T>(retried);
+      return handleResponse<T>(retried, options.responseType);
     }
   }
 
-  return handleResponse<T>(response);
+  return handleResponse<T>(response, options.responseType);
 }
 
 async function send(path: string, options: RequestOptions): Promise<Response> {
@@ -164,8 +165,9 @@ async function send(path: string, options: RequestOptions): Promise<Response> {
   });
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+async function handleResponse<T>(response: Response, responseType?: 'blob'): Promise<T> {
   if (response.status === 204) return undefined as T;
+  if (response.ok && responseType === 'blob') return await response.blob() as T;
 
   const text = await response.text();
   const data: unknown = text ? JSON.parse(text) : null;
@@ -199,7 +201,82 @@ function toApiError(data: unknown, status: number): ApiError {
   };
 }
 
+
+/** Lee SSE de un POST usando el mismo bearer en memoria y política de refresh
+ * que el cliente REST. Nunca incorpora credenciales en URL ni persiste eventos.
+ * No reintenta flujos a mitad de generación (para no duplicar consumo IA). */
+export async function apiEventStream<T>(
+  path: string, body: unknown,
+  onEvent: (event: string, data: unknown) => void,
+  signal?: AbortSignal,
+): Promise<T> {
+  const options: RequestOptions = { method: 'POST', body, ...(signal ? { signal } : {}) };
+  let response = await send(path, options);
+  if (response.status === 401 && tokenStore.get()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) response = await send(path, options);
+  }
+  if (!response.ok) return handleResponse<T>(response);
+  if (!response.body) throw new Error('El servidor no entregó el flujo del análisis.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let complete = false;
+  let result: T | undefined;
+  const consume = (frame: string) => {
+    const lines = frame.split('\n');
+    const event = lines.find((line) => line.startsWith('event:'))
+      ?.slice(6).trim() ?? 'message';
+    const dataText = lines.filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart()).join('\n');
+    if (!dataText) return;
+    let data: unknown;
+    try { data = JSON.parse(dataText) as unknown; }
+    catch { throw new Error('El servidor envió un fragmento de análisis inválido.'); }
+    if (event === 'error') {
+      const message = data && typeof data === 'object' && 'message' in data &&
+        typeof data.message === 'string'
+        ? data.message : 'El agente IA no pudo completar el análisis.';
+      throw new Error(message);
+    }
+    if (event === 'complete') {
+      result = data as T;
+      complete = true;
+    } else if (event !== 'message') {
+      // Los eventos de progreso se emiten en cuanto llegan del servidor.
+      // No se esperan ni se confunden con el JSON final de la solicitud.
+      onEvent(event, data);
+    }
+  };
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer = (buffer + decoder.decode(chunk.value, { stream: true }))
+        .replace(/\r\n/g, '\n');
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary !== -1) {
+        consume(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + 2);
+        boundary = buffer.indexOf('\n\n');
+      }
+      if (buffer.length > 1_000_000) {
+        throw new Error('El servidor envió un evento demasiado grande.');
+      }
+    }
+    buffer = (buffer + decoder.decode()).replace(/\r\n/g, '\n');
+    if (buffer.trim()) consume(buffer);
+  } finally {
+    reader.releaseLock();
+  }
+  if (!complete || !result) {
+    throw new Error('El análisis finalizó sin entregar un resultado verificable.');
+  }
+  return result;
+}
+
 export const api = {
+  getBlob: (path: string) => apiRequest<Blob>(path, { responseType: 'blob' }),
   get: <T>(path: string, query?: RequestOptions['query']) =>
     apiRequest<T>(path, query ? { query } : {}),
   post: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'POST', body }),

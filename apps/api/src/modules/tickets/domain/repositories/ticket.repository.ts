@@ -11,6 +11,14 @@ export interface TicketFilters {
   readonly leaderUserId?: readonly string[] | undefined;
   readonly status?: TicketStatus | undefined;
   readonly priority?: TicketPriority | undefined;
+  /** Solo tickets con actividad en [from, to): creados, resueltos o con horas no rechazadas en el rango. */
+  readonly activityBetween?: { readonly from: Date; readonly to: Date } | undefined;
+  /**
+   * Solo tickets con HH aprobadas cuya fecha trabajada cae en [from, to) —
+   * cualquiera de los dos extremos puede faltar. Acota también `sumHours` y
+   * `listDailyHours` a esos días.
+   */
+  readonly workedBetween?: { readonly from?: Date | undefined; readonly to?: Date | undefined } | undefined;
   readonly includeDeleted?: boolean | undefined;
 }
 
@@ -45,6 +53,14 @@ export interface TicketListItem {
   readonly createdAt: Date;
 }
 
+export interface TicketDailyHoursRow {
+  readonly ticketId: string;
+  /** 'YYYY-MM-DD'. */
+  readonly date: string;
+  readonly userFullName: string;
+  readonly hours: number;
+}
+
 export interface TicketRepository {
   findById(id: string, context?: TransactionContext): Promise<Ticket | null>;
   findByLegacyId(legacyId: string, context?: TransactionContext): Promise<Ticket | null>;
@@ -56,12 +72,38 @@ export interface TicketRepository {
     context?: TransactionContext,
   ): Promise<Page<TicketListItem>>;
 
+  /**
+   * Horas de todos los tickets que cumplen `filters`: con `activityBetween`,
+   * las HH aprobadas (solicitudes de HH) dentro del rango; sin él, la suma de
+   * `used_hours`.
+   */
+  sumHours(filters: TicketFilters, context?: TransactionContext): Promise<number>;
+
+  /**
+   * HH aprobadas de los tickets que cumplen `filters`, sumadas por ticket +
+   * día + persona (con `activityBetween`, solo los días del rango). Ordenadas
+   * por ticket y fecha.
+   */
+  listDailyHours(filters: TicketFilters, context?: TransactionContext): Promise<TicketDailyHoursRow[]>;
+
+  /** Proyectos (sin repetir) de los tickets que cumplen `filters` — para ubicar sus contratos de soporte. */
+  listProjectIds(filters: TicketFilters, context?: TransactionContext): Promise<string[]>;
+
   save(ticket: Ticket, context?: TransactionContext): Promise<void>;
 
   /** Ids de tickets `closed` de estos proyectos que aún no están facturados — para `MarkSupportInvoiceIssuedUseCase` (planes `on_demand`). */
   findClosedUnbilledIds(projectIds: readonly string[], context?: TransactionContext): Promise<string[]>;
+  /**
+   * Ids de tickets de estos proyectos (contenedor o cubierto) aún sin factura
+   * que tienen horas aprobadas antes de `before` — para enlazarlos a la
+   * factura de un contrato `monthly`/`bundle`. Los tickets legados sin
+   * solicitudes de HH cuentan si tienen `used_hours` y se crearon antes.
+   */
+  findUnbilledIdsWithHoursBefore(projectIds: readonly string[], before: Date, context?: TransactionContext): Promise<string[]>;
   /** Enlaza estos tickets a la factura recién emitida — evita facturar dos veces las mismas horas. Operación administrativa, no un cambio de estado del ticket: no pasa por el agregado `Ticket`. */
   linkToInvoice(ticketIds: readonly string[], invoiceId: string, context?: TransactionContext): Promise<void>;
+  /** Los tickets enlazados a una factura pasan a otra — al anular la factura que los tenía, si su período conserva otras. */
+  moveInvoiceLinks(fromInvoiceId: string, toInvoiceId: string, context?: TransactionContext): Promise<void>;
 }
 
 export const TICKET_REPOSITORY = Symbol('TicketRepository');

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   CLOCK,
   ForbiddenError,
@@ -24,10 +24,12 @@ import {
   InvalidTaskDatesError,
   ProjectAssigneeDisabledError,
   RejectionReasonRequiredError,
+  SegmentNotInModuleError,
 } from '../../domain/errors/project.errors';
 import { PROJECT_REPOSITORY, type ProjectRepository } from '../../domain/repositories/project.repository';
 import {
   PROJECT_MODULE_REPOSITORY,
+  type ProjectModuleRecord,
   type ProjectModuleRepository,
   type ProjectModuleTaskRecord,
 } from '../../domain/repositories/project-module.repository';
@@ -45,6 +47,9 @@ import { ProjectChangeLogRecorder } from '../services/project-change-log.recorde
 import { deadlineNote, formatCommittedDate } from '../services/deadline-note';
 import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import {
+  PROJECT_TASK_REVIEW_NOTIFIER, type ProjectTaskReviewNotifierPort,
+} from '../ports/project-task-review-notifier.port';
 
 export interface UpdateProjectModuleTaskCommand {
   readonly projectId: string;
@@ -85,6 +90,8 @@ export class UpdateProjectModuleTaskUseCase
     private readonly forecastSync: ForecastSourceSyncService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    @Optional() @Inject(PROJECT_TASK_REVIEW_NOTIFIER)
+    private readonly taskNotifier?: ProjectTaskReviewNotifierPort,
   ) {}
 
   async execute(command: UpdateProjectModuleTaskCommand): Promise<Result<void, ApplicationError>> {
@@ -98,6 +105,10 @@ export class UpdateProjectModuleTaskUseCase
 
     const task = module.tasks.find((t) => t.id === command.taskId);
     if (!task) return err(new ProjectModuleTaskNotFoundError(command.taskId));
+    if (task.cancelledAt) return err(new ForbiddenError(
+      'La tarea cancelada solo se conserva para auditoría y no puede editarse.',
+      'PROJECT_TASK_CANCELLED',
+    ));
 
     const canManage =
       command.actorPermissions.includes('projects:manage') || project.leaderUserId === command.actor.userId;
@@ -105,6 +116,12 @@ export class UpdateProjectModuleTaskUseCase
       const isTeamLeader =
         task.teamId != null &&
         (await this.projectTeams.isTeamLeaderForProject(project.id, task.teamId, command.actor.userId));
+      if (isTeamLeader && command.data.teamId !== undefined && command.data.teamId !== task.teamId &&
+        (!command.data.teamId || !await this.projectTeams.isTeamLeaderForProject(
+          project.id, command.data.teamId, command.actor.userId,
+        ))) {
+        return err(new ForbiddenError('No lideras el equipo de destino de esta tarea.', 'PROJECT_TEAM_NOT_LED'));
+      }
       if (!isTeamLeader) {
         if (task.assigneeUserId !== command.actor.userId) {
           return err(new ForbiddenError('No tienes acceso a esta tarea.', 'PROJECT_MODULE_TASK_NOT_ASSIGNEE'));
@@ -124,12 +141,26 @@ export class UpdateProjectModuleTaskUseCase
     const nextStart = command.data.startDate !== undefined ? new Date(command.data.startDate) : task.startDate;
     const nextDate = command.data.date !== undefined ? new Date(command.data.date) : task.date;
     if (nextStart > nextDate) return err(new InvalidTaskDatesError());
+    const targetSegmentId = command.data.segmentId !== undefined
+      ? command.data.segmentId : task.segmentId ?? null;
+    const targetTeamId = command.data.teamId !== undefined ? command.data.teamId : task.teamId;
+    const segment = targetSegmentId ? module.segments.find((item) => item.id === targetSegmentId) : undefined;
+    if (targetSegmentId && !segment) return err(new SegmentNotInModuleError());
+    if (segment && (targetTeamId !== segment.teamId ||
+      nextStart < segment.startDate || nextDate > segment.endDate)) {
+      return err(new ForbiddenError(
+        'La tarea debe respetar el equipo, módulo y las fechas del bloque vinculado.',
+        'PROJECT_TASK_INVALID_SEGMENT',
+      ));
+    }
 
     // Solo se valida si el colaborador cambia: editar una tarea vieja de alguien ya deshabilitado sigue permitido.
     const nextAssigneeUserId = command.data.assigneeUserId;
     if (nextAssigneeUserId && nextAssigneeUserId !== task.assigneeUserId) {
       const members = await this.projectTeamMembers.listForProject(project.id);
-      if (members.some((member) => member.userId === nextAssigneeUserId && member.userStatus === 'disabled')) {
+      const matching = members.find((member) => member.userId === nextAssigneeUserId &&
+        member.teamId === targetTeamId && !member.blockedAt);
+      if (!matching || matching.userStatus === 'disabled') {
         return err(new ProjectAssigneeDisabledError());
       }
     }
@@ -158,13 +189,15 @@ export class UpdateProjectModuleTaskUseCase
 
     // Se describen contra el estado previo, antes de escribir: cambio y registro van en la misma
     // transacción — si no se puede escribir la bitácora, la tarea tampoco cambia.
-    const messages = await this.describeChanges(project.id, module.name, task, command.data, rejectionReason ?? null, now);
+    const messages = await this.describeChanges(project.id, module, task, command.data, rejectionReason ?? null, now);
     await this.unitOfWork.run(async (tx) => {
       await this.modules.updateTask(
         command.taskId,
         {
+          ...(command.data.segmentId !== undefined ? { segmentId: command.data.segmentId ?? null } : {}),
           ...(command.data.teamId !== undefined ? { teamId: command.data.teamId ?? null } : {}),
           ...(command.data.assigneeUserId !== undefined ? { assigneeUserId: command.data.assigneeUserId ?? null } : {}),
+          ...(command.data.segmentId !== undefined ? { segmentId: command.data.segmentId ?? null } : {}),
           ...(command.data.name !== undefined ? { name: command.data.name } : {}),
           ...(command.data.description !== undefined ? { description: command.data.description ?? null } : {}),
           ...(command.data.startDate !== undefined ? { startDate: new Date(command.data.startDate) } : {}),
@@ -188,8 +221,13 @@ export class UpdateProjectModuleTaskUseCase
           tx,
         );
       }
-      await this.progress.recalculate(project.id, tx);
       await this.forecastSync.syncTask(project, command.moduleId, command.taskId, now, tx);
+      // Reconciliar también el bloque anterior si la tarea se movió de segmento.
+      const affected = new Set([task.segmentId, targetSegmentId].filter(
+        (id): id is string => Boolean(id),
+      ));
+      for (const id of affected) await this.modules.refreshSegmentClosure(id, now, tx);
+      await this.progress.recalculate(project.id, tx);
     });
 
     await this.audit.record({
@@ -200,20 +238,39 @@ export class UpdateProjectModuleTaskUseCase
       metadata: { event: 'module_task_updated', moduleId: command.moduleId, taskId: command.taskId },
     });
 
+    // Notificar solo transiciones reales y después del commit: nunca informar
+    // una aprobación/devolución que la transacción haya revertido.
+    const reviewKind = nextStatus !== task.status && nextStatus === 'in_review'
+      ? 'review_requested'
+      : task.status === 'in_review' && nextStatus === 'in_progress'
+        ? 'returned' : null;
+    if (reviewKind) await this.taskNotifier?.publish({
+      kind: reviewKind,
+      projectId: project.id,
+      projectLeaderUserId: project.leaderUserId,
+      moduleId: module.id,
+      taskId: task.id,
+      taskName: command.data.name ?? task.name,
+      assigneeUserId: nextAssigneeUserId ?? task.assigneeUserId,
+      assigneeName: task.assigneeName,
+      actorUserId: command.actor.userId,
+      reason: reviewKind === 'returned' ? command.data.rejectionReason?.trim() ?? null : null,
+    });
+
     return ok(undefined);
   }
 
   /** Un mensaje por cambio real — un campo enviado con el mismo valor que ya tenía no genera registro. */
   private async describeChanges(
     projectId: string,
-    moduleName: string,
+    module: ProjectModuleRecord,
     task: ProjectModuleTaskRecord,
     data: UpdateProjectModuleTaskInput,
     rejectionReason: string | null,
     now: Date,
   ): Promise<string[]> {
     const label = `Tarea "${task.name}"`;
-    const inPhase = `en fase "${moduleName}"`;
+    const inPhase = `en fase "${module.name}"`;
     const messages: string[] = [];
     const sameDay = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
 
@@ -240,6 +297,15 @@ export class UpdateProjectModuleTaskUseCase
           : task.assigneeUserId === null
             ? `${label} asignada a ${nextName} ${inPhase}.`
             : `${label} reasignada de ${task.assigneeName ?? 'otro colaborador'} a ${nextName} ${inPhase}.`,
+      );
+    }
+    if (data.segmentId !== undefined && (data.segmentId ?? null) !== task.segmentId) {
+      const segmentName = (segmentId: string | null) =>
+        segmentId === null
+          ? 'sin tiempo de ejecución'
+          : `"${module.segments.find((segment) => segment.id === segmentId)?.name ?? (segmentId === task.segmentId ? task.segmentName : null) ?? 'tramo'}"`;
+      messages.push(
+        `${label} ${inPhase}: tiempo de ejecución cambiado de ${segmentName(task.segmentId)} a ${segmentName(data.segmentId ?? null)}.`,
       );
     }
     if (data.startDate !== undefined && !sameDay(new Date(data.startDate), task.startDate)) {

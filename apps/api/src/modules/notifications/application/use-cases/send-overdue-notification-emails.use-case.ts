@@ -46,6 +46,18 @@ export class SendOverdueNotificationEmailsUseCase implements UseCase<void, SendO
 
   private send({ notification, recipientEmail, recipientFirstName }: OverdueNotification): Promise<void> {
     switch (notification.type) {
+      case 'task_review_requested':
+      case 'task_returned':
+        return this.sender.sendProjectTaskStatus({
+          recipientEmail,
+          recipientFirstName,
+          kind: notification.type === 'task_returned' ? 'returned' : 'review_requested',
+          projectName: notification.data.projectName,
+          projectSlug: notification.data.projectSlug,
+          taskName: notification.data.taskName,
+          assigneeName: notification.data.assigneeName,
+          reason: notification.data.reason,
+        });
       case 'team_report_data_request':
         return this.sender.sendTeamReportDataRequest({
           recipientEmail,

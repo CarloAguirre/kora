@@ -14,6 +14,20 @@ export function useNotifications() {
   });
 }
 
+/**
+ * Pendientes del líder (horas por aprobar, horas por registrar, datos de
+ * proyecto por completar). Se calculan en vivo en el servidor y vienen vacíos
+ * para quien no es líder; aprobar horas o editar un proyecto los invalida.
+ */
+export function useLeaderReminders() {
+  return useQuery({
+    queryKey: notificationKeys.reminders,
+    queryFn: () => notificationsApi.reminders(),
+    refetchInterval: POLL_INTERVAL_MS,
+    refetchOnWindowFocus: true,
+  });
+}
+
 /** Marca leída una (con id) o todas — actualiza la caché al tiro para que el contador baje sin esperar al servidor. */
 export function useMarkNotificationsRead() {
   const queryClient = useQueryClient();

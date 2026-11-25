@@ -1,0 +1,40 @@
+.page { display:flex; flex-direction:column; gap:14px; }
+.summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px 18px; }
+.summary div { display:grid; gap:4px; }
+.summary span, .kpis span { font-size:10px; color:#71809b; text-transform:uppercase; }
+.summary strong { font-size:13px; color:#15243d; }
+.pill { border-radius:18px; background:#e5f7e6; color:#33854c!important; padding:4px 9px; font-size:11px!important; width:fit-content; }
+.kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.kpis>div { display:flex; flex-direction:column; gap:8px; }
+.kpis strong { font-size:20px; color:#14233b; }
+.teamInfo { display:grid; grid-template-columns:185px 1fr; gap:16px; }
+.teamStats { display:flex; flex-direction:column; align-items:flex-start; gap:10px; border-right:1px solid #e3e8f2; padding-right:16px; }
+.logo { display:flex; justify-content:center; align-items:center; flex:none; width:35px; height:35px; border-radius:8px; color:#fff; font-size:10px; font-weight:700; }
+.teamStats h2 { font-size:14px; margin:0; color:#14243a; }
+.teamStats small { color:#65748e; font-size:11px; }
+.teamStats > span:not(.logo) { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#68768e; }
+.teamStats strong { font-size:13px; color:#15243d; }
+.people { min-width:0; }
+.people h3 { color:#182942; font-size:14px; margin:2px 0 20px; }
+.people p { color:#8190a2; text-align:center; padding:12px 0 22px; font-size:12px; }
+.people table { width:100%; border-collapse:collapse; font-size:12px; }
+.people th { color:#79859a; text-align:left; border-bottom:1px solid #e4e9f1; padding:8px; }
+.people td { border-bottom:1px solid #e4e9f1; padding:10px 8px; color:#16243d; }
+.progress h2 { margin:0; font-size:14px; }
+.progressHead { display:flex; align-items:center; gap:10px; }
+.actual { display:flex; gap:10px; align-items:baseline; margin:12px 0 7px; }
+.actual strong { font-size:36px; color:#15233e; }
+.actual span { font-size:12px; color:#13253e; font-weight:600; }
+.progressTrack { height:14px; background:#edf1f7; border-radius:7px; position:relative; overflow:visible; }
+.progressFill { height:100%; background:#b8ef4a; border-radius:7px; }
+.expectedMark { width:2px; height:20px; position:absolute; top:-3px; background:#18263e; }
+.progress p { margin:6px 0; font-size:11px; color:#6d7c95; }
+.explainer { border:1px solid #e0e6ee; background:#f7f9fc; border-radius:7px; width:100%; text-align:left; color:#273850; font-weight:600; padding:12px; margin-top:12px; cursor:pointer; }
+.progress .explanation { margin:10px 0; }
+.warnings { display:flex; flex-direction:column; gap:8px; }
+.warning { background:#f5efff; border:1px solid #dcccfa; padding:10px 12px; border-radius:10px; display:flex; gap:10px; align-items:center; color:#293153; }
+.warning strong { font-size:12px; font-weight:600; }
+.warning p { margin:4px 0 0; color:#76669e; font-size:11px; }
+.warning .logo { width:27px; height:27px; }
+@media(max-width:840px){ .summary{grid-template-columns:repeat(2,minmax(0,1fr));} .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media(max-width:600px){ .teamInfo{grid-template-columns:1fr;} .teamStats{border-right:0; border-bottom:1px solid #e3e8f2; padding-bottom:12px;} .summary{grid-template-columns:1fr;} }

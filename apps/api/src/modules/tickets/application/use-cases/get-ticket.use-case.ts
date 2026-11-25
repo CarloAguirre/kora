@@ -47,7 +47,10 @@ export class GetTicketUseCase implements UseCase<GetTicketCommand, TicketDetail,
       : false;
     const isAssignee = snapshot.assigneeUserId === command.actorUserId;
     const canManage = command.actorPermissions.includes('tickets:manage') || isAssignee || isApprover;
-    const canDelete = isAdminTier(command.actorRole) || (command.actorPermissions.includes('tickets:manage') && (isAssignee || isApprover));
+    /** Un ticket cerrado solo lo elimina admin/PMO (ver `DeleteTicketUseCase`). */
+    const canDelete =
+      isAdminTier(command.actorRole) ||
+      (snapshot.status !== 'closed' && command.actorPermissions.includes('tickets:manage') && (isAssignee || isApprover));
     /** Sin el atajo de `isAssignee` — ver `UpdateTicketUseCase`: el simple responsable no puede editar el ticket completo. */
     const canEditDetails = command.actorPermissions.includes('tickets:manage') || isApprover;
     /**

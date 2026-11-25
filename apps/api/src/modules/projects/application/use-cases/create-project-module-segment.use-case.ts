@@ -13,6 +13,7 @@ import {
   type ProjectModuleRepository,
 } from '../../domain/repositories/project-module.repository';
 import { ForecastSourceSyncService } from '../services/forecast-source-sync.service';
+import { ProjectProgressRecalculator } from '../services/project-progress-recalculator';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
@@ -39,6 +40,7 @@ export class CreateProjectModuleSegmentUseCase
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
+    private readonly progress: ProjectProgressRecalculator,
   ) {}
 
   async execute(
@@ -74,12 +76,25 @@ export class CreateProjectModuleSegmentUseCase
           name: command.data.name,
           startDate: new Date(command.data.startDate),
           endDate: new Date(command.data.endDate),
+          estimatedHours: command.data.estimatedHours ?? null,
         },
         now,
         tx,
       );
+      if (command.data.closingDelivery) {
+        await this.modules.addDelivery({
+          moduleId: command.moduleId,
+          segmentId,
+          teamId: command.data.teamId,
+          name: command.data.closingDelivery.name,
+          description: command.data.closingDelivery.description ?? null,
+          assigneeUserId: null,
+          estimatedDate: new Date(command.data.endDate),
+        }, now, tx);
+      }
       await this.modules.replaceSegmentMembers(segmentId, members, now, tx);
       await this.forecastSync.syncSegment(project, command.moduleId, segmentId, now, tx);
+      await this.progress.recalculate(project.id, tx);
       return segmentId;
     });
 
@@ -88,7 +103,8 @@ export class CreateProjectModuleSegmentUseCase
       action: 'update',
       entityType: 'project',
       entityId: project.id,
-      metadata: { event: 'module_segment_created', moduleId: command.moduleId, segmentId: id },
+      metadata: { event: 'module_segment_created', moduleId: command.moduleId,
+        segmentId: id, createdClosingDelivery: Boolean(command.data.closingDelivery) },
     });
 
     return ok({ id });

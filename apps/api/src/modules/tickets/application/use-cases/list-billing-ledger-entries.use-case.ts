@@ -18,7 +18,7 @@ import { PaymentMilestoneTriggerService } from '../../../projects/application/se
 import { isPaymentMilestoneOverdue } from '../../../projects/application/services/payment-milestone-overdue';
 import { progressToday } from '../../../projects/application/services/project-progress';
 import { resolveSupportPlanName } from '../services/support-plan-naming';
-import { paymentStatusOf } from '../services/support-invoice-payment-status';
+import { listPendingPeriods, paymentStatusOf } from '../services/support-invoice-payment-status';
 import { SupportPlanCurrentBillingResolver } from '../services/support-plan-current-billing.resolver';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import type { UseCase } from '../../../../shared/application/use-case';
@@ -43,7 +43,8 @@ const PROJECT_STATUS_TO_LEDGER_STATUS: Readonly<Record<ProjectPaymentStatus, Bil
  * `SupportPlanCurrentBillingResolver`, no el use-case: un use-case nunca
  * importa a otro, ver `architecture.spec.ts`) + TODO el historial real de
  * `support_invoices` (cualquier período, cualquier plan — si ya está
- * facturado, existe una fila ahí, sea del período que sea). Proyectos: todos
+ * facturado, existe una fila ahí, sea del período que sea) + una fila
+ * "pendiente" por el saldo de cada período "facturado parcial". Proyectos: todos
  * los `project_payment_milestones` de todos los proyectos — antes de leerlos, los
  * tramos por fecha cuya fecha ya llegó pasan a "Por facturar" (no hay cron, ver
  * `PaymentMilestoneTriggerService.reconcileDueDates`).
@@ -146,7 +147,56 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         .map(([id, client]) => [id, client.companyName] as const),
     );
 
-    return invoices.map((invoice) => this.toInvoiceEntry(invoice, planById, clientNameById, now));
+    const invoiceEntries = invoices.map((invoice) => this.toInvoiceEntry(invoice, planById, clientNameById, now));
+    return [...invoiceEntries, ...this.buildPartialBalanceEntries(invoices, planById, clientNameById, now)];
+  }
+
+  /** El saldo por facturar de cada período "facturado parcial" — una fila "pendiente" por período. */
+  private buildPartialBalanceEntries(
+    invoices: readonly SupportInvoiceRecord[],
+    planById: Map<string, { clientId: string; name: string | null; scope: SupportPlanScope }>,
+    clientNameById: Map<string, string>,
+    now: Date,
+  ): BillingLedgerEntry[] {
+    const byPlan = new Map<string, SupportInvoiceRecord[]>();
+    for (const invoice of invoices) {
+      const group = byPlan.get(invoice.planId);
+      if (group) group.push(invoice);
+      else byPlan.set(invoice.planId, [invoice]);
+    }
+
+    const entries: BillingLedgerEntry[] = [];
+    for (const [planId, planInvoices] of byPlan) {
+      const plan = planById.get(planId);
+      if (!plan) continue;
+      const clientName = clientNameById.get(plan.clientId) ?? '';
+      const planName = resolveSupportPlanName(plan.name, plan.scope, [], clientName);
+      for (const period of listPendingPeriods(planInvoices, now)) {
+        entries.push({
+          id: `partial-${planId}-${period.periodKey}`,
+          line: 'soporte',
+          clientId: plan.clientId,
+          clientName,
+          detail: `${planName} — saldo ${period.periodKey}`,
+          amount: period.pendingAmountUf,
+          currency: planInvoices[0]!.currency,
+          folio: null,
+          issuedAt: null,
+          status: 'pendiente',
+          paidAt: null,
+          dueAt: null,
+          referenceId: null,
+          projectId: null,
+          projectName: null,
+          milestoneName: null,
+          milestonePercent: null,
+          milestoneTriggerType: null,
+          milestoneTriggerPhase: null,
+          milestoneTriggerDate: null,
+        });
+      }
+    }
+    return entries;
   }
 
   private toInvoiceEntry(
@@ -198,6 +248,8 @@ export class ListBillingLedgerEntriesUseCase implements UseCase<void, BillingLed
         amount: milestone.amount,
         currency: milestone.currency,
         folio: milestone.invoiceNumber,
+        hasAttachment: milestone.hasAttachment ?? false,
+        hasPaymentReceipt: milestone.hasPaymentReceipt ?? false,
         issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
         status: isPaymentMilestoneOverdue(milestone, today) ? 'atrasado' : PROJECT_STATUS_TO_LEDGER_STATUS[milestone.status],
         paidAt: milestone.paidAt?.toISOString().slice(0, 10) ?? null,

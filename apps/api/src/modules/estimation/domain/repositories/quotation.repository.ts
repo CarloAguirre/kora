@@ -31,7 +31,8 @@ export interface QuotationRepository {
   createAiPocDraft(projectId: string, userId: string,
     proposal: EstimationPocProposal, answers: readonly SubmitEstimationAnswerInput[],
     dynamicQuestions: readonly EstimationQuestion[], edt: QuotationReferenceEdt,
-    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>): Promise<QuotationVersion>;
+    confirmedUnderstanding?: string, roleTeamIds?: Readonly<Record<string, string>>,
+    selectedTeamIds?: readonly string[]): Promise<QuotationVersion>;
   updateDraft(projectId: string, versionId: string, userId: string, input: UpdateQuotationDraftInput): Promise<QuotationVersion | null>;
   deleteVersion(projectId: string, versionId: string, revision: number): Promise<boolean>;
   acceptAiProposal(projectId: string, versionId: string, userId: string,

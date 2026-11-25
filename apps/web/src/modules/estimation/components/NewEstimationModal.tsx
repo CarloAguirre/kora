@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '@/modules/auth/hooks/usePermissions';
 import type {
@@ -15,11 +15,13 @@ import {
   useUpdateProjectExtras,
 } from '@/modules/projects/api/projects.queries';
 import { Button } from '@/shared/components/ui/Button';
+import { estimationApi } from '../api/estimation.api';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
 import { TextField } from '@/shared/components/ui/TextField';
 import {
   useEstimationDriveInventory,
+  useEstimationDriveOAuthPocStatus,
   useResolveEstimationDriveFolder,
 } from '../api/estimation.queries';
 import styles from './NewEstimationModal.module.css';
@@ -56,6 +58,9 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
   const [instructions, setInstructions] = useState('');
   const [driveTouched, setDriveTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [drivePocBusy, setDrivePocBusy] = useState(false);
+  const [drivePocResult, setDrivePocResult] = useState<string | null>(null);
+  const drivePocWindow = useRef<Window | null>(null);
 
   const selected = useMemo(
     () => prospects.find((project) => project.slug === projectRef || project.id === projectRef) ?? null,
@@ -81,6 +86,7 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     open && mode === 'ai' && Boolean(selected),
   );
 
+  const drivePocStatus = useEstimationDriveOAuthPocStatus(open && mode === 'ai');
   const driveUrlIsValid = isGoogleDriveFolderUrl(driveFolderUrl);
   const driveInventory = useEstimationDriveInventory(
     driveFolderUrl.trim(),
@@ -95,8 +101,31 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
       setInstructions('');
       setDriveTouched(false);
       setError(null);
+      setDrivePocBusy(false);
+      setDrivePocResult(null);
     }
   }, [open]);
+
+  // El callback OAuth abre una página en la MISMA origin y comunica SOLO
+  // resultado y conteo. Jamás viajan tokens a la interfaz de Kora.
+  useEffect(() => {
+    const onDrivePocMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin ||
+          event.source !== drivePocWindow.current) return;
+      const data: unknown = event.data;
+      if (!data || typeof data !== 'object') return;
+      const value = data as Record<string, unknown>;
+      if (value.type !== 'kora-drive-oauth-poc' ||
+          (value.status !== 'ok' && value.status !== 'error') ||
+          typeof value.message !== 'string') return;
+      setDrivePocBusy(false);
+      setDrivePocResult(value.status === 'ok'
+        ? `Lectura real confirmada: ${value.message} Archivos en primera página: ${value.filesInSample ?? 0}.`
+        : `No se completó la prueba: ${value.message} (${value.code ?? 'sin código'}).`);
+    };
+    window.addEventListener('message', onDrivePocMessage);
+    return () => window.removeEventListener('message', onDrivePocMessage);
+  }, []);
 
   useEffect(() => {
     if (!selected) {
@@ -206,6 +235,35 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
     onClose();
   };
 
+  /** Diagnóstico aislado: no cambia el lector de Drive de la cotización. */
+  const startDriveOAuthPoc = async () => {
+    if (!selected || !driveUrlIsValid || drivePocBusy) return;
+    setDrivePocResult(null);
+    // Abrir de forma síncrona desde el clic para no activar el bloqueo de popups.
+    const popup = window.open('about:blank', 'kora-drive-oauth-poc',
+      'width=580,height=730,scrollbars=yes');
+    if (!popup) {
+      setDrivePocResult('El navegador bloqueó la ventana de Google. Permite ventanas emergentes para Kora.');
+      return;
+    }
+    drivePocWindow.current = popup;
+    setDrivePocBusy(true);
+    try {
+      const { authorizationUrl } = await estimationApi.startDriveOAuthPoc({
+        projectId: selected.id, driveFolderUrl: driveFolderUrl.trim(),
+      });
+      const googleUrl = new URL(authorizationUrl);
+      if (googleUrl.origin !== 'https://accounts.google.com') {
+        throw new Error('La API devolvió un proveedor OAuth inesperado.');
+      }
+      popup.location.replace(googleUrl.href);
+    } catch (cause) {
+      popup.close();
+      setDrivePocBusy(false);
+      setDrivePocResult(cause instanceof Error ? cause.message : 'No se pudo iniciar la prueba Drive.');
+    }
+  };
+
   const selectCandidate = (url: string) => {
     setDriveTouched(true);
     setDriveFolderUrl(url);
@@ -312,6 +370,35 @@ export function NewEstimationModal({ open, prospects, onClose }: NewEstimationMo
             loading={driveInventory.isLoading || driveInventory.isFetching}
             inventory={driveInventory.data}
           />
+
+          {drivePocStatus.data?.enabled && <div className={styles.drivePocPanel}>
+            <div>
+              <strong>Diagnóstico de conexión Google Drive (PoC)</strong>
+              <p>Google solicitará permiso de lectura sobre los archivos de tu Drive.
+                Esta prueba consulta únicamente la carpeta indicada. La API conserva
+                el token temporalmente en memoria para permitir análisis durante la cotización,
+                sin guardarlo en base de datos ni alterar tu sesión de Kora.</p>
+            </div>
+            <div className={styles.drivePocButtons}>
+              <Button variant="outline" size="sm"
+                disabled={!selected || !driveUrlIsValid || drivePocBusy}
+                loading={drivePocBusy}
+                onClick={() => void startDriveOAuthPoc()}>
+                Probar acceso con Google
+              </Button>
+              {drivePocBusy && <Button variant="ghost" size="sm"
+                onClick={() => {
+                  // No depender de Window.closed: Google aplica COOP en algunos navegadores.
+                  try { drivePocWindow.current?.close(); } catch { /* Puede estar aislado. */ }
+                  drivePocWindow.current = null;
+                  setDrivePocBusy(false);
+                  setDrivePocResult('Prueba cancelada. Puedes intentarla nuevamente.');
+                }}>
+                Cancelar prueba
+              </Button>}
+            </div>
+            {drivePocResult && <p className={styles.drivePocResult} role="status">{drivePocResult}</p>}
+          </div>}
 
           <label className={styles.instructions}>
             <span>Indicaciones para el agente (opcional)</span>

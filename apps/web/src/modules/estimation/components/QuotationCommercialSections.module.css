@@ -1,39 +1,40 @@
 /* Kora v5: tarjetas comerciales compactas, tablas editables sin layout administrativo. */
 .surface{display:grid;gap:12px;min-width:0}
 .head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.head h2{margin:0;font-size:15px;font-weight:750;color:#111a2f}
-.head p{margin:0;color:#7b8496;font-size:11.5px}
+.head h2{margin:0;font-size:15px;font-weight:750;color:var(--kora-text)}
+.head p{margin:0;color:var(--kora-text-muted);font-size:11.5px}
 .scroll{max-width:100%;overflow-x:auto}
 .table{border-collapse:collapse;width:100%;min-width:570px;table-layout:fixed}
-.table th{padding:9px 8px;color:#7b8496;background:#f9fafc;font-size:11px;text-align:left;font-weight:500;border-bottom:1px solid #e4e8ee}
-.table td{padding:7px 8px;border-bottom:1px solid #e6e8ef;font-size:12px;color:#111a2f;vertical-align:middle}
+.table th{padding:9px 8px;color:var(--kora-text-muted);background:var(--kora-surface-alt);font-size:11px;text-align:left;font-weight:500;border-bottom:1px solid var(--kora-border-subtle)}
+.table td{padding:7px 8px;border-bottom:1px solid var(--kora-border-subtle);font-size:12px;color:var(--kora-text);vertical-align:middle}
 .table tr:last-child td{border-bottom:0}
-.table th:nth-child(1){width:60%}
+.table th:nth-child(1){width:58%}
 .table th:nth-child(2){width:17%}
 .table th:nth-child(3){width:19%}
-.table th:nth-child(4){width:4%}
-.table input,.table select{min-width:0;width:100%;height:37px;border:1px solid #e0e4ed;border-radius:8px;background:#fff;color:#17233a;padding:7px 10px;font-family:inherit;font-size:12.5px}
-.table select{cursor:pointer}
-.table input:disabled,.table select:disabled{background:#f5f6f9;color:#7b8496}
-.table input:focus-visible,.table select:focus-visible,.notes:focus-visible{outline:2px solid #ede9fe;border-color:#5b21b6}
-.table .right{text-align:right;font-variant-numeric:tabular-nums}
-.remove{all:unset;cursor:pointer;color:#8c98a7;font-size:18px;padding:3px}
-.remove:hover{color:#b42318}
-.add{cursor:pointer;justify-self:start;border:1px solid #e1e5ed;background:#fff;color:#17233a;font-size:12px;font-weight:650;border-radius:9px;padding:7px 12px}
-.add:hover{background:#f8fafc}
-.empty{color:#7b8496!important;padding:16px!important;text-align:center}
+.table th:nth-child(4){width:6%}
+/* TextField y Select administran el foco, disabled y la superficie.
+   La grilla solo ajusta la densidad; no reconstruye controles compartidos. */
+.field{width:100%;min-width:0}
+.field>div{height:var(--kora-control-height-sm);min-width:0}
+.field input,.field select{font-size:var(--kora-text-xs)}
+.numericField input{text-align:right;font-variant-numeric:tabular-nums}
+.remove{color:var(--kora-danger);font-size:20px}
+.add{justify-self:start}
+.empty{color:var(--kora-text-muted)!important;padding:16px!important;text-align:center}
 .payment{min-width:680px}
 .payment th:nth-child(1){width:26%}.payment th:nth-child(2){width:10%}.payment th:nth-child(3){width:23%}
-.payment th:nth-child(4){width:22%}.payment th:nth-child(5){width:16%}.payment th:nth-child(6){width:3%}
+.payment th:nth-child(4){width:21%}.payment th:nth-child(5){width:16%}.payment th:nth-child(6){width:4%}
 .payment .amount{text-align:right;white-space:nowrap;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
-.dash{color:#98a2b3;display:block;padding:9px}
-.notice,.ok{margin:0;font-size:11.5px;line-height:1.45;color:#8f5c1d}
-.ok{color:#2f8657}
-.notes{resize:vertical;width:100%;min-height:78px;border:1px solid #e1e5ed;border-radius:9px;padding:10px 12px;font:inherit;font-size:13px;line-height:1.55;color:#132039;background:#fff}
-.notes:disabled{color:#758092;background:#f7f8fb}
-.details>summary{cursor:pointer;font-size:12px;color:#5b21b6;text-decoration:underline;text-underline-offset:2px;font-weight:650;width:fit-content}
+.dash{color:var(--kora-text-disabled);display:block;padding:9px}
+.notice,.ok{margin:0;font-size:11.5px;line-height:1.45;color:var(--kora-warning-text)}
+.ok{color:var(--kora-success-text)}
+/* Kora aún no tiene Textarea compartido: se mantiene nativo y tokenizado. */
+.notes{resize:vertical;width:100%;min-height:78px;border:1px solid var(--kora-blue-200);border-radius:var(--kora-radius-input);padding:10px 12px;font:inherit;font-size:13px;line-height:1.55;color:var(--kora-text);background:var(--kora-surface)}
+.notes:focus-visible{outline:2px solid var(--kora-blue-600);outline-offset:1px}
+.notes:disabled{color:var(--kora-text-disabled);background:var(--kora-surface-disabled)}
+.details>summary{cursor:pointer;font-size:12px;color:var(--kora-blue-link);text-decoration:underline;text-underline-offset:2px;font-weight:650;width:fit-content}
 .details[open]{display:grid;gap:10px}
-.answers{display:grid;gap:10px;border:1px solid #e3e7f0;background:#fafbfe;padding:12px;border-radius:9px}
+.answers{display:grid;gap:10px;border:1px solid var(--kora-border-subtle);background:var(--kora-surface-alt);padding:12px;border-radius:var(--kora-radius)}
 .answers>div{display:grid;grid-template-columns:minmax(130px,1fr) 1.4fr;gap:10px;font-size:12px}
-.answers dt{color:#667085}.answers dd{margin:0;color:#142035;font-weight:650}
+.answers dt{color:var(--kora-text-muted)}.answers dd{margin:0;color:var(--kora-text);font-weight:650}
 @media(max-width:580px){.answers>div{grid-template-columns:1fr;gap:4px}}

@@ -1,4 +1,4 @@
-import type { ProjectStatus, TeamReportProject, TeamReportResponse } from '@kora/contracts';
+import { teamReportMissingFields, type ProjectStatus, type TeamReportProject, type TeamReportResponse } from '@kora/contracts';
 
 /**
  * Cálculos del "Reporte de equipo" (`/equipos`, consola del líder). Portado del prototipo
@@ -113,6 +113,11 @@ export function buildReportRows(report: TeamReportResponse, includePending: bool
     accumulated = round2(accumulated);
     const total = round2([...hoursByUser.values()].reduce((sum, value) => sum + value, 0));
     const assigned = project.assignedHours ?? 0;
+    // Las HH por aprobar cuentan aunque la tabla no muestre las pendientes: mismo criterio que "Pedir datos".
+    const missing = teamReportMissingFields(
+      project,
+      project.hours.some((entry) => entry.accumulatedApproved + entry.accumulatedPending > 0),
+    );
     return {
       project,
       hoursByUser,
@@ -122,8 +127,8 @@ export function buildReportRows(report: TeamReportResponse, includePending: bool
       assigned,
       balance: round2(assigned - accumulated),
       participation: participationState(project, accumulated),
-      missingAssigned: assigned === 0 && accumulated > 0,
-      missingDates: !project.startDate || !project.endDate,
+      missingAssigned: missing.includes('assigned_hours'),
+      missingDates: missing.includes('dates'),
     };
   });
 }

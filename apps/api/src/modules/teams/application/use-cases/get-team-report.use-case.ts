@@ -1,10 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { err, ForbiddenError, ok, type ApplicationError, type Result } from '@kora/core';
+import { CLOCK, err, ForbiddenError, ok, type ApplicationError, type Clock, type Result } from '@kora/core';
 import type { Permission, TeamReportMemberHours, TeamReportResponse } from '@kora/contracts';
 import { TeamNotFoundError } from '../../domain/errors/team.errors';
 import { TEAM_REPOSITORY, type TeamRepository } from '../../domain/repositories/team.repository';
 import { TEAM_REPORT_READER, type TeamReportReader } from '../ports/team-report-reader.port';
 import type { ActorContext, UseCase } from '../../../../shared/application/use-case';
+
+/** Ventana móvil de actividad para el listado, independiente del período usado para calcular HH. */
+const RECENT_ACTIVITY_DAYS = 10;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface GetTeamReportCommand {
   readonly teamId: string;
@@ -24,6 +28,7 @@ export class GetTeamReportUseCase implements UseCase<GetTeamReportCommand, TeamR
   constructor(
     @Inject(TEAM_REPOSITORY) private readonly teams: TeamRepository,
     @Inject(TEAM_REPORT_READER) private readonly reports: TeamReportReader,
+    @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
   async execute(command: GetTeamReportCommand): Promise<Result<TeamReportResponse, ApplicationError>> {
@@ -39,7 +44,19 @@ export class GetTeamReportUseCase implements UseCase<GetTeamReportCommand, TeamR
       this.reports.listPeople(team.id, team.leaderUserId),
       this.reports.listProjects(team.id),
     ]);
-    const projectIds = projects.map((project) => project.projectId);
+    // El vínculo histórico en project_teams no implica participación vigente.
+    // Primero seleccionar proyectos donde alguien del equipo CARGÓ horas dentro
+    // de los últimos 10 días, independientemente de la fecha trabajada o de los
+    // controles de período del reporte.
+    const now = this.clock.now();
+    const recentlyActiveIds = await this.reports.findProjectsWithRecentHourEntries(
+      projects.map((project) => project.projectId),
+      members.map((member) => member.id),
+      new Date(now.getTime() - RECENT_ACTIVITY_DAYS * DAY_MS),
+      now,
+    );
+    const activeProjects = projects.filter((project) => recentlyActiveIds.has(project.projectId));
+    const projectIds = activeProjects.map((project) => project.projectId);
     const [hours, tasks, approvedDeliveries] = await Promise.all([
       this.reports.sumHours(
         projectIds,
@@ -65,7 +82,7 @@ export class GetTeamReportUseCase implements UseCase<GetTeamReportCommand, TeamR
       dateFrom,
       dateTo,
       members: [...members],
-      projects: projects.map((project) => ({
+      projects: activeProjects.map((project) => ({
         ...project,
         hours: hoursByProject.get(project.projectId) ?? [],
         teamTasks: {

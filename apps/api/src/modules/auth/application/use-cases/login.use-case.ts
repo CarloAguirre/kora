@@ -3,6 +3,7 @@ import { CLOCK, err, ok, type ApplicationError, type Clock, type Result } from '
 import { AUTH_ERROR_CODES, type LoginInput } from '@kora/contracts';
 import { UnauthorizedError, ForbiddenError } from '@kora/core';
 import { Email } from '../../../users/domain/value-objects/email.vo';
+import { ClientPortalLoginAccessService } from '../../infrastructure/client-portal-login-access.service';
 import {
   USER_REPOSITORY,
   type UserRepository,
@@ -60,6 +61,7 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
     @Inject(CLOCK) private readonly clock: Clock,
     private readonly sessionIssuer: SessionIssuerService,
     private readonly config: AppConfigService,
+    private readonly portalLoginAccess: ClientPortalLoginAccessService,
   ) {}
 
   async execute(command: LoginCommand): Promise<Result<LoginOutcome, ApplicationError>> {
@@ -70,7 +72,16 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
     if (emailResult.isErr()) return err(invalidCredentials());
     const email = emailResult.value;
 
-    if (!email.belongsToAnyDomain(settings.allowedEmailDomains)) {
+    // El dominio corporativo sigue siendo la regla general.
+    // Excepción estricta: usuario cliente cuyo contacto está habilitado
+    // por un administrador en el portal externo (nunca por dominio abierto).
+    const user = await this.users.findByEmail(email);
+    const isClientAccount = !!user && !user.isDeleted && user.role === 'cliente';
+    // Para cuentas internas se conserva el control de dominio.
+    // Para el rol cliente, NO revelar si existe el vínculo externo antes
+    // de comprobar la contraseña: permitir validación de credenciales y,
+    // solo después, informar la falta de concesión al portal.
+    if (!isClientAccount && !email.belongsToAnyDomain(settings.allowedEmailDomains)) {
       return err(
         new ForbiddenError(
           'Este correo no pertenece a un dominio autorizado.',
@@ -78,8 +89,6 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
         ),
       );
     }
-
-    const user = await this.users.findByEmail(email);
     if (!user || user.isDeleted) {
       await this.recordFailure(command, null, email.value, 'unknown_user');
       return err(invalidCredentials());
@@ -135,6 +144,16 @@ export class LoginUseCase implements UseCase<LoginCommand, LoginOutcome, Applica
           ? 'Tu cuenta está bloqueada. Contacta a un administrador.'
           : 'Tu cuenta está deshabilitada. Contacta a un administrador.';
       return err(new ForbiddenError(message, code));
+    }
+
+    if (isClientAccount && !await this.portalLoginAccess.isEnabled(user.id, email.value)) {
+      await this.recordFailure(command, user.id, email.value, 'client_portal_not_enabled');
+      return err(
+        new ForbiddenError(
+          'Tu cuenta de cliente aún no tiene acceso al portal. Solicita que te vinculen como contacto desde la ficha de tu empresa y habiliten tus proyectos o contratos.',
+          AUTH_ERROR_CODES.CLIENT_PORTAL_NOT_ENABLED,
+        ),
+      );
     }
 
     if (verification.needsRehash) {

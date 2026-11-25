@@ -27,10 +27,17 @@ const minVisibleBar = (value: number | undefined | null) => ((value ?? 0) > 0 ? 
  * `LiderProyectoFicha` (v1): gráfico de barras (Asignadas + Desviadas apiladas,
  * Utilizadas aparte) por equipo, con totalizadores y % de avance a la derecha.
  */
-export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSummary[] }) {
+export function TeamHoursSummaryChart({
+  teams,
+  unassignedHours = 0,
+}: {
+  teams: readonly TeamHoursSummary[];
+  /** HH aprobadas de personas que no son miembros de ningún equipo del proyecto — van en su propia barra "Sin equipo". */
+  unassignedHours?: number;
+}) {
   const chartData = useMemo(
-    () =>
-      teams.map((team) => ({
+    () => [
+      ...teams.map((team) => ({
         equipo: team.teamName,
         asignadas: team.assignedHours,
         // Total real usado — para el tooltip. La barra apilada usa `utilizadasDentro`
@@ -39,17 +46,22 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
         utilizadasDentro: Math.min(team.assignedHours, team.consumedHours),
         desviadas: Math.max(0, team.consumedHours - team.assignedHours),
       })),
-    [teams],
+      // Sin presupuesto propio: no se marca como desviado, solo se muestra lo usado.
+      ...(unassignedHours > 0
+        ? [{ equipo: 'Sin equipo', asignadas: 0, utilizadas: unassignedHours, utilizadasDentro: unassignedHours, desviadas: 0 }]
+        : []),
+    ],
+    [teams, unassignedHours],
   );
 
   const totals = useMemo(() => {
     const totalAsignadas = teams.reduce((acc, t) => acc + t.assignedHours, 0);
-    const totalUtilizadas = teams.reduce((acc, t) => acc + t.consumedHours, 0);
+    const totalUtilizadas = teams.reduce((acc, t) => acc + t.consumedHours, 0) + unassignedHours;
     const totalDesviadas = teams.reduce((acc, t) => acc + Math.max(0, t.consumedHours - t.assignedHours), 0);
     const totalRestantes = Math.max(0, totalAsignadas - totalUtilizadas);
     const avancePct = totalAsignadas > 0 ? Math.round((totalUtilizadas / totalAsignadas) * 100) : 0;
     return { totalAsignadas, totalUtilizadas, totalDesviadas, totalRestantes, avancePct };
-  }, [teams]);
+  }, [teams, unassignedHours]);
 
   return (
     <Card>
@@ -60,7 +72,7 @@ export function TeamHoursSummaryChart({ teams }: { teams: readonly TeamHoursSumm
 
       <div className={styles.body}>
         <div className={styles.chartArea}>
-          {teams.length === 0 ? (
+          {chartData.length === 0 ? (
             <div className={styles.empty}>
               <FolderOpenIcon size={28} />
               <span>Los datos estarán disponibles cuando el proyecto tenga equipos asignados.</span>

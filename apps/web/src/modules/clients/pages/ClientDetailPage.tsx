@@ -14,6 +14,7 @@ import { TextField } from '@/shared/components/ui/TextField';
 import { PencilIcon, PlusIcon, ChevronLeftIcon, SearchIcon, EyeIcon } from '@/shared/components/icons/Icons';
 import { ClientStatusBadge } from '../components/ClientStatusBadge';
 import { ClientFormDialog } from '../components/ClientFormDialog';
+import { ClientPortalAccessManager } from '../components/ClientPortalAccessManager';
 import type { SupportPlanListItem } from '@kora/contracts';
 import { useClientDetail } from '../api/clients.queries';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
@@ -283,6 +284,11 @@ export function ClientDetailPage() {
           </div>
         </Card>
 
+        {can('clients:manage') && can('users:create') && (
+          <ClientPortalAccessManager client={client} projects={allProjects}
+            supportPlans={supportPlans ?? []} />
+        )}
+
         <Card>
           <p className={styles.sectionTitle}>Proyectos ({projects?.total ?? 0})</p>
 
@@ -358,9 +364,10 @@ export function ClientDetailPage() {
         clientId={client.id}
         onClose={() => setEditing(false)}
         onSuccess={(message) => {
+          // Se queda en la ficha: la mutación invalida el detalle y la página
+          // se refresca con lo guardado.
           toast.success(message);
           setEditing(false);
-          void navigate('/clientes');
         }}
       />
     </DashboardLayout>

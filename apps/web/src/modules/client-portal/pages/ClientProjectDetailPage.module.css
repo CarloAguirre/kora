@@ -79,19 +79,61 @@
   height: 38px;
   border-radius: 19px;
   border: none;
-  background: #0f2a44;
+  /* La atenuación del estado apagado va en el fondo (no en `opacity` del botón)
+     para que el tooltip ::after no herede la transparencia. */
+  background: color-mix(in srgb, #0f2a44 45%, transparent);
   color: var(--kora-surface);
-  opacity: 0.45;
   cursor: pointer;
-  transition: opacity var(--kora-transition);
+  transition: background var(--kora-transition);
+  position: relative;
 }
 
 .sectionToggle:hover {
-  opacity: 0.7;
+  background: color-mix(in srgb, #0f2a44 70%, transparent);
 }
 
-.sectionToggleOn {
+.sectionToggleOn,
+.sectionToggleOn:hover {
+  background: #0f2a44;
+}
+
+.sectionToggle[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  padding: 6px 10px;
+  border-radius: var(--kora-radius-sm, 6px);
+  background: #0f2a44;
+  color: var(--kora-surface);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 10;
+}
+
+.sectionToggle[data-tooltip]:hover::after,
+.sectionToggle[data-tooltip]:focus-visible::after {
   opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* El último botón queda pegado al borde derecho: alinear el tooltip a la
+   derecha para que no se corte. */
+.sectionToggle[data-tooltip]:last-child::after {
+  left: auto;
+  right: 0;
+  transform: translateY(4px);
+}
+
+.sectionToggle[data-tooltip]:last-child:hover::after,
+.sectionToggle[data-tooltip]:last-child:focus-visible::after {
+  transform: translateY(0);
 }
 
 /* Franja de datos del proyecto — una sola fila (Figma node 9203:3138), no una
@@ -228,12 +270,6 @@
   font-size: 11px;
   font-weight: var(--kora-weight-medium);
   color: #93a0ac;
-}
-
-.roadmapList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kora-space-3);
 }
 
 .hoursGrid {

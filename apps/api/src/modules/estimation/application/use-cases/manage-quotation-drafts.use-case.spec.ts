@@ -30,6 +30,30 @@ describe('ManageQuotationDraftsUseCase', () => {
       .rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('restringe el GET comercial al perfil de calculadora y al proyecto autorizado', async () => {
+    const { useCase, repository } = setup();
+    const outsider = { id: manager.id, permissions: ['projects:read_assigned'] as const };
+    const ordinaryViewer = { id: manager.id, permissions: ['projects:read'] as const };
+
+    await expect(useCase.get(project.id, ordinaryViewer))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(useCase.get(project.id, outsider))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.getByProjectId).not.toHaveBeenCalled();
+
+    await expect(useCase.get(project.id, leader)).resolves.toBeNull();
+    await expect(useCase.get(project.id, manager)).resolves.toBeNull();
+    expect(repository.getByProjectId).toHaveBeenCalledTimes(2);
+  });
+
+  it('el resumen comercial completo no se entrega por dossier a un usuario ajeno', async () => {
+    const { useCase, repository } = setup();
+    await expect(useCase.getCommercialDossier(project.id, 'version', {
+      id: manager.id, permissions: ['projects:read_assigned'],
+    })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(repository.getByProjectId).not.toHaveBeenCalled();
+  });
+
   it('permite crear borradores en prospectos o cotizados activos, sin mutar Proyectos', async () => {
     for (const salesStage of ['prospect', 'quoted'] as const) {
       const { useCase, repository } = setup({ ...project, salesStage, status: 'active' });
@@ -56,6 +80,20 @@ describe('ManageQuotationDraftsUseCase', () => {
       const { useCase } = setup(deniedProject);
       await expect(useCase.create(project.id, manager, {})).rejects.toThrow();
     }
+  });
+
+  it('después del traspaso no crea versiones y conserva el historial de lectura', async () => {
+    const { useCase, repository } = setup({ ...project, salesStage: 'approved', status: 'active' });
+    vi.mocked(repository.getByProjectId).mockResolvedValue({
+      id: '0777e456-fd76-445e-83f1-afc25061c106',
+      projectId: project.id, versions: [],
+      transferredVersionId: '0777e456-fd76-445e-83f1-afc25061c105',
+    });
+    await expect(useCase.create(project.id, manager, {})).rejects.toBeInstanceOf(ConflictException);
+    expect(repository.createDraft).not.toHaveBeenCalled();
+    await expect(useCase.get(project.id, manager)).resolves.toMatchObject({
+      transferredVersionId: '0777e456-fd76-445e-83f1-afc25061c105',
+    });
   });
 
   it('permite consultar historial comercial aunque el proyecto esté aprobado', async () => {

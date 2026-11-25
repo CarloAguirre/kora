@@ -9,6 +9,7 @@ import type {
   CreateProjectModuleInput,
   CreateProjectModuleSegmentInput,
   CreateProjectModuleTaskInput,
+  ExcludeRoadmapReferenceInput,
   CreateProjectPaymentMilestoneInput,
   IssueProjectPaymentMilestoneInvoiceInput,
   ListProjectsQuery,
@@ -28,6 +29,23 @@ import type {
 } from '@kora/contracts';
 import { projectKeys, projectsApi } from './projects.api';
 
+/** Recursos del colaborador con clave separada del detalle interno. */
+export function useMyProjects(query: { page: number; pageSize: number; search?: string }) {
+  return useQuery({
+    queryKey: ['projects', 'mine', query],
+    queryFn: () => projectsApi.mine(query),
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
+  });
+}
+export function useMyProjectDetail(projectId: string | null) {
+  return useQuery({
+    queryKey: ['projects', 'mine', 'detail', projectId],
+    queryFn: () => projectsApi.myDetail(projectId as string),
+    enabled: Boolean(projectId),
+  });
+}
+
 export function useProjectsList(query: Partial<ListProjectsQuery>, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: projectKeys.list(query),
@@ -46,13 +64,28 @@ export function useProjectDetail(projectId: string | null) {
   });
 }
 
+/** Fases y tiempos de ejecución — no exige ver la ficha, solo registrar horas en el proyecto. */
+export function useProjectPhases(projectId: string | null) {
+  return useQuery({
+    queryKey: projectKeys.phases(projectId ?? ''),
+    queryFn: () => projectsApi.phases(projectId as string),
+    enabled: Boolean(projectId),
+  });
+}
+
 function useInvalidateProjects() {
   const queryClient = useQueryClient();
   return () => {
-    queryClient.invalidateQueries({ queryKey: projectKeys.all });
+    // Devolver la promesa permite que una mutación de inicio espere el GET del
+    // detalle activo: ese GET materializa los bloques de la cotización en API.
+    const projectRefresh = queryClient.invalidateQueries({ queryKey: projectKeys.all });
     // El Dashboard resume proyectos/soporte: sin esto quedaba desactualizado
     // hasta que el usuario recargaba la página a mano.
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    // Una tarea completada o devuelta también puede generar avisos de
+    // revisión. Actualizar tanto la campanita persistida como recordatorios.
+    void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    return projectRefresh;
   };
 }
 
@@ -63,9 +96,11 @@ function useInvalidateProjects() {
 function useInvalidateProjectsAndForecast() {
   const queryClient = useQueryClient();
   const invalidateProjects = useInvalidateProjects();
-  return () => {
-    invalidateProjects();
-    queryClient.invalidateQueries({ queryKey: ['forecast'] });
+  return async () => {
+    // No resolver mutateAsync hasta que el proyecto activo tenga sus nuevos
+    // bloques. De lo contrario "Agregar tarea" podía abrir con modules stale.
+    await invalidateProjects();
+    void queryClient.invalidateQueries({ queryKey: ['forecast'] });
   };
 }
 
@@ -100,7 +135,10 @@ export function useChangeProjectStatus() {
   return useMutation({
     mutationFn: ({ projectId, input }: { projectId: string; input: ChangeProjectStatusInput }) =>
       projectsApi.changeStatus(projectId, input),
-    onSuccess: () => invalidate(),
+    // React Query espera esta promesa antes de resolver mutateAsync. Al activar
+    // un proyecto, la lectura refetch materializa y devuelve el calendario
+    // antes de cerrar EditProjectDialog, sin recargar la página.
+    onSuccess: async () => { await invalidate(); },
   });
 }
 
@@ -339,6 +377,35 @@ export function useDeleteProjectModuleSegment() {
   });
 }
 
+/** Referencias EDT excluidas solo del Roadmap operativo (no de la cotización). */
+export function useRoadmapReferenceExclusions(projectId: string) {
+  return useQuery({
+    queryKey: [...projectKeys.detail(projectId), 'roadmap-reference-exclusions'],
+    queryFn: () => projectsApi.listRoadmapReferenceExclusions(projectId),
+    enabled: Boolean(projectId),
+  });
+}
+
+export function useExcludeRoadmapReference() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, moduleId, input }: {
+      projectId: string; moduleId: string; input: ExcludeRoadmapReferenceInput;
+    }) => projectsApi.excludeRoadmapReference(projectId, moduleId, input),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRestoreRoadmapReference() {
+  const invalidate = useInvalidateProjects();
+  return useMutation({
+    mutationFn: ({ projectId, moduleId, input }: {
+      projectId: string; moduleId: string; input: ExcludeRoadmapReferenceInput;
+    }) => projectsApi.restoreRoadmapReference(projectId, moduleId, input),
+    onSuccess: invalidate,
+  });
+}
+
 export function useCreateProjectModuleTask() {
   const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
@@ -376,8 +443,8 @@ export function useUpdateProjectModuleTask() {
 export function useDeleteProjectModuleTask() {
   const invalidate = useInvalidateProjectsAndForecast();
   return useMutation({
-    mutationFn: ({ projectId, moduleId, taskId }: { projectId: string; moduleId: string; taskId: string }) =>
-      projectsApi.deleteModuleTask(projectId, moduleId, taskId),
+    mutationFn: ({ projectId, moduleId, taskId, cancel }: { projectId: string; moduleId: string; taskId: string; cancel?: boolean }) =>
+      projectsApi.deleteModuleTask(projectId, moduleId, taskId, cancel),
     onSuccess: () => invalidate(),
   });
 }
@@ -434,6 +501,7 @@ export function useIssueProjectPaymentMilestoneInvoice() {
 
 export function useMarkProjectPaymentMilestonePaid() {
   const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
       projectId,
@@ -442,9 +510,38 @@ export function useMarkProjectPaymentMilestonePaid() {
     }: {
       projectId: string;
       milestoneId: string;
-      input: MarkProjectPaymentMilestonePaidInput;
+      input: MarkProjectPaymentMilestonePaidInput & { file?: File };
     }) => projectsApi.markPaymentMilestonePaid(projectId, milestoneId, input),
-    onSuccess: () => invalidate(),
+    onSuccess: () => {
+      invalidate();
+      return queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
+  });
+}
+
+export function useUploadProjectInvoiceAttachment() {
+  const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, milestoneId, file }: { projectId: string; milestoneId: string; file: File }) =>
+      projectsApi.uploadInvoiceAttachment(projectId, milestoneId, file),
+    onSuccess: () => {
+      invalidate();
+      return queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
+  });
+}
+
+export function useUploadProjectPaymentReceipt() {
+  const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ projectId, milestoneId, file }: { projectId: string; milestoneId: string; file: File }) =>
+      projectsApi.uploadPaymentReceipt(projectId, milestoneId, file),
+    onSuccess: () => {
+      invalidate();
+      return queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
   });
 }
 

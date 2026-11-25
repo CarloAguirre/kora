@@ -51,7 +51,7 @@ export interface CreateSupportPlanCommand {
  * fuera de todo lo que lista proyectos de soporte (Proyectos → Soporte,
  * dashboard, ficha de cliente, selector de proyecto del ticket). Los tickets
  * se abren contra el contenedor y el proyecto cubierto va en "Proyecto de
- * desarrollo"; el consumo suma ambos (ver `resolveSupportPlanHourProjectIds`).
+ * desarrollo"; el consumo cuenta solo el contenedor (ver `resolveSupportPlanHourProjectIds`).
  */
 @Injectable()
 export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanCommand, { id: string }, ApplicationError> {
@@ -101,6 +101,9 @@ export class CreateSupportPlanUseCase implements UseCase<CreateSupportPlanComman
       leaderUserId: data.leaderUserId,
       startDate,
       estimatedDeliveryDate: endDate,
+      // Las horas contratadas al crear el contrato son las HH vendidas del proyecto (lo que muestran
+      // listado, gráfico y dashboard); `supportHours` se mantiene sincronizado con el plan.
+      soldHours: data.contractedHours,
       supportHours: data.contractedHours,
       quotationLink: data.quotationLink,
       contractLink: data.contractLink,

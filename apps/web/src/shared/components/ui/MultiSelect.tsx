@@ -140,6 +140,7 @@ export function MultiSelect({
             <SearchIcon size={14} className={styles.searchIcon} />
             <input
               type="search"
+              spellCheck={false}
               className={styles.searchInput}
               placeholder={searchPlaceholder ?? `Buscar ${label.toLocaleLowerCase('es-CL')}`}
               value={search}

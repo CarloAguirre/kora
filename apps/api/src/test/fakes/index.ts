@@ -13,7 +13,9 @@ import type {
   MissingHoursReminderNotification,
   PendingHoursDigestNotification,
   ProjectReactivatedFromHoldNotification,
+  SupportBillingDigestNotification,
   TeamReportDataRequestEmail,
+  ProjectTaskStatusEmail,
   UserInvitation,
 } from '../../shared/application/ports/notification.port';
 import type { OpaqueTokenGenerator } from '../../shared/application/ports/token.port';
@@ -156,6 +158,7 @@ export class RecordingNotificationSender implements NotificationSender {
 
   readonly missingHoursReminders: MissingHoursReminderNotification[] = [];
   readonly pendingHoursDigests: PendingHoursDigestNotification[] = [];
+  readonly supportBillingDigests: SupportBillingDigestNotification[] = [];
   readonly teamReportDataRequests: TeamReportDataRequestEmail[] = [];
   /** Correos cuyo envío falla aunque `shouldFail` sea false — para probar fallos parciales en lote. */
   readonly failFor = new Set<string>();
@@ -170,9 +173,19 @@ export class RecordingNotificationSender implements NotificationSender {
     this.pendingHoursDigests.push(notification);
   }
 
+  async sendSupportBillingDigest(notification: SupportBillingDigestNotification): Promise<void> {
+    if (this.shouldFail || this.failFor.has(notification.recipientEmail)) throw new Error('proveedor de correo caído');
+    this.supportBillingDigests.push(notification);
+  }
+
   async sendTeamReportDataRequest(notification: TeamReportDataRequestEmail): Promise<void> {
     if (this.shouldFail || this.failFor.has(notification.recipientEmail)) throw new Error('proveedor de correo caído');
     this.teamReportDataRequests.push(notification);
+  }
+  readonly projectTaskStatusEmails: ProjectTaskStatusEmail[] = [];
+  async sendProjectTaskStatus(notification: ProjectTaskStatusEmail): Promise<void> {
+    if (this.shouldFail || this.failFor.has(notification.recipientEmail)) throw new Error('proveedor de correo caído');
+    this.projectTaskStatusEmails.push(notification);
   }
 }
 

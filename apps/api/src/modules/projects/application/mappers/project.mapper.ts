@@ -49,8 +49,10 @@ export function toProjectSummary(item: ProjectListItem, progress: ProjectProgres
     endDate: item.endDate?.toISOString().slice(0, 10) ?? null,
     progress,
     supportPlanDescription: item.supportPlanDescription,
+    supportPlanType: item.supportPlanType,
     supportHours: item.supportHours,
     allowsOvertime: item.allowsOvertime,
+    isInternal: item.isInternal,
     createdAt: item.createdAt.toISOString(),
   };
 }
@@ -72,6 +74,10 @@ export interface ProjectDetailSource {
   readonly leaderLastActivityAt: Date | null;
   /** Horas aprobadas con fecha anterior al día del Hito 0 — ver `GetProjectUseCase`. */
   readonly prospectPhaseHours: number;
+  /** HH capturadas antes del primer traspaso, aunque el proyecto ya estuviera activo. */
+  readonly phaseZeroHours: number;
+  readonly phaseZeroEntries: ProjectDetail['phaseZeroEntries'];
+  readonly phaseZeroEntriesTruncated: boolean;
   readonly actorUserId: string;
   /** Líder de este proyecto, PMO o admin: puede editar cualquier entrada de bitácora y resolver pendientes. */
   readonly canManagePendings: boolean;
@@ -79,6 +85,14 @@ export interface ProjectDetailSource {
   readonly ledTeamIds: ReadonlySet<string>;
   readonly canAuthorizeOvertime: boolean;
   readonly now: Date;
+}
+
+/** Permiso de liderazgo de equipo alineado con el COALESCE del repositorio. */
+export function isProjectTeamLeader(
+  actorUserId: string,
+  team: Pick<ProjectTeamRecord, 'effectiveLeaderUserId'>,
+): boolean {
+  return team.effectiveLeaderUserId !== null && team.effectiveLeaderUserId === actorUserId;
 }
 
 export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
@@ -95,6 +109,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     activity: member.activity,
     assignedHours: member.assignedHours,
     consumedHours: member.consumedHours,
+    blockedAt: member.blockedAt?.toISOString() ?? null,
   }));
 
   const teams: ProjectTeamDto[] = source.teams.map((team) => ({
@@ -103,9 +118,11 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     teamSlug: team.teamSlug,
     teamName: team.teamName,
     leader: team.leaderUserId ? { id: team.leaderUserId, fullName: team.leaderName ?? '' } : null,
+    isTeamLeader: isProjectTeamLeader(source.actorUserId, team),
     assignedHours: team.assignedHours,
     memberCount: team.memberCount,
     maxMembers: team.maxMembers,
+    leaderConsumedHours: team.leaderConsumedHours,
   }));
 
   const observations: ProjectObservationDto[] = source.observations.map((observation) => ({
@@ -140,7 +157,16 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       usedHours: Number(snapshot.usedHours),
       status: snapshot.status,
       stopsClock: snapshot.stopsClock,
-      modules: source.modules,
+      modules: source.modules.map((module) => ({
+        ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+        // Global y fases: mismo denominador operacional de los bloques que
+        // utiliza la ficha interna del proyecto y Avance del equipo.
+        segments: module.segments.map((block) => ({
+          id: block.id, teamId: block.teamId,
+          estimatedHours: block.estimatedHours,
+          startDate: block.startDate, endDate: block.endDate, closedAt: block.closedAt,
+        })),
+      })),
     },
     today,
   );
@@ -161,18 +187,27 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       description: delivery.description,
       assigneeUserId: delivery.assigneeUserId,
       assigneeName: delivery.assigneeName,
+      segmentId: delivery.segmentId,
+      segmentName: delivery.segmentName,
       estimatedDate: delivery.estimatedDate.toISOString().slice(0, 10),
       status: delivery.status,
       rejectionReason: delivery.rejectionReason,
+      createdAt: delivery.createdAt.toISOString(),
+      completedOn: delivery.completedOn?.toISOString().slice(0, 10) ?? null,
+      completedByName: delivery.completedByName ?? null,
+      completionComment: delivery.completionComment ?? null,
       canManage: source.canManagePendings || (delivery.teamId !== null && source.ledTeamIds.has(delivery.teamId)),
     })),
     segments: module.segments.map((segment) => ({
       id: segment.id,
+      closedAt: segment.closedAt?.toISOString() ?? null,
       teamId: segment.teamId,
       teamName: segment.teamName,
       name: segment.name,
       startDate: segment.startDate.toISOString().slice(0, 10),
       endDate: segment.endDate.toISOString().slice(0, 10),
+      estimatedHours: segment.estimatedHours,
+      consumedHours: segment.consumedHours ?? 0,
       members: segment.members.map((member) => ({
         teamMemberId: member.teamMemberId,
         fullName: member.fullName,
@@ -185,18 +220,30 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       teamName: task.teamName,
       assigneeUserId: task.assigneeUserId,
       assigneeName: task.assigneeName,
+      segmentId: task.segmentId,
+      segmentName: task.segmentName,
       name: task.name,
       description: task.description,
       startDate: task.startDate.toISOString().slice(0, 10),
       date: task.date.toISOString().slice(0, 10),
       estimatedHours: task.estimatedHours,
+      actualHours: task.actualHours ?? null,
+      pendingHours: task.pendingHours ?? null,
       status: task.status,
       scope: task.scope,
       completedAt: task.completedAt?.toISOString() ?? null,
+      cancelledAt: task.cancelledAt?.toISOString() ?? null,
       rejectionReason: task.rejectionReason,
     })),
     blockerCount: module.blockerCount,
-    progress: calculateModuleProgress(module, today),
+    progress: calculateModuleProgress({
+      ...module, tasks: module.tasks.filter((task) => !task.cancelledAt),
+      segments: module.segments.map((block) => ({
+        id: block.id, teamId: block.teamId,
+        estimatedHours: block.estimatedHours,
+        startDate: block.startDate, endDate: block.endDate, closedAt: block.closedAt,
+      })),
+    }, today),
   }));
 
   const paymentMilestones: ProjectPaymentMilestoneDto[] = source.paymentMilestones.map((milestone) => ({
@@ -205,6 +252,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     percent: milestone.percent,
     amount: milestone.amount,
     invoiceNumber: milestone.invoiceNumber,
+    hasAttachment: milestone.hasAttachment ?? false,
+    hasPaymentReceipt: milestone.hasPaymentReceipt ?? false,
     issuedAt: milestone.issuedAt?.toISOString().slice(0, 10) ?? null,
     dueAt: milestone.dueAt?.toISOString().slice(0, 10) ?? null,
     status: milestone.status,
@@ -237,8 +286,8 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
       : null,
     soldHours: Number(snapshot.soldHours),
     usedHours: Number(snapshot.usedHours),
-    assignedMemberCount: members.length,
-    plannedHours: members.reduce((sum, member) => sum + member.assignedHours, 0),
+    assignedMemberCount: members.filter((member) => !member.blockedAt).length,
+    plannedHours: members.filter((member) => !member.blockedAt).reduce((sum, member) => sum + member.assignedHours, 0),
     startDate: snapshot.startDate?.toISOString().slice(0, 10) ?? null,
     endDate: snapshot.endDate?.toISOString().slice(0, 10) ?? null,
     estimatedDeliveryDate: snapshot.estimatedDeliveryDate?.toISOString().slice(0, 10) ?? null,
@@ -247,6 +296,7 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     supportHours: Number(snapshot.supportHours),
     overtimeRateUf: Number(snapshot.overtimeRateUf),
     allowsOvertime: snapshot.allowsOvertime,
+    isInternal: snapshot.isInternal,
     canAuthorizeOvertime: source.canAuthorizeOvertime,
     quotationLink: snapshot.quotationLink,
     contractLink: snapshot.contractLink,
@@ -278,6 +328,9 @@ export function toProjectDetail(source: ProjectDetailSource): ProjectDetail {
     usedHoursUpdatedAt: source.usedHoursUpdatedAt?.toISOString().slice(0, 10) ?? null,
     leaderLastActivityAt: source.leaderLastActivityAt?.toISOString() ?? null,
     prospectPhaseHours: source.prospectPhaseHours,
+    phaseZeroHours: source.phaseZeroHours,
+    phaseZeroEntries: source.phaseZeroEntries,
+    phaseZeroEntriesTruncated: source.phaseZeroEntriesTruncated,
     contractAmount: snapshot.contractAmount,
     contractCurrency: snapshot.contractCurrency,
     pendingManagementApproval: source.project.pendingManagementApproval,

@@ -12,6 +12,7 @@ import {
 import { LastAdministratorError, UserNotFoundError } from '../../domain/errors/user.errors';
 import { USER_REPOSITORY, type UserRepository } from '../../domain/repositories/user.repository';
 import { SESSION_REVOKER, type SessionRevoker } from '../ports/session-revoker.port';
+import { CLIENT_PORTAL_PROVISIONER, type ClientPortalProvisioner } from '../ports/client-portal-provisioner.port';
 import {
   AUDIT_RECORDER,
   type AuditRecorder,
@@ -43,6 +44,7 @@ export class DeleteUserUseCase implements UseCase<DeleteUserCommand, void, Appli
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CLIENT_PORTAL_PROVISIONER) private readonly portal: ClientPortalProvisioner,
   ) {}
 
   async execute(command: DeleteUserCommand): Promise<Result<void, ApplicationError>> {
@@ -62,6 +64,9 @@ export class DeleteUserUseCase implements UseCase<DeleteUserCommand, void, Appli
 
     await this.unitOfWork.run(async (tx) => {
       await this.users.save(user, actor.userId, tx);
+      // Evita vínculos/grants huérfanos al eliminar una cuenta cliente y
+      // preserva las referencias históricas al usuario y los contactos.
+      await this.portal.detachUser(user.id, tx);
       await this.sessions.revokeAllForUser(user.id, 'admin_revoked', now, tx);
     });
 
