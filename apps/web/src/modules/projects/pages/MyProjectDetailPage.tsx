@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   PROJECT_PHASE_LABELS, PROJECT_STATUS_LABELS,
-  type CollaboratorProjectDetail,
+  type CollaboratorProjectDetail, type ProjectModule, type ProjectModuleTask,
 } from '@kora/contracts';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Card } from '@/shared/components/ui/Card';
@@ -18,6 +18,7 @@ import { calculateOperationalBlockProgress, roadmapBlockMetrics } from '../lib/t
 import { calculateScheduleElapsedPercent } from '../lib/project-progress-display';
 import { SegmentDrawer } from '../components/SegmentDrawer';
 import { ProjectPhaseTasksTable } from '../components/ProjectPhaseTasksTable';
+import { TaskReadOnlyModal } from '../components/TaskReadOnlyModal';
 import { ProjectRoadmapTaskDetail } from '../components/ProjectRoadmapTaskDetail';
 import { phaseHeaderMeta } from '../lib/phase-header-meta';
 import roadmapStyles from '../components/ProjectModulesCard.module.css';
@@ -49,6 +50,7 @@ export function MyProjectDetailPage() {
   const navigate = useNavigate();
   const { data: project, error, isLoading } = useMyProjectDetail(projectId ?? null);
   const [tab, setTab] = useState<'roadmap' | 'bitacora'>('roadmap');
+  const [viewingTask, setViewingTask] = useState<{ module: ProjectModule; task: ProjectModuleTask } | null>(null);
   const roadmap = useMemo(() => project ? toPhaseRoadmap(project) : null, [project]);
   const blockProgressById = useMemo(() => {
     const blocks = new Map<string, ReturnType<typeof calculateOperationalBlockProgress>>();
@@ -138,7 +140,8 @@ export function MyProjectDetailPage() {
                   renderPhaseReferences={(phase) => {
                     const module = project.modules.find((item) => item.id === phase.id);
                     return module ? (
-                      <ProjectPhaseTasksTable module={module} canManage={false} readOnly />
+                      <ProjectPhaseTasksTable module={module} canManage={false} readOnly
+                        onViewTask={(task) => setViewingTask({ module, task })} />
                     ) : null;
                   }}
                   renderSelectionDetail={(phase, selection, clearSelection) => {
@@ -162,6 +165,8 @@ export function MyProjectDetailPage() {
           </> : <MyProjectBitacora project={project} />}
         </div>
       </div>
+      {viewingTask && <TaskReadOnlyModal module={viewingTask.module}
+        task={viewingTask.task} onClose={() => setViewingTask(null)} />}
     </div>
   </DashboardLayout>;
 }
