@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
 import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
-import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
+import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, projectInvoiceAttachments, projectPaymentReceipts, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
   assertQuotationPhaseCapacity,
@@ -1038,10 +1038,29 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         hasOnlyUntouchedDefaultPaymentMilestones(existingPayments) &&
         ((existingHours.length === 0 && Number(project.usedHours) === 0) ||
           hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours)));
-      const replaceDefaultPayments = hasOnlyUntouchedDefaultPaymentMilestones(existingPayments);
+      // Sin Roadmap ni facturación, HH vendidas, HH por equipo, monto e hitos
+      // son estimados de Prospecto/Cotización: la cotización los reemplaza.
+      // Un hito con datos o archivos de factura/pago cuenta como facturado
+      // aunque su estado no lo diga (borrarlo eliminaría esos archivos en cascada).
+      const paymentIds = existingPayments.map((row) => row.id);
+      const [withInvoiceFiles, withReceipts] = paymentIds.length ? await Promise.all([
+        tx.select({ id: projectInvoiceAttachments.milestoneId }).from(projectInvoiceAttachments)
+          .where(inArray(projectInvoiceAttachments.milestoneId, paymentIds)),
+        tx.select({ id: projectPaymentReceipts.milestoneId }).from(projectPaymentReceipts)
+          .where(inArray(projectPaymentReceipts.milestoneId, paymentIds)),
+      ]) : [[], []];
+      const documented = new Set([...withInvoiceFiles, ...withReceipts].map((row) => row.id));
+      const replacesEstimatedSoldHours = soldHoursAreCommercialEstimate({
+        moduleCount: existingModules.length,
+        paymentStatuses: existingPayments.map((row) =>
+          row.invoiceNumber !== null || row.issuedAt !== null || row.paidAt !== null ||
+            documented.has(row.id) ? 'invoiced' : row.status),
+      });
+      const replaceDefaultPayments = replacesEstimatedSoldHours ||
+        hasOnlyUntouchedDefaultPaymentMilestones(existingPayments);
       // Los hitos antiguos nunca se destruyen salvo los dos placeholders
       // totalmente vacíos. Un contrato anterior en otra moneda no se puede sumar.
-      if (project.contractAmount !== null &&
+      if (!replacesEstimatedSoldHours && project.contractAmount !== null &&
           project.contractCurrency !== version.currency) {
         throw new ConflictException(
           'El contrato previo está en otra moneda. Hay que conciliar los montos ' +
@@ -1080,11 +1099,6 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       // Presupuestos de equipo previos (con o sin fases) se conservan.
       // Cada nueva cotización aporta únicamente sus propias HH y fases;
       // las HH consumidas siguen en projects.used_hours sin modificaciones.
-      // Sin Roadmap ni contrato, project.sold_hours son las «HH estimadas» de
-      // Prospecto/Cotización: la cotización aprobada las reemplaza, no se suman.
-      const replacesEstimatedSoldHours = soldHoursAreCommercialEstimate({
-        moduleCount: existingModules.length, contractAmount: project.contractAmount,
-      });
       const previousSoldHours = replacesEstimatedSoldHours ? 0 : Number(project.soldHours);
       let transferPlan: ReturnType<typeof planCommercialPreparationTransfer>;
       try {
@@ -1208,7 +1222,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (version.currency !== 'UF' && version.currency !== 'CLP' && version.currency !== 'USD') {
         throw new BadRequestException('Moneda de la cotización incompatible con el contrato del proyecto.');
       }
-      const contractAmount = Number(project.contractAmount ?? 0) + targetTotal;
+      const contractAmount = replacesEstimatedSoldHours
+        ? targetTotal : Number(project.contractAmount ?? 0) + targetTotal;
       if (!Number.isFinite(contractAmount) || contractAmount > 999999999999.99) {
         throw new ConflictException('El monto acumulado excede el rango contractual permitido.');
       }

@@ -121,7 +121,9 @@ export function QuotationTransferDialog({
   // Mismo criterio que el backend: sin Roadmap ni contrato, las HH vendidas
   // actuales son las «HH estimadas» de Prospecto/Cotización y se reemplazan.
   const replacesEstimate = soldHoursAreCommercialEstimate({
-    moduleCount: project.modules?.length ?? 0, contractAmount: project.contractAmount ?? null,
+    moduleCount: project.modules?.length ?? 0,
+    paymentStatuses: (project.paymentMilestones ?? []).map((row) =>
+      row.invoiceNumber || row.issuedAt || row.paidAt ? 'invoiced' : row.status),
   });
   const currentSoldHours = project.soldHours ?? 0;
   const previousSoldHours = replacesEstimate ? 0 : currentSoldHours;
@@ -202,7 +204,10 @@ export function QuotationTransferDialog({
       : 'Valor neto nuevo: ' + formatted(version.netAmount) + ' ' + version.currency },
     { key: 'plan', source: 'Plan de pago',
       target: 'Tramos: ' + version.draft.paymentPlan.map((item) =>
-        item.name + ' ' + formatted(item.percent) + '%').join(' · ') },
+        item.name + ' ' + formatted(item.percent) + '%').join(' · ') +
+        (replacesEstimate && (project.contractAmount != null ||
+          (project.paymentMilestones ?? []).length > 0)
+          ? ' · reemplaza el monto de contrato y los tramos estimados' : '') },
     { key: 'version', source: 'Versión aprobada',
       target: 'Documentación → Cotización: v' + version.versionNumber },
     { key: 'commercial', source: 'Valor HH, impuesto, licencias',
