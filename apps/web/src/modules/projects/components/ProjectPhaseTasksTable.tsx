@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import {
   type AppliedQuotationPlanning, type ProjectModule, type ProjectModuleTask, type ProjectTeam,
 } from '@kora/contracts';
-import { PencilIcon, CopyIcon, TrashIcon } from '@/shared/components/icons/Icons';
+import { PencilIcon, CopyIcon, TrashIcon, EyeIcon } from '@/shared/components/icons/Icons';
 import { Button } from '@/shared/components/ui/Button';
 import { DataTable, type Column } from '@/shared/components/ui/DataTable';
 import { roleFromTeamName } from '@/modules/client-portal/adapters/project-detail.adapter';
@@ -26,6 +26,8 @@ interface ProjectPhaseTasksTableProps {
   referenceDeletePending?: boolean;
   onReviewTask?: (task: ProjectModuleTask) => ReactNode;
   onEditTask?: (task: ProjectModuleTask) => void;
+  /** Consulta de tareas sin permisos de edición (vista del colaborador). */
+  onViewTask?: (task: ProjectModuleTask) => void;
   onDuplicateTask?: (task: ProjectModuleTask) => void;
   onDeleteTask?: (task: ProjectModuleTask) => void;
   onEditReference?: (task: ReferenceTask) => void;
@@ -45,7 +47,7 @@ const teamColor = (name: string | null) => ({
 export function ProjectPhaseTasksTable({
   module, teams = [], teamOptions = [], commercial, quotationVersionId,
   references = [], canManage, readOnly = false, referenceDeletePending = false,
-  onReviewTask, onEditTask, onDuplicateTask, onDeleteTask,
+  onReviewTask, onEditTask, onViewTask, onDuplicateTask, onDeleteTask,
   onEditReference, onDeleteReference, onAddTask,
 }: ProjectPhaseTasksTableProps) {
   const showActions = canManage && !readOnly;
@@ -127,6 +129,18 @@ export function ProjectPhaseTasksTable({
   });
   columns.push({ key: 'due', header: 'Fecha límite',
     render: (row) => row.kind === 'task' ? formatDate(row.task.date) : '—' });
+
+  if (readOnly && onViewTask) columns.push({
+    key: 'view', header: 'Detalle', align: 'right', width: '76px',
+    render: (row) => row.kind === 'task' ? (
+      <Button variant="ghost" size="icon"
+        aria-label={'Ver detalle de tarea ' + row.task.name}
+        title="Ver detalle de tarea"
+        onClick={() => onViewTask(row.task)}>
+        <EyeIcon size={16} />
+      </Button>
+    ) : null,
+  });
 
   if (showActions) columns.push({
     key: 'actions', header: 'Acciones', align: 'right', width: '132px',
