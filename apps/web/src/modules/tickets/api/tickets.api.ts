@@ -4,6 +4,7 @@ import type {
   ListTicketLinkableProjectsQuery,
   ListTicketsQuery,
   ListTicketsResponse,
+  TicketContractConsumptionResponse,
   TicketDailyHours,
   TicketDetail,
   TicketLinkableClient,
@@ -22,6 +23,8 @@ function filterParams(query: Partial<ListTicketsQuery>) {
     status: query.status,
     priority: query.priority,
     month: query.month,
+    workedFrom: query.workedFrom,
+    workedTo: query.workedTo,
   };
 }
 
@@ -38,6 +41,10 @@ export const ticketsApi = {
   /** HH aprobadas por ticket + día + persona de TODOS los tickets del filtro (sin paginar) — para el Excel del historial. */
   dailyHours(query: Partial<ListTicketsQuery>): Promise<TicketDailyHours[]> {
     return api.get<TicketDailyHours[]>('/tickets/daily-hours', filterParams(query));
+  },
+  /** Total de los contratos de soporte del filtro y sus horas sin ticket — para que el Excel cuadre con la ficha del contrato. */
+  contractConsumption(query: Partial<ListTicketsQuery>): Promise<TicketContractConsumptionResponse> {
+    return api.get<TicketContractConsumptionResponse>('/tickets/contract-consumption', filterParams(query));
   },
   detail(ticketId: string): Promise<TicketDetail> {
     return api.get<TicketDetail>(`/tickets/${ticketId}`);

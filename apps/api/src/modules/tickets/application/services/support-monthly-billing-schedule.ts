@@ -2,7 +2,7 @@ import type { SupportMonthlyBillingPeriod } from '@kora/contracts';
 import type { SupportMonthlyPeriodRecord, SupportPlanRecord } from '../../domain/repositories/support-plan.repository';
 import type { SupportInvoiceRecord } from '../../domain/repositories/support-invoice.repository';
 import { invoicesOfMonthlyPeriod, monthlyPeriodCharge, unbilledMonthlyOverageHours } from './support-billing-calculator';
-import { sumInvoiceAmounts, toInvoiceRefs } from './support-invoice-payment-status';
+import { periodBillingOf, toInvoiceRefs } from './support-invoice-payment-status';
 
 /** Tope de meses futuros proyectados — un contrato sin fecha de término solo proyecta el próximo. */
 const MAX_PROJECTED_PERIODS = 120;
@@ -37,6 +37,7 @@ export function buildMonthlyBillingSchedule(
   const schedule = chain.map((period): SupportMonthlyBillingPeriod => {
     const periodKey = periodKeyOf(period.startDate);
     const periodInvoices = invoicesOfMonthlyPeriod(invoices, period);
+    const billing = periodBillingOf(periodInvoices);
     const hasStarted = period.startDate.getTime() <= today.getTime();
     return {
       monthlyPeriodId: period.id,
@@ -44,12 +45,12 @@ export function buildMonthlyBillingSchedule(
       startDate: toIsoDate(period.startDate),
       endDate: toIsoDate(period.endDate),
       isCurrent: period.status === 'active' && hasStarted && today.getTime() < period.endDate.getTime(),
-      status: periodInvoices.length > 0 ? 'invoiced' : hasStarted ? 'to_invoice' : 'upcoming',
+      status: billing ? billing.status : hasStarted ? 'to_invoice' : 'upcoming',
       // Mismo monto que cobraría `SupportBillingCalculator`: cuota + excedente aún no facturado.
-      amountUf:
-        periodInvoices.length > 0
-          ? sumInvoiceAmounts(periodInvoices)
-          : round2(period.contractedHours * plan.planValueUf + unbilledMonthlyOverageHours(plan, chain, invoices, period) * plan.extraHourValueUf),
+      amountUf: billing
+        ? billing.totalAmountUf
+        : round2(period.contractedHours * plan.planValueUf + unbilledMonthlyOverageHours(plan, chain, invoices, period) * plan.extraHourValueUf),
+      pendingAmountUf: billing?.pendingAmountUf ?? 0,
       invoices: toInvoiceRefs(periodInvoices, now),
     };
   });
@@ -64,17 +65,18 @@ export function buildMonthlyBillingSchedule(
     const endDate = addMonthsUtc(nextStart, 1);
     const periodKey = periodKeyOf(nextStart);
     const periodInvoices = invoices.filter((item) => item.periodKey === periodKey);
+    const billing = periodBillingOf(periodInvoices);
     schedule.push({
       monthlyPeriodId: null,
       periodKey,
       startDate: toIsoDate(nextStart),
       endDate: toIsoDate(endDate),
       isCurrent: false,
-      status: periodInvoices.length > 0 ? 'invoiced' : 'upcoming',
-      amountUf:
-        periodInvoices.length > 0
-          ? sumInvoiceAmounts(periodInvoices)
-          : monthlyPeriodCharge(plan, { contractedHours: plan.contractedHours, reusedBalanceHours: 0, consumedHoursPeriod: 0 }).amountUf,
+      status: billing ? billing.status : 'upcoming',
+      amountUf: billing
+        ? billing.totalAmountUf
+        : monthlyPeriodCharge(plan, { contractedHours: plan.contractedHours, reusedBalanceHours: 0, consumedHoursPeriod: 0 }).amountUf,
+      pendingAmountUf: billing?.pendingAmountUf ?? 0,
       invoices: toInvoiceRefs(periodInvoices, now),
     });
     nextStart = endDate;

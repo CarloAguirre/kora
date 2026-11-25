@@ -22,9 +22,9 @@ Pensado para integraciones y reportes externos (BI, IA, planillas): trae todo de
 |---|---|
 | **Método** | `GET` |
 | **Ruta** | `/api/export/kora` |
-| **URL local (API directa)** | `http://localhost:3000/api/export/kora` |
-| **URL local (vía front/Vite)** | `http://localhost:5173/api/export/kora` |
-| **Autenticación** | ⚠️ **Ninguna por ahora** (ver [Seguridad](#seguridad)) |
+| **URL producción** | `https://kora.kabeli.cl/api/export/kora` |
+| **URL local** | `http://localhost:3000/api/export/kora` |
+| **Autenticación** | API key en el header `X-Api-Key` (ver [Seguridad](#seguridad)) |
 | **Respuesta** | `200 OK` · `application/json` |
 | **Solo lectura** | Sí, no modifica nada |
 
@@ -49,16 +49,19 @@ GET /api/export/kora?updatesLimit=0
 ## Ejemplo de uso
 
 ```bash
-curl --location 'http://localhost:3000/api/export/kora?updatesLimit=5'
+curl --location 'https://kora.kabeli.cl/api/export/kora?updatesLimit=5' \
+  --header 'X-Api-Key: TU_API_KEY'
 ```
 
 Guardar a archivo:
 
 ```bash
-curl -s 'http://localhost:3000/api/export/kora?updatesLimit=5' -o kora-export.json
+curl -s 'https://kora.kabeli.cl/api/export/kora?updatesLimit=5' \
+  -H 'X-Api-Key: TU_API_KEY' \
+  -o kora-export.json
 ```
 
-En Postman: **Import → Raw text** y pegar el primer `curl`.
+En Postman: **Import → Raw text** y pegar el primer `curl`, o agregar a mano el header `X-Api-Key`.
 
 ---
 
@@ -297,6 +300,9 @@ Proyectos que no cuelgan de ningún cliente: sin cliente asignado, o cuyo client
 | Código HTTP | `code` | Cuándo |
 |---|---|---|
 | `400` | `VALIDATION_ERROR` | `updatesLimit` no es entero o está fuera de `0–50` (detalle en `details.issues.updatesLimit`) |
+| `401` | `EXPORT_MISSING_API_KEY` | No se envió el header `X-Api-Key` |
+| `401` | `EXPORT_INVALID_API_KEY` | La API key no coincide |
+| `403` | `EXPORT_DISABLED` | El servidor no tiene `EXPORT_API_KEY` configurada (endpoint cerrado) |
 | `500` | error interno | Falla de base de datos u otra excepción |
 
 Formato de error (igual que el resto de la API):
@@ -314,12 +320,18 @@ Formato de error (igual que el resto de la API):
 
 ## Seguridad
 
-> ⚠️ **Temporal:** el endpoint está marcado como `@Public()` y **no exige token**. Cualquiera que alcance la API puede leer datos de todos los clientes.
+El endpoint no usa sesión de usuario: se protege con una **API key fija** enviada en el header `X-Api-Key`, pensada para integraciones máquina a máquina.
 
-Antes de desplegarlo a producción hay que volver a protegerlo con una de estas opciones:
+- La clave se configura en el servidor con la variable `EXPORT_API_KEY` (mínimo 32 caracteres) en `apps/api/.env`.
+- Si la variable no está configurada, el endpoint queda **cerrado** (`403 EXPORT_DISABLED`), nunca abierto.
+- La comparación es de tiempo constante (hash SHA-256 + `timingSafeEqual`).
+- **Rotar la clave:** generar una nueva, reemplazar `EXPORT_API_KEY` en el servidor, reiniciar la API y avisar a los consumidores. La anterior deja de funcionar en el acto.
 
-1. **Sesión de admin/PMO:** quitar `@Public()` y restaurar `@RequirePermissions('clients:read', 'projects:read')`. Se llama con `Authorization: Bearer <accessToken>` obtenido de `POST /api/auth/login`.
-2. **API key** para integraciones máquina a máquina (pendiente de implementar).
+```bash
+node -e "console.log('kora_exp_' + require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+> La API key da acceso a datos de todos los clientes: no se comparte fuera del equipo ni se sube al repositorio.
 
 ---
 
@@ -337,6 +349,7 @@ Antes de desplegarlo a producción hay que volver a protegerlo con una de estas 
 |---|---|
 | Contrato (tipos y validación) | [`packages/contracts/src/export/kora-export.contract.ts`](../packages/contracts/src/export/kora-export.contract.ts) |
 | Controlador | [`apps/api/src/modules/export/presentation/export.controller.ts`](../apps/api/src/modules/export/presentation/export.controller.ts) |
+| Guard de API key | [`apps/api/src/modules/export/presentation/export-api-key.guard.ts`](../apps/api/src/modules/export/presentation/export-api-key.guard.ts) |
 | Caso de uso (arma el árbol) | [`apps/api/src/modules/export/application/use-cases/get-kora-export.use-case.ts`](../apps/api/src/modules/export/application/use-cases/get-kora-export.use-case.ts) |
 | Puerto | [`apps/api/src/modules/export/application/ports/kora-export-reader.port.ts`](../apps/api/src/modules/export/application/ports/kora-export-reader.port.ts) |
 | Lector Drizzle (consultas) | [`apps/api/src/modules/export/infrastructure/drizzle-kora-export.reader.ts`](../apps/api/src/modules/export/infrastructure/drizzle-kora-export.reader.ts) |

@@ -2,6 +2,7 @@ import type {
   CloseSupportPlanInput,
   CreateProjectInput,
   CreateSupportPlanInput,
+  CloseSupportInvoicePeriodInput,
   MarkSupportInvoiceIssuedInput,
   MarkSupportInvoicePaidInput,
   SupportPlanListItem,
@@ -69,6 +70,9 @@ export const supportPlanApi = {
     return api.patch<void>(`/support-invoices/${invoiceId}/paid`, input);
   },
   /** "Anular factura" — solo pendientes de pago; el período vuelve a quedar por facturar. */
+  closeInvoicePeriod(planId: string, input: CloseSupportInvoicePeriodInput): Promise<void> {
+    return api.post<void>(`/support-plans/${planId}/invoices/close-period`, input);
+  },
   voidInvoice(invoiceId: string): Promise<void> {
     return api.delete<void>(`/support-invoices/${invoiceId}`);
   },

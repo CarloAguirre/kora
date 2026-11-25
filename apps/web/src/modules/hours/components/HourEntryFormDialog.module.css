@@ -141,6 +141,44 @@
   font-size: var(--kora-text-xs);
 }
 
+/* Registro colapsado al que le falta algo: que no quede oculto el motivo del botón deshabilitado. */
+.blockIncomplete {
+  flex-shrink: 0;
+  padding: 2px var(--kora-space-2);
+  border-radius: var(--kora-radius-pill);
+  background: #fff8e1;
+  color: #8b6914;
+  font-size: var(--kora-text-xs);
+}
+
+/* Por qué el botón de guardar está deshabilitado (ver `SubmitBlockers`). */
+.submitBlockers {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+  padding: var(--kora-space-2) var(--kora-space-3);
+  border-radius: var(--kora-radius-sm);
+  background: #fff8e1;
+  color: #8b6914;
+  font-size: var(--kora-text-xs);
+}
+
+.submitBlockersList {
+  margin: var(--kora-space-1) 0 0;
+  padding-left: var(--kora-space-4);
+}
+
+.submitBlockersLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--kora-weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .dailyTotal {
   align-self: flex-end;
   font-size: var(--kora-text-sm);

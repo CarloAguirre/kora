@@ -74,6 +74,7 @@ export class ListSupportPlansForClientUseCase
       currency: record.currency,
       currentBillingStatus: current.billingStatus,
       currentAmountUf: current.amountUf,
+      currentPendingAmountUf: current.pendingAmountUf,
       alerts,
     };
   }

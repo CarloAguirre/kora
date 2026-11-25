@@ -12,13 +12,13 @@ class FakeCalculator implements Pick<SupportBillingCalculator, 'calculate'> {
 }
 
 class FakeSupportInvoiceRepository implements Pick<SupportInvoiceRepository, 'listByPlanAndPeriod'> {
-  constructor(private readonly invoices: Pick<SupportInvoiceRecord, 'planId' | 'periodKey' | 'amountUf'>[]) {}
+  constructor(private readonly invoices: (Pick<SupportInvoiceRecord, 'planId' | 'periodKey' | 'amountUf'> & { targetAmountUf?: number | null })[]) {}
   async listByPlanAndPeriod(planId: string, periodKey: string): Promise<SupportInvoiceRecord[]> {
     return this.invoices.filter((invoice) => invoice.planId === planId && invoice.periodKey === periodKey) as SupportInvoiceRecord[];
   }
 }
 
-function buildResolver(calculation: SupportBillingCalculation | null, invoices: Pick<SupportInvoiceRecord, 'planId' | 'periodKey' | 'amountUf'>[] = []) {
+function buildResolver(calculation: SupportBillingCalculation | null, invoices: (Pick<SupportInvoiceRecord, 'planId' | 'periodKey' | 'amountUf'> & { targetAmountUf?: number | null })[] = []) {
   return new SupportPlanCurrentBillingResolver(
     new FakeSupportInvoiceRepository(invoices) as unknown as SupportInvoiceRepository,
     new FakeCalculator(calculation) as unknown as SupportBillingCalculator,
@@ -32,7 +32,7 @@ describe('SupportPlanCurrentBillingResolver', () => {
   it('queda por facturar con el monto calculado en vivo cuando aún no hay factura del período', async () => {
     const resolver = buildResolver({ amountUf: 15, hoursBilled: 12.5, periodKey: '2026-09', monthlyPeriodId: null });
 
-    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'to_invoice', amountUf: 15 });
+    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'to_invoice', amountUf: 15, pendingAmountUf: 0 });
   });
 
   it('muestra el monto CONGELADO de la factura del período, no el recalculado', async () => {
@@ -40,7 +40,7 @@ describe('SupportPlanCurrentBillingResolver', () => {
       { planId: 'plan-1', periodKey: '2026-09', amountUf: 9.6 },
     ]);
 
-    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'invoiced', amountUf: 9.6 });
+    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'invoiced', amountUf: 9.6, pendingAmountUf: 0 });
   });
 
   it('con el total dividido en varias facturas, muestra la suma de todas', async () => {
@@ -49,18 +49,26 @@ describe('SupportPlanCurrentBillingResolver', () => {
       { planId: 'plan-1', periodKey: '2026-09', amountUf: 34.81 },
     ]);
 
-    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'invoiced', amountUf: 134.81 });
+    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'invoiced', amountUf: 134.81, pendingAmountUf: 0 });
+  });
+
+  it('con facturas que no alcanzan el total esperado, queda facturado parcial con el saldo pendiente', async () => {
+    const resolver = buildResolver({ amountUf: 18, hoursBilled: 15, periodKey: '2026-09', monthlyPeriodId: null }, [
+      { planId: 'plan-1', periodKey: '2026-09', amountUf: 100, targetAmountUf: 134.81 },
+    ]);
+
+    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'partially_invoiced', amountUf: 134.81, pendingAmountUf: 34.81 });
   });
 
   it('sigue mostrando "facturado" cuando el excedente de la bolsa ya se facturó entero este mes (cálculo en 0)', async () => {
     const resolver = buildResolver(null, [{ planId: 'plan-1', periodKey: '2026-09', amountUf: 9.6 }]);
 
-    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'invoiced', amountUf: 9.6 });
+    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: 'invoiced', amountUf: 9.6, pendingAmountUf: 0 });
   });
 
   it('queda sin movimiento cuando no hay nada que facturar ni factura del mes', async () => {
     const resolver = buildResolver(null, [{ planId: 'plan-1', periodKey: '2026-08', amountUf: 9.6 }]);
 
-    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: null, amountUf: 0 });
+    expect(await resolver.resolve(PLAN, [], TODAY)).toEqual({ billingStatus: null, amountUf: 0, pendingAmountUf: 0 });
   });
 });

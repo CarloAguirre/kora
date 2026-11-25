@@ -53,6 +53,10 @@
   min-width: 200px;
 }
 
+.date {
+  min-width: 170px;
+}
+
 .tableSection {
   display: flex;
   flex-direction: column;

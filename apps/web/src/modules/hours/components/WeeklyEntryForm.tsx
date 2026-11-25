@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
+  OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE,
+  OTHER_WORK_MIN_DESCRIPTION_LENGTH,
   PROJECT_REQUIRING_ASSIGNMENTS,
+  hasOtherWorkDescription,
   hourEntryRequiresApproval,
   type CreateHourEntryInput,
   type HourEntryAssignment,
@@ -22,7 +25,11 @@ import { useHourEntryProjectOptions } from '../hooks/useHourEntryProjectOptions'
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { overflowByBlock, selectAttributableTasks } from './DailyEntryForm';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
-import { activityForTaskChange, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId } from './hour-task-selection';
+import { SubmitBlockers } from './SubmitBlockers';
+import { revealInScroller } from '../lib/reveal-in-scroller';
+import {
+  activityForTaskChange, initialTaskIdForPhase, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId,
+} from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -32,7 +39,7 @@ const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'];
 const WEEKLY_CAP_HOURS = 40;
 const DAILY_CAP_HOURS = 8;
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
-const MIN_DESCRIPTION_LENGTH = 5;
+const MIN_DESCRIPTION_LENGTH = OTHER_WORK_MIN_DESCRIPTION_LENGTH;
 
 function mondayOf(dateStr: string): Date {
   const date = new Date(`${dateStr}T00:00:00`);
@@ -95,6 +102,11 @@ export function WeeklyEntryForm({
   const [dayHours, setDayHours] = useState<string[]>(['', '', '', '', '']);
   const [autoFill, setAutoFill] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // El error se muestra arriba; con el formulario desplazado hasta el botón quedaba fuera de vista.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) revealInScroller(errorRef.current);
+  }, [error]);
   const [submitting, setSubmitting] = useState(false);
 
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(assignment as HourEntryAssignment);
@@ -111,6 +123,8 @@ export function WeeklyEntryForm({
   const availableSegments = (selectedHourPhase?.segments ?? [])
     .filter((segment) => segment.eligibleForHours === true);
   const hasProjectPhases = (hourPhases ?? []).length > 0;
+  /** «Otro» dentro del stepper: nombre y descripción obligatorios. */
+  const isOtherWork = assignment === 'Proyecto' && Boolean(moduleId) && taskId === OTHER_TASK_OPTION;
   const overtimeDisabled = needsProject && !selectedProject?.allowsOvertime;
   const weekTotal = dayHours.reduce((sum, value) => sum + (Number(value) || 0), 0);
 
@@ -196,20 +210,23 @@ export function WeeklyEntryForm({
     if (needsProject && hasProjectPhases && !moduleId)
       return 'Selecciona una fase para imputar estas horas.';
     if (needsProject && moduleId && !taskId)
-      return 'Selecciona tu tarea o «Asignar a otra».';
+      return 'Selecciona tu tarea u «Otro».';
     if (needsProject && moduleId && availableSegments.length > 0 && !segmentId &&
         (!taskId || taskId === OTHER_TASK_OPTION))
       return 'Selecciona el bloque de tu equipo para este trabajo.';
     if (needsApprover && !designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
     if (unauthorizedOvertime) return 'Este proyecto no tiene autorizadas horas extra.';
-    if (!category.trim()) return 'Indica la actividad realizada.';
+    if (!category.trim())
+      return isOtherWork ? 'Al elegir «Otro», indica el nombre de lo realizado.' : 'Indica la actividad realizada.';
+    if (isOtherWork && !hasOtherWorkDescription(description)) return OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE;
     if (description.trim().length > 0 && description.trim().length < MIN_DESCRIPTION_LENGTH) {
       return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
     }
     return null;
   };
 
-  const canSubmit = validate() === null;
+  const pendingError = validate();
+  const canSubmit = pendingError === null;
 
   const onSubmit = async () => {
     setError(null);
@@ -256,7 +273,7 @@ export function WeeklyEntryForm({
       <p className={styles.formSubtitle}>Registra tus horas por día y se suman automáticamente</p>
 
       {error && (
-        <div className={styles.alert} role="alert">
+        <div ref={errorRef} className={styles.alert} role="alert">
           <AlertIcon size={18} className={styles.alertIcon} />
           <span>{error}</span>
         </div>
@@ -362,17 +379,22 @@ export function WeeklyEntryForm({
           tasks={availableTasks}
           taskId={taskId}
           requiresPhase={hasProjectPhases}
+          requiresSegment={Boolean(moduleId) && availableSegments.length > 0 &&
+            (!taskId || taskId === OTHER_TASK_OPTION)}
           approverName={projectDetail?.teams.find((team) =>
             team.teamId === selectedModule?.segments.find((segment) => segment.id === segmentId)?.teamId
           )?.leader?.fullName ?? resolveHourApprover(hourPhases, user?.id, segmentId)}
           onPhaseChange={(id) => {
-            setModuleId(id); setSegmentId(''); setTaskId('');
+            setModuleId(id); setSegmentId('');
+            setTaskId(id ? initialTaskIdForPhase(selectAttributableTasks(
+              hourPhases?.find((phase) => phase.id === id)?.tasks ?? [], user?.id,
+            )) : '');
             setCategory((previous) => activityForTaskChange(
               previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
             ));
           }}
           onSegmentChange={(id) => {
-            setSegmentId(id); setTaskId('');
+            setSegmentId(id); setTaskId(initialTaskIdForPhase(availableTasks));
             setCategory((previous) => activityForTaskChange(
               previous, availableTasks.find((task) => task.id === taskId)?.name, undefined,
             ));
@@ -393,8 +415,8 @@ export function WeeklyEntryForm({
       )}
 
       <div className={styles.row}>
-        <TextField label="Actividad" required
-          placeholder={taskId === OTHER_TASK_OPTION ? 'Describe el trabajo realizado fuera de las tareas asignadas' : 'Ej: Diseño webapp'}
+        <TextField label={isOtherWork ? 'Nombre de lo realizado' : 'Actividad'} required
+          placeholder={isOtherWork ? 'Ej: Reunión de seguimiento con el cliente' : 'Ej: Diseño webapp'}
           value={category} onChange={(event) => setCategory(event.target.value)} />
         <div className={styles.overtimeField}>
           <span className={styles.stepperLabel}>Horas Extra</span>
@@ -467,17 +489,22 @@ export function WeeklyEntryForm({
 
       <div className={styles.textareaField}>
         <label className={styles.textareaLabel}>
-          Descripción / Bitácora Detallada {availableTasks.some((task) => task.id === taskId) && '(opcional, ya está vinculada a una tarea)'}
+          {isOtherWork
+            ? <>Descripción de lo realizado <span aria-hidden="true">*</span></>
+            : <>Descripción / Bitácora Detallada {availableTasks.some((task) => task.id === taskId) && '(opcional, ya está vinculada a una tarea)'}</>}
         </label>
         <textarea
           className={styles.textarea}
+          required={isOtherWork}
           placeholder={availableTasks.some((task) => task.id === taskId)
             ? 'Agrega detalles si te sirven para la bitácora'
-            : 'Describa detalladamente el avance realizado (mínimo 5 caracteres)'}
+            : `Describa detalladamente el avance realizado (mínimo ${MIN_DESCRIPTION_LENGTH} caracteres)`}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
       </div>
+
+      <SubmitBlockers items={pendingError ? [{ key: 'week', message: pendingError }] : []} />
 
       <div className={styles.actions}>
         <Button variant="outline" type="button" onClick={onClose}>

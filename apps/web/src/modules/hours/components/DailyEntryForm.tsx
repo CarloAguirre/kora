@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
+  OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE,
+  OTHER_WORK_MIN_DESCRIPTION_LENGTH,
   PROJECT_MODULE_STAGE_LABELS,
   PROJECT_REQUIRING_ASSIGNMENTS,
+  hasOtherWorkDescription,
   hourEntryRequiresApproval,
+  isOtherWorkHourEntry,
   type CreateHourEntryInput,
   type HourEntryAssignment,
   type ProjectSummary,
@@ -24,7 +28,11 @@ import { filterHourEntryProjects } from '../lib/selectable-project-statuses';
 import { useHourEntryProjectOptions } from '../hooks/useHourEntryProjectOptions';
 import { ApiRequestError } from '@/shared/lib/api-client';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
-import { activityForTaskChange, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId } from './hour-task-selection';
+import { SubmitBlockers } from './SubmitBlockers';
+import { revealInScroller } from '../lib/reveal-in-scroller';
+import {
+  activityForTaskChange, initialTaskIdForPhase, OTHER_TASK_OPTION, resolveHourApprover, toHourTaskId,
+} from './hour-task-selection';
 
 /** Proyecto primero: es la asignación más común y el resto confundía al elegir. */
 const ASSIGNMENT_OPTIONS = [...HOUR_ENTRY_ASSIGNMENTS]
@@ -172,12 +180,15 @@ export function validateDailyBlock(
     overtimeNeedsApproval = true,
     overtimeAlreadyGranted = false,
     exceedsDailyCap = false,
+    requireOtherWorkDescription = true,
   }: {
     projects: ProjectSummary[];
     isCollaborator: boolean;
     overtimeNeedsApproval?: boolean;
     overtimeAlreadyGranted?: boolean;
     exceedsDailyCap?: boolean;
+    /** En edición, falso si el registro ya estaba sin tarea en esa fase (mismo criterio que la API). */
+    requireOtherWorkDescription?: boolean;
   },
 ): string | null {
   if (!block.assignment) return 'Selecciona una asignación.';
@@ -191,7 +202,7 @@ export function validateDailyBlock(
   if (block.assignment === 'Proyecto' && block.roadmapNeedsPhase && !block.moduleId)
     return 'Selecciona una fase para imputar estas horas.';
   if (block.assignment === 'Proyecto' && block.roadmapNeedsTask && !block.taskId)
-    return 'Selecciona tu tarea o «Asignar a otra».';
+    return 'Selecciona tu tarea u «Otro».';
   if (block.assignment === 'Proyecto' && block.roadmapNeedsSegment && !block.segmentId &&
       (!block.taskId || block.taskId === OTHER_TASK_OPTION))
     return 'Selecciona el bloque de tu equipo para este trabajo.';
@@ -203,7 +214,12 @@ export function validateDailyBlock(
   // designado (docs/DECISION-M4-HORAS.md) — el backend rechaza ambos a la vez.
   const needsApprover = !needsProject && (isCollaborator || (overtimeNeedsApproval && (block.isOvertime || exceedsDailyCap)));
   if (needsApprover && !block.designatedApproverUserId) return 'Selecciona a quién aprueba estas horas.';
-  if (!block.category.trim()) return 'Indica la actividad realizada.';
+  const isOtherWork = block.taskId === OTHER_TASK_OPTION &&
+    isOtherWorkHourEntry({ assignment: block.assignment, moduleId: block.moduleId, taskId: null });
+  if (!block.category.trim())
+    return isOtherWork ? 'Al elegir «Otro», indica el nombre de lo realizado.' : 'Indica la actividad realizada.';
+  if (isOtherWork && requireOtherWorkDescription && !hasOtherWorkDescription(block.description))
+    return OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE;
   if (block.description.trim().length > 0 && block.description.trim().length < MIN_DESCRIPTION_LENGTH) {
     return `La descripción debe tener al menos ${MIN_DESCRIPTION_LENGTH} caracteres.`;
   }
@@ -270,6 +286,11 @@ export function DailyEntryForm({
   const [blockErrors, setBlockErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // El error del servidor se muestra arriba; con el modal desplazado hasta el botón quedaba fuera de vista.
+  const serverErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (serverError) revealInScroller(serverErrorRef.current);
+  }, [serverError]);
 
   const { data: holidaysForDate } = useHolidays({ dateFrom: date, dateTo: date });
   /** Catálogo completo (unas decenas de filas) para marcarlos en el calendario, navegue al mes que navegue. */
@@ -341,8 +362,20 @@ export function DailyEntryForm({
       exceedsDailyCap: (overflowByKey.get(block.key) ?? 0) > 0,
     });
 
+  const errorByKey = new Map(blocks.map((block) => [block.key, validateBlock(block)]));
   const canSubmit = !blockingMessage && validTaskPrefill &&
-    blocks.every((block) => validateBlock(block) === null);
+    blocks.every((block) => errorByKey.get(block.key) === null);
+  /** Abre el registro y lo trae a la vista, para corregir lo que falta. */
+  const focusBlock = (key: string) => {
+    setBlocks((prev) => prev.map((block) => (block.key === key ? { ...block, expanded: true } : block)));
+    requestAnimationFrame(() => revealInScroller(document.getElementById(`hour-block-${key}`), 'start'));
+  };
+  const submitBlockers = blockingMessage ? [] : blocks.flatMap((block, index) => {
+    const message = errorByKey.get(block.key);
+    return message
+      ? [{ key: block.key, title: blockTitle(block, index), message, onSelect: () => focusBlock(block.key) }]
+      : [];
+  });
 
   const onSubmit = async () => {
     setServerError(null);
@@ -409,7 +442,7 @@ export function DailyEntryForm({
         </p>}
 
       {serverError && (
-        <div className={styles.alert} role="alert">
+        <div ref={serverErrorRef} className={styles.alert} role="alert">
           <AlertIcon size={18} className={styles.alertIcon} />
           <span>{serverError}</span>
         </div>
@@ -456,6 +489,8 @@ export function DailyEntryForm({
       {blocks.map((block, index) => (
         <DailyEntryBlockFields
           key={block.key}
+          domId={`hour-block-${block.key}`}
+          incomplete={!blockingMessage && Boolean(errorByKey.get(block.key))}
           block={block}
           index={index}
           removable={blocks.length > 1}
@@ -482,6 +517,8 @@ export function DailyEntryForm({
       <div className={styles.dailyTotal}>
         Total del día: <strong>{dailyTotal.toLocaleString('es-CL', { maximumFractionDigits: 1 })} horas</strong>
       </div>
+
+      <SubmitBlockers items={submitBlockers} />
 
       <div className={styles.actions}>
         <Button variant="outline" type="button" onClick={onClose}>
@@ -587,7 +624,14 @@ export function DailyEntryBlockFields({
   ownerUserId,
   historicalProjectId,
   historicalAssignment,
+  requireOtherWorkDescription = true,
+  domId,
+  incomplete = false,
 }: {
+  /** Ancla para llevar la vista a este registro (ver `SubmitBlockers`). */
+  domId?: string;
+  /** Le falta algo para poder guardar: se avisa en la cabecera si está colapsado. */
+  incomplete?: boolean;
   block: DailyBlock;
   index: number;
   removable: boolean;
@@ -609,6 +653,8 @@ export function DailyEntryBlockFields({
   ownerUserId?: string;
   historicalProjectId?: string;
   historicalAssignment?: HourEntryAssignment | '';
+  /** Ver `validateDailyBlock`: en edición no se exige si el registro ya era «Otro» en esa fase. */
+  requireOtherWorkDescription?: boolean;
 }) {
   const needsProject = PROJECT_REQUIRING_ASSIGNMENTS.has(block.assignment as HourEntryAssignment);
   const showApproverInRow =
@@ -651,6 +697,9 @@ export function DailyEntryBlockFields({
       ? allowedTeamIds.has(segment.teamId ?? '')
       : segment.eligibleForHours === true);
   const requiresPhase = (hourPhases ?? []).length > 0;
+  /** «Otro» dentro del stepper: nombre y descripción obligatorios. */
+  const isOtherWork = block.assignment === 'Proyecto' && Boolean(block.moduleId) &&
+    block.taskId === OTHER_TASK_OPTION;
 
   // La obligatoriedad depende de los equipos REALES del autor en este proyecto.
   // La capa de API conserva la misma regla y vuelve a comprobarla al guardar.
@@ -667,7 +716,7 @@ export function DailyEntryBlockFields({
     requiresPhase, availableSegments.length, onUpdate]);
 
   return (
-    <div className={styles.block}>
+    <div id={domId} className={styles.block}>
       <div
         className={[styles.blockHeader, block.expanded ? styles.blockHeaderExpanded : ''].join(' ')}
         role="button"
@@ -682,6 +731,7 @@ export function DailyEntryBlockFields({
       >
         {block.expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
         <span className={styles.blockTitle}>{title}</span>
+        {incomplete && !block.expanded && <span className={styles.blockIncomplete}>Falta completar</span>}
         {removable && (
           <Button
             variant="ghost"
@@ -770,17 +820,22 @@ export function DailyEntryBlockFields({
               tasks={availableTasks}
               taskId={block.taskId ?? ''}
               requiresPhase={requiresPhase}
+              requiresSegment={Boolean(block.moduleId) && availableSegments.length > 0 &&
+                (!block.taskId || block.taskId === OTHER_TASK_OPTION)}
               approverName={projectDetail?.teams.find((team) =>
                 team.teamId === selectedModule?.segments.find((segment) => segment.id === block.segmentId)?.teamId
               )?.leader?.fullName ?? resolveHourApprover(
                 hourPhases, ownerUserId ?? user?.id, block.segmentId,
               )}
               onPhaseChange={(moduleId) => onUpdate({
-                moduleId, segmentId: '', taskId: '',
+                moduleId, segmentId: '',
+                taskId: moduleId ? initialTaskIdForPhase(selectAttributableTasks(
+                  hourPhases?.find((phase) => phase.id === moduleId)?.tasks ?? [], ownerUserId ?? user?.id,
+                )) : '',
                 category: activityForTaskChange(block.category, selectedTask?.name, undefined),
               })}
               onSegmentChange={(segmentId) => onUpdate({
-                segmentId, taskId: '',
+                segmentId, taskId: initialTaskIdForPhase(availableTasks),
                 category: activityForTaskChange(block.category, selectedTask?.name, undefined),
               })}
               onTaskChange={(taskId) => {
@@ -800,9 +855,9 @@ export function DailyEntryBlockFields({
           )}
 
           <TextField
-            label="Actividad"
+            label={isOtherWork ? 'Nombre de lo realizado' : 'Actividad'}
             required
-            placeholder={block.taskId === OTHER_TASK_OPTION ? 'Describe el trabajo realizado fuera de las tareas asignadas' : 'Ej: Diseño de wireframes para el módulo'}
+            placeholder={isOtherWork ? 'Ej: Reunión de seguimiento con el cliente' : 'Ej: Diseño de wireframes para el módulo'}
             value={block.category}
             onChange={(event) => onUpdate({ category: event.target.value })}
           />
@@ -862,11 +917,16 @@ export function DailyEntryBlockFields({
 
           <div className={styles.textareaField}>
             <label className={styles.textareaLabel}>
-              Descripción / Bitácora Detallada {selectedTask && '(opcional, ya está vinculada a una tarea)'}
+              {isOtherWork
+                ? <>Descripción de lo realizado {requireOtherWorkDescription && <span aria-hidden="true">*</span>}</>
+                : <>Descripción / Bitácora Detallada {selectedTask && '(opcional, ya está vinculada a una tarea)'}</>}
             </label>
             <textarea
               className={styles.textarea}
-              placeholder={selectedTask ? 'Agrega detalles si te sirven para la bitácora' : 'Describa detalladamente el avance realizado (mínimo 5 caracteres)'}
+              required={isOtherWork && requireOtherWorkDescription}
+              placeholder={selectedTask
+                ? 'Agrega detalles si te sirven para la bitácora'
+                : `Describa detalladamente el avance realizado (mínimo ${OTHER_WORK_MIN_DESCRIPTION_LENGTH} caracteres)`}
               value={block.description}
               onChange={(event) => onUpdate({ description: event.target.value })}
             />

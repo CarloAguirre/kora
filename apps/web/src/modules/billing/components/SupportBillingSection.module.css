@@ -132,3 +132,23 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Monto de un mes "facturado parcial": el total y, debajo, el saldo por facturar. */
+.amountCell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.amountSub {
+  font-size: var(--kora-text-xs);
+  color: var(--kora-warning-text);
+}
+
+.rowActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--kora-space-2);
+}

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { buildPage, ok, type Page, type Result } from '@kora/core';
-import type { CapacityReportRow, ListCapacityReportQuery } from '@kora/contracts';
+import { resolveHourEntryProjectWorkType, type CapacityReportRow, type ListCapacityReportQuery } from '@kora/contracts';
 import { HOUR_ENTRY_REPOSITORY, type HourEntryListItem, type HourEntryRepository } from '../../domain/repositories/hour-entry.repository';
 import { DrizzleHolidayReader } from '../../infrastructure/persistence/drizzle-holiday-reader';
 import type { UseCase } from '../../../../shared/application/use-case';
@@ -111,10 +111,7 @@ function toCapacityReportRow(item: HourEntryListItem, laborHours: number, monthl
 /** Misma regla que `getCapacityHHType` en la v1 (`src/utils/capacityHHType.ts`). */
 function resolveCapacityType(item: HourEntryListItem): string {
   if (!item.projectId) return (item.assignment || item.category || 'Sin proyecto').trim() || 'Sin proyecto';
-  if (item.projectSalesStage === 'prospect') return 'Prospecto';
-  if (item.projectSalesStage === 'quoted') return 'Cotización';
-  if (item.projectType === 'support') return 'Soporte';
-  return 'Proyecto';
+  return resolveHourEntryProjectWorkType({ salesStage: item.projectSalesStage, type: item.projectType });
 }
 
 function sortRows(

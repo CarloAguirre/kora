@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   HOUR_ENTRY_ASSIGNMENTS,
   PROJECT_REQUIRING_ASSIGNMENTS,
@@ -33,6 +33,8 @@ import {
   type TaskHourEntryTarget,
 } from './DailyEntryForm';
 import { WeeklyEntryForm } from './WeeklyEntryForm';
+import { SubmitBlockers } from './SubmitBlockers';
+import { revealInScroller } from '../lib/reveal-in-scroller';
 import { canEditAnyMonth, isInCurrentMonth, OUTSIDE_CURRENT_MONTH_MESSAGE } from '../lib/edit-window';
 import { OTHER_TASK_OPTION, toHourTaskId } from './hour-task-selection';
 
@@ -151,6 +153,10 @@ function EditEntryForm({
   const [blockError, setBlockError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const serverErrorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (serverError) revealInScroller(serverErrorRef.current);
+  }, [serverError]);
 
   // Las horas de Proyecto respetan asignación; Prospecto permite el catálogo completo.
   const restrictToAssigned = user?.id === entry.user.id && user?.role !== 'pmo';
@@ -215,14 +221,19 @@ function EditEntryForm({
     user?.id === entry.user.id ? user.role === 'collaborator' : entry.designatedApprover !== null;
   // Las horas extra de un líder se autoaprueban; con el registro de otro se asume que no.
   const overtimeNeedsApproval = user?.id === entry.user.id ? hourEntryRequiresApproval(user.role, true) : true;
+  // Como la API: la descripción de «Otro» se exige al PASAR a «Otro» (desde
+  // una tarea u otra fase), no al corregir un registro que ya estaba así.
+  const requireOtherWorkDescription = Boolean(entry.taskId) || block.moduleId !== (entry.module?.id ?? '');
   const validationOptions = {
+    requireOtherWorkDescription,
     projects: selectableProjects,
     isCollaborator: ownerRequiresApprover,
     overtimeNeedsApproval,
     overtimeAlreadyGranted: entry.isOvertime && block.projectId === entry.project?.id,
     exceedsDailyCap: autoOvertimeHours > 0,
   };
-  const canSubmit = !blockingMessage && validateDailyBlock(block, validationOptions) === null;
+  const pendingError = validateDailyBlock(block, validationOptions);
+  const canSubmit = !blockingMessage && pendingError === null;
   const blockTitle = (() => {
     const project = projects.find((p) => p.id === block.projectId);
     return project ? getProjectOptionLabel(project) : block.assignment || 'Registro';
@@ -267,7 +278,7 @@ function EditEntryForm({
   return (
     <div className={styles.form}>
       {serverError && (
-        <div className={styles.alert} role="alert">
+        <div ref={serverErrorRef} className={styles.alert} role="alert">
           <AlertIcon size={18} className={styles.alertIcon} />
           <span>{serverError}</span>
         </div>
@@ -319,7 +330,12 @@ function EditEntryForm({
         onToggleExpand={() => setBlock((prev) => ({ ...prev, expanded: !prev.expanded }))}
         onAdjustHours={(delta) => updateBlock({ hours: stepBlockHours(block.hours, delta) })}
         ownerUserId={entry.user.id}
+        requireOtherWorkDescription={requireOtherWorkDescription}
+        incomplete={!blockingMessage && pendingError !== null}
       />
+
+      <SubmitBlockers items={!blockingMessage && pendingError
+        ? [{ key: 'entry', message: pendingError }] : []} />
 
       <div className={styles.actions}>
         <Button variant="outline" type="button" onClick={onClose}>

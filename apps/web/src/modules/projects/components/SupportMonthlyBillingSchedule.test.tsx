@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const period: SupportMonthlyBillingPeriod = {
   monthlyPeriodId: 'period-1', periodKey: '2026-01', startDate: '2026-01-01', endDate: '2026-02-01',
-  isCurrent: false, status: 'invoiced', amountUf: 7.1,
+  isCurrent: false, status: 'invoiced', amountUf: 7.1, pendingAmountUf: 0,
   invoices: [{ id: 'invoice-1', folio: '4444', amountUf: 7.1, paymentStatus: 'pending', hasAttachment: true }],
 };
 

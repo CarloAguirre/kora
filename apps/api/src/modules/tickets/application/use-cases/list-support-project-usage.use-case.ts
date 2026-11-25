@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CLOCK, ok, type Clock, type Result } from '@kora/core';
 import type { Permission, SupportProjectSummary, SupportProjectUsage } from '@kora/contracts';
-import { HOUR_ENTRY_REPOSITORY, type HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
 import {
   SUPPORT_PLAN_REPOSITORY,
   type SupportPlanRecord,
   type SupportPlanRepository,
 } from '../../domain/repositories/support-plan.repository';
 import { TICKET_PROJECT_READER, type TicketProjectReader } from '../ports/ticket-project-reader.port';
+import { SUPPORT_CONSUMPTION_READER, sumConsumptionDays, type SupportConsumptionReader } from '../ports/support-consumption-reader.port';
 import { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
 import type { UseCase } from '../../../../shared/application/use-case';
 
@@ -37,7 +37,7 @@ export class ListSupportProjectUsageUseCase implements UseCase<ListSupportProjec
     @Inject(SUPPORT_PLAN_REPOSITORY) private readonly plans: SupportPlanRepository,
     @Inject(TICKET_PROJECT_READER) private readonly projects: TicketProjectReader,
     private readonly summaryBuilder: SupportPlanSummaryBuilder,
-    @Inject(HOUR_ENTRY_REPOSITORY) private readonly hourEntries: HourEntryRepository,
+    @Inject(SUPPORT_CONSUMPTION_READER) private readonly consumption: SupportConsumptionReader,
     @Inject(CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -79,7 +79,7 @@ export class ListSupportProjectUsageUseCase implements UseCase<ListSupportProjec
     const from = plan.startDate > monthStart ? plan.startDate : monthStart;
     const to = plan.endDate && plan.endDate < monthLastDay ? plan.endDate : monthLastDay;
     if (from > to) return 0;
-    return round2(await this.hourEntries.sumApprovedHoursForProjects(linkedProjectIds, from, to));
+    return sumConsumptionDays(await this.consumption.listDailyHours(linkedProjectIds, from, to), from, null);
   }
 }
 

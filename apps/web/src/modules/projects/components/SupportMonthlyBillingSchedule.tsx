@@ -24,7 +24,18 @@ function lastIncludedDay(endDate: string): string {
   return day.toLocaleDateString('es-CL');
 }
 
-function StatusCell({ period }: { period: SupportMonthlyBillingPeriod }) {
+function StatusCell({ period, currency }: { period: SupportMonthlyBillingPeriod; currency: SupportPlanCurrency }) {
+  if (period.status === 'partially_invoiced') {
+    return (
+      <span className={styles.folioCell}>
+        <Badge tone="brand">Facturado parcial</Badge>
+        <span className={styles.folioSub}>
+          Saldo {formatMoney(period.pendingAmountUf, currency)} · {period.invoices.length === 1 ? 'Folio' : 'Folios'}{' '}
+          {period.invoices.map((invoice) => invoice.folio).join(', ')}
+        </span>
+      </span>
+    );
+  }
   if (period.status === 'invoiced') {
     return (
       <span className={styles.folioCell}>
@@ -59,7 +70,8 @@ export interface SupportMonthlyBillingScheduleProps {
  * Calendario de facturación de un contrato mensual: un mes por fila, del
  * primero al último del contrato. Cada mes se factura cuando empieza; los
  * meses ya cerrados que quedaron sin factura también se pueden registrar
- * desde acá. Los montos de los meses futuros son la cuota estimada.
+ * desde acá, y las que le faltan a un mes "facturado parcial". Los montos de
+ * los meses futuros son la cuota estimada.
  */
 export function SupportMonthlyBillingSchedule({ periods, currency, canManageBilling, onIssue }: SupportMonthlyBillingScheduleProps) {
   const { pageItems, pagination } = usePaginatedItems(periods);
@@ -78,12 +90,12 @@ export function SupportMonthlyBillingSchedule({ periods, currency, canManageBill
       ),
     },
     { key: 'amount', header: 'Monto', align: 'right', render: (p) => formatMoney(p.amountUf, currency) },
-    { key: 'status', header: 'Estado', render: (p) => <StatusCell period={p} /> },
+    { key: 'status', header: 'Estado', render: (p) => <StatusCell period={p} currency={currency} /> },
     {
       key: 'actions',
       header: '',
       render: (p) =>
-        p.status === 'invoiced' ? (
+        p.status === 'invoiced' || p.status === 'partially_invoiced' ? (
           <span className={styles.invoiceActions}>
             {p.invoices.map((invoice) => (
               <SupportInvoiceDocumentButton
@@ -94,6 +106,11 @@ export function SupportMonthlyBillingSchedule({ periods, currency, canManageBill
                 folio={p.invoices.length > 1 ? invoice.folio : undefined}
               />
             ))}
+            {p.status === 'partially_invoiced' && canManageBilling && (
+              <Button variant="outline" size="sm" onClick={() => onIssue(p)}>
+                Registrar factura
+              </Button>
+            )}
           </span>
         ) : p.status === 'to_invoice' && p.monthlyPeriodId && p.amountUf > 0 && canManageBilling ? (
           <Button variant="outline" size="sm" onClick={() => onIssue(p)}>

@@ -68,7 +68,29 @@ const TABS = [
   { id: 'development', label: 'Proyectos Desarrollo' },
   { id: 'support', label: 'Soporte' },
 ] as const;
+// Tope de página del API (`MAX_PAGE_SIZE`) y de ids por consulta de consumo de soporte.
 const EXPORT_PAGE_SIZE = 200;
+
+/** Todas las páginas del tipo: con una sola página de 200, los proyectos que pasaban de ese tope no salían en el Excel. */
+async function fetchAllProjectsOfType(type: 'development' | 'support'): Promise<ProjectSummary[]> {
+  const first = await projectsApi.list({ type, page: 1, pageSize: EXPORT_PAGE_SIZE });
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(first.pageCount - 1, 0) }, (_, index) =>
+      projectsApi.list({ type, page: index + 2, pageSize: EXPORT_PAGE_SIZE }),
+    ),
+  );
+  return [first, ...rest].flatMap((page) => page.items);
+}
+
+/** `/support-plans/usage` acepta hasta 200 ids por llamada — se pide en lotes. */
+async function fetchSupportUsage(projectIds: readonly string[]): Promise<SupportProjectUsage[]> {
+  const chunks: string[][] = [];
+  for (let start = 0; start < projectIds.length; start += EXPORT_PAGE_SIZE) {
+    chunks.push(projectIds.slice(start, start + EXPORT_PAGE_SIZE));
+  }
+  const results = await Promise.all(chunks.map((ids) => supportPlanApi.listUsage(ids)));
+  return results.flat();
+}
 
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 // Restantes y desviadas se separan: si el proyecto ya consumió todo lo vendido, restantes queda en 0
@@ -392,12 +414,12 @@ export function ProjectsListPage() {
       // del tipo activo, sin los filtros de la tabla ni del gráfico — y se pide
       // recién al descargar. El delay artificial es para que se alcance a ver
       // el estado "Generando…" antes de que el navegador dispare la descarga.
-      const [{ items }] = await Promise.all([
-        projectsApi.list({ type: tab, page: 1, pageSize: EXPORT_PAGE_SIZE }),
+      const [items] = await Promise.all([
+        fetchAllProjectsOfType(tab),
         new Promise((resolve) => setTimeout(resolve, 1000)),
       ]);
       if (tab === 'development') exportDevelopmentProjects(items);
-      else exportSupportProjects(items, await supportPlanApi.listUsage(items.map((project) => project.id)));
+      else exportSupportProjects(items, await fetchSupportUsage(items.map((project) => project.id)));
     } finally {
       setExporting(false);
     }

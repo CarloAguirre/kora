@@ -139,6 +139,23 @@
   margin-top: 2px;
 }
 
+/* Falta monto: aviso + elección de qué pasa con la diferencia. */
+.noticeStacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--kora-space-3);
+}
+
+.noticeLine {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kora-space-2);
+}
+
+.noticeHint {
+  font-size: var(--kora-text-xs);
+}
+
 .addButton {
   align-self: flex-start;
 }

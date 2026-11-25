@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ProjectHourPlanFields } from './ProjectHourPlanFields';
 import {
-  OTHER_TASK_OPTION, activityForTaskChange, formatTaskHourSummary, resolveHourApprover, toHourTaskId,
+  OTHER_TASK_OPTION, activityForTaskChange, initialTaskIdForPhase, formatTaskHourSummary, resolveHourApprover, toHourTaskId,
 } from './hour-task-selection';
 
 const tasks = [
@@ -70,23 +70,37 @@ describe('Vincula estas horas al plan', () => {
     expect(screen.queryByLabelText('Bloque de trabajo')).not.toBeInTheDocument();
     expect(screen.getByLabelText(/^Tarea/)).toBeEnabled();
     expect(screen.getByRole('option', { name: 'Modelo de datos' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /Asignar a otra/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^Otro/ })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/^Tarea/),
       { target: { value: OTHER_TASK_OPTION } });
     expect(props.onTaskChange).toHaveBeenCalledWith(OTHER_TASK_OPTION);
   });
 
-  it('deja «Asignar a otra» aun cuando no existen tareas del usuario', () => {
+  it('deja «Otro» aun cuando no existen tareas del usuario y explica qué registrar', () => {
     render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
-      segments={[]} segmentId="" tasks={[]} taskId=""
+      segments={[]} segmentId="" tasks={[]} taskId={OTHER_TASK_OPTION}
       requiresPhase {...callbacks()} />);
     expect(screen.getByLabelText(/^Tarea/)).toBeEnabled();
     expect(screen.getAllByRole('option')).toEqual(expect.arrayContaining([
-      expect.objectContaining({ textContent: 'Asignar a otra (sin tarea vinculada)' }),
+      expect.objectContaining({ textContent: 'Otro (trabajo sin tarea asignada)' }),
     ]));
+    expect(screen.getByText(/No tienes tareas asignadas en esta fase/)).toBeInTheDocument();
+    expect(initialTaskIdForPhase([])).toBe(OTHER_TASK_OPTION);
+    expect(initialTaskIdForPhase(tasks)).toBe('');
   });
 
-  it('permite elegir explícitamente Asignar a otra sin enviar un ID inexistente', () => {
+  it('marca el bloque como obligatorio solo cuando se exige', () => {
+    const { rerender } = render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
+      segments={segments} segmentId="" tasks={[]} taskId={OTHER_TASK_OPTION}
+      requiresPhase requiresSegment {...callbacks()} />);
+    expect(screen.getByLabelText(/^Bloque de trabajo/)).toBeRequired();
+    rerender(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
+      segments={segments} segmentId="" tasks={tasks} taskId="task-1"
+      requiresPhase {...callbacks()} />);
+    expect(screen.getByLabelText(/^Bloque de trabajo/)).not.toBeRequired();
+  });
+
+  it('permite elegir explícitamente «Otro» sin enviar un ID inexistente', () => {
     const props = callbacks();
     render(<ProjectHourPlanFields phases={phases} phaseId="phase-1"
       segments={segments} segmentId="segment-1" tasks={tasks}

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { SUPPORT_PLAN_TYPE_LABELS, type SupportInvoice, type SupportMonthlyBillingPeriod } from '@kora/contracts';
+import { SUPPORT_PLAN_TYPE_LABELS, type SupportInvoice, type SupportInvoicePendingPeriod } from '@kora/contracts';
 import styles from './SupportPlanDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
@@ -27,8 +27,10 @@ import { MarkSupportInvoicePaidDialog } from '../components/MarkSupportInvoicePa
 import { IssueSupportInvoiceDialog } from '../components/IssueSupportInvoiceDialog';
 import { SupportMonthlyBillingSchedule, formatPeriodMonth } from '../components/SupportMonthlyBillingSchedule';
 import { SupportInvoiceDocumentButton } from '../components/SupportInvoiceDocumentButton';
+import { SupportPendingPeriodsCard } from '../components/SupportPendingPeriodsCard';
 import { CloseSupportPlanDialog } from '../components/CloseSupportPlanDialog';
 import {
+  useCloseSupportInvoicePeriod,
   useCloseSupportPlan,
   useIssueSupportInvoice,
   useMarkSupportInvoicePaid,
@@ -43,6 +45,18 @@ const formatDate = (value: string | null) => (value ? new Date(`${value}T00:00:0
 const formatHours = (value: number) => value.toLocaleString('es-CL', { maximumFractionDigits: 2 });
 
 type PayAction = { invoice: SupportInvoice } | null;
+
+/**
+ * Qué se va a registrar desde la ficha: un mes sin factura (por su período
+ * mensual) o las facturas que le faltan a un mes "facturado parcial" (por su
+ * `periodKey`, con el saldo como referencia).
+ */
+interface IssueTarget {
+  readonly periodKey: string;
+  readonly monthlyPeriodId: string | null;
+  readonly amountUf: number;
+  readonly append: boolean;
+}
 
 function currentMonth(): { year: number; month: number } {
   const now = new Date();
@@ -75,7 +89,8 @@ export function SupportPlanDetailPage() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [payAction, setPayAction] = useState<PayAction>(null);
   const [invoiceToVoid, setInvoiceToVoid] = useState<SupportInvoice | null>(null);
-  const [issuePeriod, setIssuePeriod] = useState<SupportMonthlyBillingPeriod | null>(null);
+  const [issueTarget, setIssueTarget] = useState<IssueTarget | null>(null);
+  const [periodToClose, setPeriodToClose] = useState<SupportInvoicePendingPeriod | null>(null);
   const [closing, setClosing] = useState(false);
   const [ticketsPage, setTicketsPage] = useState(1);
   const [ticketsPageSize, setTicketsPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -85,6 +100,7 @@ export function SupportPlanDetailPage() {
   const issueInvoice = useIssueSupportInvoice(plan?.id ?? '', plan?.clientId);
   const markPaid = useMarkSupportInvoicePaid(plan?.id ?? '', plan?.clientId);
   const voidInvoice = useVoidSupportInvoice(plan?.clientId);
+  const closeInvoicePeriod = useCloseSupportInvoicePeriod(plan?.id ?? '', plan?.clientId);
   const closePlan = useCloseSupportPlan(plan?.id ?? '', plan?.clientId);
 
   const currentProjectId = activeProjectId ?? plan?.linkedProjects[0]?.id ?? null;
@@ -102,9 +118,9 @@ export function SupportPlanDetailPage() {
     () => [...(plan?.invoices ?? [])].sort((a, b) => b.periodKey.localeCompare(a.periodKey) || a.position - b.position),
     [plan],
   );
-  // Las facturas de un período se anulan juntas (ver `VoidSupportInvoiceUseCase`) — el diálogo tiene que nombrarlas todas.
-  const invoicesToVoid = useMemo(
-    () => (invoiceToVoid ? sortedInvoices.filter((i) => i.periodKey === invoiceToVoid.periodKey) : []),
+  // Cada factura se anula por separado (ver `VoidSupportInvoiceUseCase`): si el mes conserva otras, el monto anulado vuelve a quedar por facturar.
+  const voidKeepsOthers = useMemo(
+    () => (invoiceToVoid ? sortedInvoices.some((i) => i.periodKey === invoiceToVoid.periodKey && i.id !== invoiceToVoid.id) : false),
     [invoiceToVoid, sortedInvoices],
   );
   const { pageItems: pagedInvoices, pagination: invoicesPagination } = usePaginatedItems(sortedInvoices);
@@ -237,7 +253,11 @@ export function SupportPlanDetailPage() {
         <IdentityField
           label="Estado de facturación y pago"
           value={<SupportInvoiceBillingStatusBadge status={plan.currentBillingStatus} />}
-          sub={formatMoney(plan.currentAmountUf, plan.currency)}
+          sub={
+            plan.currentPendingAmountUf > 0
+              ? `${formatMoney(plan.currentAmountUf, plan.currency)} · saldo ${formatMoney(plan.currentPendingAmountUf, plan.currency)}`
+              : formatMoney(plan.currentAmountUf, plan.currency)
+          }
         />
       </Card>
 
@@ -309,12 +329,28 @@ export function SupportPlanDetailPage() {
         <Pagination {...invoicesPagination} />
       </Card>
 
+      <SupportPendingPeriodsCard
+        periods={plan.pendingPeriods}
+        currency={plan.currency}
+        canManageBilling={canManageBilling}
+        onIssue={(period) =>
+          setIssueTarget({ periodKey: period.periodKey, monthlyPeriodId: period.monthlyPeriodId, amountUf: period.pendingAmountUf, append: true })
+        }
+        onClosePeriod={setPeriodToClose}
+      />
+
       {plan.planType === 'monthly' && (
         <SupportMonthlyBillingSchedule
           periods={plan.billingPeriods}
           currency={plan.currency}
           canManageBilling={canManageBilling}
-          onIssue={setIssuePeriod}
+          onIssue={(period) =>
+            setIssueTarget(
+              period.status === 'partially_invoiced'
+                ? { periodKey: period.periodKey, monthlyPeriodId: period.monthlyPeriodId, amountUf: period.pendingAmountUf, append: true }
+                : { periodKey: period.periodKey, monthlyPeriodId: period.monthlyPeriodId, amountUf: period.amountUf, append: false },
+            )
+          }
         />
       )}
 
@@ -406,40 +442,60 @@ export function SupportPlanDetailPage() {
       />
       <ConfirmActionDialog
         open={invoiceToVoid !== null}
-        title={invoicesToVoid.length > 1 ? 'Anular facturas del período' : 'Anular factura'}
+        title="Anular factura"
         description={
           invoiceToVoid
-            ? invoicesToVoid.length > 1
-              ? `El total de ${invoiceToVoid.periodKey} se dividió en ${invoicesToVoid.length} facturas y se anulan todas juntas: folios ${invoicesToVoid.map((i) => i.folio).join(', ')} (${formatMoney(invoicesToVoid.reduce((total, i) => total + i.amountUf, 0), invoiceToVoid.currency)}). El mes vuelve a quedar "Por facturar" para registrarlo de nuevo con el monto correcto.`
-              : `Se anulará el folio ${invoiceToVoid.folio} (${invoiceToVoid.periodKey} · ${formatMoney(invoiceToVoid.amountUf, invoiceToVoid.currency)}). El mes vuelve a quedar "Por facturar" para registrarlo de nuevo con el monto correcto.`
+            ? `Se anulará el folio ${invoiceToVoid.folio} (${invoiceToVoid.periodKey} · ${formatMoney(invoiceToVoid.amountUf, invoiceToVoid.currency)}). ${
+                voidKeepsOthers
+                  ? 'Las demás facturas del mes se mantienen y este monto vuelve a quedar por facturar ("Facturado parcial"), para registrar la factura correcta.'
+                  : 'El mes vuelve a quedar "Por facturar" para registrarlo de nuevo con el monto correcto.'
+              }`
             : ''
         }
-        warning={
-          invoicesToVoid.length > 1
-            ? 'Kora no emite las facturas: anula también cada documento en el sistema de facturación.'
-            : 'Kora no emite la factura: anula también el documento en el sistema de facturación.'
-        }
-        confirmLabel={invoicesToVoid.length > 1 ? 'Anular facturas' : 'Anular factura'}
+        warning="Kora no emite la factura: anula también el documento en el sistema de facturación."
+        confirmLabel="Anular factura"
         destructive
         onConfirm={async () => {
           if (!invoiceToVoid) return;
-          const folios = invoicesToVoid.map((i) => i.folio);
           await voidInvoice.mutateAsync(invoiceToVoid.id);
-          toast.success(folios.length > 1 ? `Se anularon los folios ${folios.join(', ')}.` : `Se anuló el folio ${invoiceToVoid.folio}.`);
+          toast.success(`Se anuló el folio ${invoiceToVoid.folio}.`);
         }}
         onClose={() => setInvoiceToVoid(null)}
       />
       <IssueSupportInvoiceDialog
-        open={issuePeriod !== null}
-        description={issuePeriod ? `${formatPeriodMonth(issuePeriod.periodKey)} · ${formatMoney(issuePeriod.amountUf, plan.currency)}` : ''}
-        totalAmount={issuePeriod?.amountUf ?? 0}
+        open={issueTarget !== null}
+        description={
+          issueTarget
+            ? `${formatPeriodMonth(issueTarget.periodKey)} · ${issueTarget.append ? 'saldo por facturar ' : ''}${formatMoney(issueTarget.amountUf, plan.currency)}`
+            : ''
+        }
+        totalAmount={issueTarget?.amountUf ?? 0}
+        reference={issueTarget?.append ? 'pending' : 'calculated'}
         currency={plan.currency}
-        onClose={() => setIssuePeriod(null)}
+        onClose={() => setIssueTarget(null)}
         onConfirm={async (input) => {
-          if (!issuePeriod?.monthlyPeriodId) return;
-          await issueInvoice.mutateAsync({ ...input, monthlyPeriodId: issuePeriod.monthlyPeriodId });
+          if (!issueTarget) return;
+          if (issueTarget.append) await issueInvoice.mutateAsync({ ...input, periodKey: issueTarget.periodKey });
+          else if (issueTarget.monthlyPeriodId) await issueInvoice.mutateAsync({ ...input, monthlyPeriodId: issueTarget.monthlyPeriodId });
+          else return;
           toast.success('Se registró la factura.');
         }}
+      />
+      <ConfirmActionDialog
+        open={periodToClose !== null}
+        title="Cerrar mes por lo facturado"
+        description={
+          periodToClose
+            ? `${formatPeriodMonth(periodToClose.periodKey)} quedará facturado por ${formatMoney(periodToClose.invoicedAmountUf, plan.currency)} (folios ${periodToClose.invoices.map((i) => i.folio).join(', ')}). El saldo de ${formatMoney(periodToClose.pendingAmountUf, plan.currency)} no se cobra después.`
+            : ''
+        }
+        confirmLabel="Cerrar mes"
+        onConfirm={async () => {
+          if (!periodToClose) return;
+          await closeInvoicePeriod.mutateAsync(periodToClose.periodKey);
+          toast.success(`Se cerró ${formatPeriodMonth(periodToClose.periodKey)} por lo facturado.`);
+        }}
+        onClose={() => setPeriodToClose(null)}
       />
       <CloseSupportPlanDialog
         open={closing}

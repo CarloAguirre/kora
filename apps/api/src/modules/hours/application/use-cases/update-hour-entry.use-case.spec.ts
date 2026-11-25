@@ -140,7 +140,7 @@ describe('edición de horas y atribución a bloque', () => {
   it('puede corregir una imputación aún pendiente sin modificar su número de horas', async () => {
     const { useCase, entry, save } = setup();
     const result = await useCase.execute({
-      entryId: 'entry-1', data: { segmentId: 'segment-2' },
+      entryId: 'entry-1', data: { segmentId: 'segment-2', description: 'Apoyo al bloque 2' },
       actor, actorRole: 'collaborator',
     });
     expect(result.isOk()).toBe(true);
@@ -148,6 +148,28 @@ describe('edición de horas y atribución a bloque', () => {
     expect(entry.toSnapshot()).toMatchObject({
       segmentId: 'segment-2', taskId: null, moduleId: 'module-1', hours: 4,
     });
+  });
+
+  it('pasar de una tarea a «Otro» exige describir lo realizado', async () => {
+    const { useCase, save } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { moduleId: 'module-1', segmentId: 'segment-1', taskId: null },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isErr()).toBe(true);
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_OTHER_DESCRIPTION_REQUIRED');
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('pasar a «Otro» con descripción se guarda sin tarea', async () => {
+    const { useCase, entry } = setup();
+    const result = await useCase.execute({
+      entryId: 'entry-1',
+      data: { moduleId: 'module-1', segmentId: 'segment-1', taskId: null, description: 'Reunión con cliente' },
+      actor, actorRole: 'collaborator',
+    });
+    expect(result.isOk()).toBe(true);
+    expect(entry.toSnapshot()).toMatchObject({ taskId: null, description: 'Reunión con cliente' });
   });
 
   it('no permite trasladar las HH a un bloque ajeno', async () => {
@@ -215,11 +237,42 @@ function buildUseCase(
     new FixedClock(NOW),
     new SequentialIdGenerator(),
   );
-  return { useCase, entries };
+  return { useCase, entries, projects };
 }
 
 const OWNER = { userId: 'collab-1', email: 'collab@kabeli.cl' };
 const BOSS = { userId: 'boss-1', email: 'boss@kabeli.cl' };
+
+describe('UpdateHourEntryUseCase — asignación según etapa comercial', () => {
+  const approvedProject = { id: 'project-1', name: 'P', status: 'active', leaderUserId: null, allowsOvertime: false,
+    type: 'development', salesStage: 'approved' };
+
+  it('rechaza cambiar a "Prospecto" en un proyecto aprobado', async () => {
+    const { useCase, entries, projects } = buildUseCase(buildEntry('2026-10-20'), { 'project-1': 'active' });
+    vi.mocked(projects.findById).mockResolvedValue(approvedProject as never);
+
+    const result = await useCase.execute({ entryId: 'entry-1', data: { assignment: 'Prospecto' }, actor: OWNER, actorRole: 'collaborator' });
+
+    expect(result.isErr() && result.error.code).toBe('HOUR_ENTRY_ASSIGNMENT_MISMATCHES_PROJECT_STAGE');
+    expect(entries.save).not.toHaveBeenCalled();
+  });
+
+  it('deja corregir horas de un registro histórico "Prospecto" de un proyecto que después se aprobó', async () => {
+    const entry = HourEntry.create({
+      id: 'entry-1', userId: 'collab-1', assignment: 'Prospecto', projectId: 'project-1', category: 'Preventa',
+      hours: 4, date: new Date('2026-10-20'), ownerRequiresApproval: true, now: new Date('2026-10-20T12:00:00.000Z'),
+    }).unwrap();
+    const { useCase, entries, projects } = buildUseCase(entry, { 'project-1': 'active' });
+    vi.mocked(projects.findById).mockResolvedValue(approvedProject as never);
+
+    const result = await useCase.execute({
+      entryId: 'entry-1', data: { assignment: 'Prospecto', projectId: 'project-1', hours: 3 }, actor: OWNER, actorRole: 'collaborator',
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(entries.save).toHaveBeenCalled();
+  });
+});
 
 describe('UpdateHourEntryUseCase', () => {
   it.each(['admin', 'pmo'] as const)('%s edita un registro de un mes cerrado', async (role: RoleCode) => {

@@ -1,7 +1,7 @@
 import type { ProjectPhaseOption } from '@kora/contracts';
 import { Select } from '@/shared/components/ui/Select';
 import styles from './HourEntryFormDialog.module.css';
-import { formatTaskHourSummary, OTHER_TASK_OPTION } from './hour-task-selection';
+import { formatTaskHourSummary, OTHER_TASK_LABEL, OTHER_TASK_OPTION } from './hour-task-selection';
 
 type PlanSegment = Pick<ProjectPhaseOption['segments'][number], 'id' | 'name' | 'teamName' | 'startDate' | 'endDate'>;
 type PlanTask = Pick<ProjectPhaseOption['tasks'][number], 'id' | 'name' | 'estimatedHours' | 'actualHours' | 'pendingHours'>;
@@ -15,6 +15,12 @@ export interface ProjectHourPlanFieldsProps {
   tasks: readonly PlanTask[];
   taskId: string;
   requiresPhase: boolean;
+  /**
+   * El autor es parte del equipo de algún bloque de la fase y no eligió una
+   * tarea propia: el bloque es obligatorio (misma regla que `validateDailyBlock`
+   * y la API). Se marca con asterisco para que no parezca opcional.
+   */
+  requiresSegment?: boolean;
   /** Etiqueta verificable del aprobador, cuando se encuentra en el detalle. */
   approverName?: string | null;
   onPhaseChange: (id: string) => void;
@@ -25,11 +31,11 @@ export interface ProjectHourPlanFieldsProps {
 /**
  * Selector compartido por registro diario, semanal y edición.
  * Fase -> Bloques elegibles si existen -> Tareas propias de la fase.
- * La tarea puede no pertenecer a un bloque del equipo. «Asignar a otra»
- * es una opción explícita de UI y no se envía como task_id.
+ * La tarea puede no pertenecer a un bloque del equipo. «Otro» es una
+ * opción explícita de UI y no se envía como task_id.
  */
 export function ProjectHourPlanFields({
-  phases, phaseId, segments, segmentId, tasks, taskId, requiresPhase, approverName,
+  phases, phaseId, segments, segmentId, tasks, taskId, requiresPhase, requiresSegment = false, approverName,
   onPhaseChange, onSegmentChange, onTaskChange,
 }: ProjectHourPlanFieldsProps) {
   const selectedTask = tasks.find((task) => task.id === taskId);
@@ -49,6 +55,7 @@ export function ProjectHourPlanFields({
         />
         {showTriplet && <>
           {segments.length > 0 && <Select label="Bloque de trabajo"
+            required={requiresSegment}
             placeholder="Seleccionar bloque..."
             options={segments.map((segment) => ({
               value: segment.id, label: segment.name,
@@ -56,10 +63,10 @@ export function ProjectHourPlanFields({
             value={segmentId} onChange={(event) => onSegmentChange(event.target.value)}
           />}
           <Select label="Tarea" required
-            placeholder="Seleccionar tarea o asignar a otra..."
+            placeholder="Seleccionar tarea u «Otro»..."
             options={[
               ...tasks.map((task) => ({ value: task.id, label: task.name })),
-              { value: OTHER_TASK_OPTION, label: 'Asignar a otra (sin tarea vinculada)' },
+              { value: OTHER_TASK_OPTION, label: OTHER_TASK_LABEL },
             ]}
             value={taskId} onChange={(event) => onTaskChange(event.target.value)}
           />
@@ -76,9 +83,13 @@ export function ProjectHourPlanFields({
           <span>Las nuevas HH se registran por separado. Solo las aprobadas se suman a las reales del Roadmap.</span>
         </div>
       ) : <p className={styles.planHelp}>
-        {phaseId
-          ? 'Elige una de tus tareas asignadas o «Asignar a otra» para describir un trabajo sin tarea vinculada.'
-          : 'Selecciona la fase del proyecto. Se mostrarán los bloques de tu equipo, si existen, y tus tareas asignadas.'}
+        {!phaseId
+          ? 'Selecciona la fase del proyecto. Se mostrarán los bloques de tu equipo, si existen, y tus tareas asignadas.'
+          : tasks.length === 0
+            ? 'No tienes tareas asignadas en esta fase: registra tus horas como «Otro», indicando el nombre y la descripción de lo realizado.'
+            : taskId === OTHER_TASK_OPTION
+              ? 'Con «Otro» debes indicar el nombre y la descripción de lo realizado.'
+              : 'Elige una de tus tareas asignadas u «Otro» para un trabajo sin tarea asignada.'}
       </p>}
     </section>
   );

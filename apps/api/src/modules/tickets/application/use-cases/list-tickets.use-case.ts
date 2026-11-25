@@ -69,7 +69,15 @@ export async function resolveTicketFilters(
     status: query.status,
     priority: query.priority,
     activityBetween: query.month ? monthRange(query.month) : undefined,
+    workedBetween: query.workedFrom || query.workedTo ? workedRange(query.workedFrom, query.workedTo) : undefined,
   };
+}
+
+/** [workedFrom, día siguiente a workedTo) en UTC, desde 'YYYY-MM-DD' inclusivos. */
+function workedRange(workedFrom: string | undefined, workedTo: string | undefined): { from: Date | undefined; to: Date | undefined } {
+  const to = workedTo ? new Date(`${workedTo}T00:00:00.000Z`) : undefined;
+  to?.setUTCDate(to.getUTCDate() + 1);
+  return { from: workedFrom ? new Date(`${workedFrom}T00:00:00.000Z`) : undefined, to };
 }
 
 /** [primer día del mes, primer día del siguiente) en UTC, desde 'YYYY-MM'. */

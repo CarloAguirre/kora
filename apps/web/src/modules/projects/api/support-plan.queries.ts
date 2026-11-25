@@ -123,6 +123,15 @@ export function useUploadSupportInvoiceAttachment() {
   });
 }
 
+/** "Cerrar mes por lo facturado" — el saldo de un período "facturado parcial" deja de cobrarse. */
+export function useCloseSupportInvoicePeriod(planId: string, clientId?: string) {
+  const invalidate = useInvalidateSupportPlans(clientId);
+  return useMutation({
+    mutationFn: (periodKey: string) => supportPlanApi.closeInvoicePeriod(planId, { periodKey }),
+    onSuccess: () => invalidate(),
+  });
+}
+
 export function useVoidSupportInvoice(clientId?: string) {
   const invalidate = useInvalidateSupportPlans(clientId);
   return useMutation({

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { Fragment, useState, type CSSProperties } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styles from './ProjectDetailPage.module.css';
 import { DashboardLayout } from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/shared/components/ui/Button';
+import { Card } from '@/shared/components/ui/Card';
 import { PageLoadError } from '@/shared/components/ui/PageLoadError';
 import { Select } from '@/shared/components/ui/Select';
 import { ChevronLeftIcon } from '@/shared/components/icons/Icons';
@@ -64,7 +65,7 @@ export function ProjectDetailPage() {
   if (isLoading || !project || !projectId) {
     return (
       <DashboardLayout title="Proyectos">
-        <p>Cargando…</p>
+        <ProjectDetailSkeleton />
       </DashboardLayout>
     );
   }
@@ -167,5 +168,80 @@ export function ProjectDetailPage() {
             />}
       </div>
     </DashboardLayout>
+  );
+}
+
+const SKELETON_METRICS = 5;
+const SKELETON_TABS = [72, 80, 72, 96];
+
+/**
+ * Esqueleto de la ficha mientras carga: misma estructura que la vista real
+ * (título, volver, tarjeta de datos, KPIs, pestañas y dos columnas) para que
+ * no haya salto cuando llegan los datos. Sirve tanto para desarrollo como soporte.
+ */
+function ProjectDetailSkeleton() {
+  const bar = (extra: string | undefined, style?: CSSProperties) => (
+    <span className={[styles.skeletonBar, extra].join(' ')} style={style} />
+  );
+
+  return (
+    <div className={styles.page} role="status" aria-busy="true" aria-label="Cargando proyecto">
+      <div className={styles.headerBlock}>{bar(styles.skeletonTitle)}</div>
+
+      <div className={styles.topRow}>{bar(styles.skeletonButton)}</div>
+
+      <Card className={styles.infoCard}>
+        <div className={styles.skeletonInfoGrid}>
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className={styles.skeletonStack}>
+              {bar(styles.skeletonLabel)}
+              {bar(styles.skeletonLine, { width: `${60 + ((index * 13) % 30)}%` })}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        {bar(styles.skeletonLine, { width: '40%' })}
+        {bar(styles.skeletonProgress)}
+        <div className={styles.metricsDivider} />
+        <div className={styles.metricsStrip}>
+          {Array.from({ length: SKELETON_METRICS }, (_, index) => (
+            <div key={index} className={[styles.metricItem, styles.skeletonStack].join(' ')}>
+              {bar(styles.skeletonLabel)}
+              {bar(styles.skeletonKpi)}
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <div className={styles.tabsShell}>
+        <div className={styles.tabsShellBar}>
+          {SKELETON_TABS.map((width, index) => (
+            <span key={index} className={[styles.tabsShellButton, index === 0 ? styles.tabsShellButtonActive : ''].join(' ')}>
+              {bar(styles.skeletonLabel, { width })}
+            </span>
+          ))}
+        </div>
+        <div className={styles.tabsShellBody}>
+          <div className={styles.layout}>
+            <div className={styles.colLeft}>
+              <Card>{bar(styles.skeletonBlock, { height: 220 })}</Card>
+              <Card>{bar(styles.skeletonBlock, { height: 160 })}</Card>
+            </div>
+            <div className={styles.colRight}>
+              <Card>
+                <div className={styles.skeletonStack}>
+                  {bar(styles.skeletonLine, { width: '50%' })}
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <Fragment key={index}>{bar(styles.skeletonLine, { width: `${55 + ((index * 17) % 40)}%` })}</Fragment>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

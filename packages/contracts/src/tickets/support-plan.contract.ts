@@ -195,8 +195,11 @@ export const supportPlanListItemSchema = z.object({
   planValueUf: z.number(),
   currency: supportPlanCurrencySchema,
   /** Estado de facturación del período EN CURSO — no de todo el historial. `null` si el monto a facturar hoy es 0. */
-  currentBillingStatus: z.enum(['to_invoice', 'invoiced']).nullable(),
+  currentBillingStatus: z.enum(['to_invoice', 'partially_invoiced', 'invoiced']).nullable(),
+  /** Facturado parcial: el total esperado del período (el saldo va en `currentPendingAmountUf`). */
   currentAmountUf: z.number(),
+  /** Saldo por facturar del período en curso — solo > 0 si está "facturado parcial". */
+  currentPendingAmountUf: z.number(),
   alerts: z.array(supportPlanAlertSchema),
 });
 export type SupportPlanListItem = z.infer<typeof supportPlanListItemSchema>;

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { projectAnalysisToQuotationDraft } from '../../domain/project-analysis-to-quotation';
 import { QuotationAnalysisIntegrityError, reconcileQuotationAnalysis } from '../../domain/quotation-analysis-integrity';
-import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, type Database } from '@kora/db';
+import { and, asc, desc, eq, inArray, isNull, hourEntries, projectQuotations, projects, quotationEvents, quotationVersions, sql, teams, projectTeams, projectModules, projectModuleTasks, projectModuleSegments, projectPaymentMilestones, projectInvoiceAttachments, projectPaymentReceipts, type Database } from '@kora/db';
 import {
   quotationDraftDataSchema,
   assertQuotationPhaseCapacity,
@@ -33,6 +33,7 @@ import {
   type QuotationVersion,
   type QuotationTeamCatalogEntry,
   type UpdateQuotationDraftInput,
+  soldHoursAreCommercialEstimate,
 } from '@kora/contracts';
 import { DATABASE } from '../../../../shared/infrastructure/database/database.module';
 import { calculateQuotation } from '../../domain/quotation-math';
@@ -1037,10 +1038,29 @@ export class DrizzleQuotationRepository implements QuotationRepository {
         hasOnlyUntouchedDefaultPaymentMilestones(existingPayments) &&
         ((existingHours.length === 0 && Number(project.usedHours) === 0) ||
           hasOnlyCommercialPreparationHours(existingHours, Number(project.usedHours)));
-      const replaceDefaultPayments = hasOnlyUntouchedDefaultPaymentMilestones(existingPayments);
+      // Sin Roadmap ni facturación, HH vendidas, HH por equipo, monto e hitos
+      // son estimados de Prospecto/Cotización: la cotización los reemplaza.
+      // Un hito con datos o archivos de factura/pago cuenta como facturado
+      // aunque su estado no lo diga (borrarlo eliminaría esos archivos en cascada).
+      const paymentIds = existingPayments.map((row) => row.id);
+      const [withInvoiceFiles, withReceipts] = paymentIds.length ? await Promise.all([
+        tx.select({ id: projectInvoiceAttachments.milestoneId }).from(projectInvoiceAttachments)
+          .where(inArray(projectInvoiceAttachments.milestoneId, paymentIds)),
+        tx.select({ id: projectPaymentReceipts.milestoneId }).from(projectPaymentReceipts)
+          .where(inArray(projectPaymentReceipts.milestoneId, paymentIds)),
+      ]) : [[], []];
+      const documented = new Set([...withInvoiceFiles, ...withReceipts].map((row) => row.id));
+      const replacesEstimatedSoldHours = soldHoursAreCommercialEstimate({
+        moduleCount: existingModules.length,
+        paymentStatuses: existingPayments.map((row) =>
+          row.invoiceNumber !== null || row.issuedAt !== null || row.paidAt !== null ||
+            documented.has(row.id) ? 'invoiced' : row.status),
+      });
+      const replaceDefaultPayments = replacesEstimatedSoldHours ||
+        hasOnlyUntouchedDefaultPaymentMilestones(existingPayments);
       // Los hitos antiguos nunca se destruyen salvo los dos placeholders
       // totalmente vacíos. Un contrato anterior en otra moneda no se puede sumar.
-      if (project.contractAmount !== null &&
+      if (!replacesEstimatedSoldHours && project.contractAmount !== null &&
           project.contractCurrency !== version.currency) {
         throw new ConflictException(
           'El contrato previo está en otra moneda. Hay que conciliar los montos ' +
@@ -1079,13 +1099,15 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       // Presupuestos de equipo previos (con o sin fases) se conservan.
       // Cada nueva cotización aporta únicamente sus propias HH y fases;
       // las HH consumidas siguen en projects.used_hours sin modificaciones.
+      const previousSoldHours = replacesEstimatedSoldHours ? 0 : Number(project.soldHours);
       let transferPlan: ReturnType<typeof planCommercialPreparationTransfer>;
       try {
         transferPlan = planCommercialPreparationTransfer({
-          previousSoldHours: Number(project.soldHours),
+          previousSoldHours,
           approvedQuotationHours: Number(version.totalHours),
           phaseZeroBillableHours: draft.phaseZeroBillableHours ?? 0,
           existingTeams,
+          replaceEstimatedTeamHours: replacesEstimatedSoldHours,
           quotationTeams: [...byTeam].map(([teamId, quotedHours]) => ({
             teamId, quotedHours,
           })),
@@ -1119,6 +1141,13 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             updatedAt: new Date(),
           },
         });
+      }
+      // HH estimadas de equipos que no entraron a la cotización: dejan de ser
+      // presupuesto. El equipo, su cupo, líder e integrantes se conservan.
+      if (transferPlan.clearedEstimatedTeamIds.length > 0) {
+        await tx.update(projectTeams).set({ assignedHours: null, updatedAt: new Date() })
+          .where(and(eq(projectTeams.projectId, projectId),
+            inArray(projectTeams.teamId, transferPlan.clearedEstimatedTeamIds)));
       }
       // Las fases comercialmente aceptadas son la fuente de verdad del
       // Roadmap inicial y de los hitos. No usar nombres de módulos Gemini que
@@ -1193,7 +1222,8 @@ export class DrizzleQuotationRepository implements QuotationRepository {
       if (version.currency !== 'UF' && version.currency !== 'CLP' && version.currency !== 'USD') {
         throw new BadRequestException('Moneda de la cotización incompatible con el contrato del proyecto.');
       }
-      const contractAmount = Number(project.contractAmount ?? 0) + targetTotal;
+      const contractAmount = replacesEstimatedSoldHours
+        ? targetTotal : Number(project.contractAmount ?? 0) + targetTotal;
       if (!Number.isFinite(contractAmount) || contractAmount > 999999999999.99) {
         throw new ConflictException('El monto acumulado excede el rango contractual permitido.');
       }
@@ -1212,7 +1242,9 @@ export class DrizzleQuotationRepository implements QuotationRepository {
           phaseZeroBillableHours: billablePhaseZero,
           futureQuotedHours: Number(version.totalHours),
           uncalendarizedProspectPhase: {
-            priorSoldHours: Number(project.soldHours),
+            priorSoldHours: previousSoldHours,
+            replacedEstimatedSoldHours: replacesEstimatedSoldHours
+              ? Number(project.soldHours) : null,
             phase1AssignedHours: transferPlan.phase1AssignedHours,
             existingTeams: existingTeams.map((row) => ({
               teamId: row.teamId,
@@ -1221,6 +1253,7 @@ export class DrizzleQuotationRepository implements QuotationRepository {
             })),
           },
           phase2QuotationAllocations: transferPlan.teamAllocations,
+          clearedEstimatedTeamIds: transferPlan.clearedEstimatedTeamIds,
           paymentCount: draft.paymentPlan.length,
           preservedPreviousPayments: !replaceDefaultPayments,
           preservedStartDate: true,

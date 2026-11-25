@@ -1,6 +1,13 @@
 import * as XLSX from 'xlsx';
 import type { ProjectSummary, SupportProjectUsage } from '@kora/contracts';
-import { PROJECT_PRIORITY_LABELS, SUPPORT_PLAN_TYPE_LABELS } from '@kora/contracts';
+import {
+  PROJECT_KIND_LABELS,
+  PROJECT_PHASE_LABELS,
+  PROJECT_PRIORITY_LABELS,
+  PROJECT_STATUS_LABELS,
+  SUPPORT_PLAN_TYPE_LABELS,
+  projectKindOf,
+} from '@kora/contracts';
 import { getProjectStageLabel } from './project-stage-display';
 import { formatProgressDelay, formatProgressPercent } from './project-progress-display';
 import { supportHoursOf, type SupportHoursFigures } from './support-hours-display';
@@ -20,7 +27,12 @@ const DEVELOPMENT_COLUMNS: readonly ExportColumn[] = [
   { label: 'Nombre', getValue: (p) => p.name },
   { label: 'Cliente', getValue: (p) => p.client?.companyName ?? '-' },
   { label: 'Líder', getValue: (p) => p.leader?.fullName ?? '-' },
-  { label: 'Estado', getValue: (p) => getProjectStageLabel(p) },
+  // Igual que la tabla: Tipo, Estado y Etapa por separado, con los mismos valores que ofrecen sus
+  // filtros. Antes iban fundidos en una sola columna (`getProjectStageLabel`) y un proyecto en
+  // Levantamiento salía como "No iniciado"/"Cotizado"/etc., así que filtrar el Excel no cuadraba con la pantalla.
+  { label: 'Tipo de proyecto', getValue: (p) => PROJECT_KIND_LABELS[projectKindOf(p)] },
+  { label: 'Estado', getValue: (p) => PROJECT_STATUS_LABELS[p.status] },
+  { label: 'Etapa', getValue: (p) => (p.phase ? PROJECT_PHASE_LABELS[p.phase] : '-') },
   { label: 'Inicio', getValue: (p) => formatDate(p.startDate) },
   { label: 'Fin', getValue: (p) => formatDate(p.endDate) },
   { label: '% Avance', getValue: (p) => formatProgressPercent(p.progress.actual) },

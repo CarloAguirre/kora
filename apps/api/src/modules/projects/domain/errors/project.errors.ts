@@ -352,6 +352,13 @@ export class CannotChangeProjectInternalFlagError extends ForbiddenError {
   }
 }
 
+/** Las HH vendidas son un compromiso comercial: solo Gerencia/PMO (`projects:manage`) las ajusta, no el líder del proyecto. */
+export class CannotChangeProjectSoldHoursError extends ForbiddenError {
+  constructor() {
+    super('Solo Gerencia/PMO puede modificar las HH vendidas del proyecto.', 'PROJECT_CANNOT_CHANGE_SOLD_HOURS');
+  }
+}
+
 /** Un proyecto interno no se cobra: no tiene tramos de pago que crear ni facturar. */
 export class ProjectIsInternalError extends ValidationError {
   constructor() {

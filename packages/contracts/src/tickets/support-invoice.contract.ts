@@ -10,11 +10,14 @@ import {
 
 /**
  * Una fila de `support_invoices` es un hecho consumado, no un estado: que
- * exista alguna para un `(planId, periodKey)` YA significa "facturado". El
- * total de un período se puede dividir en varias facturas (varias filas del
- * mismo período), que se registran todas juntas. Su suma es el monto
+ * exista alguna para un `(planId, periodKey)` YA significa "facturado" (o
+ * "facturado parcial"). El total de un período se puede dividir en varias
+ * facturas (varias filas del mismo período), registradas juntas o en
+ * distintos momentos: si al registrar la suma queda bajo el total, el saldo
+ * sigue por facturar ("facturado parcial") hasta que se registren las que
+ * faltan o se cierre el mes por lo facturado. Cerrado, la suma es el monto
  * congelado del período — puede diferir del calculado por Kora (p. ej. una
- * cuota fija que no cobra el excedente); la UI avisa la diferencia. El estado de pago es de cada factura y se deriva al leer
+ * cuota fija que no cobra el excedente). El estado de pago es de cada factura y se deriva al leer
  * (`paidAt` → pagado; `dueAt` vencido → atrasado; si no, pendiente) — nunca
  * se guarda, ver el comentario en `packages/db/src/schema/tickets.ts`. Kora
  * no emite la factura: solo registra que ya se emitió y cuándo se pagó.
@@ -24,12 +27,14 @@ import {
 export const MAX_SUPPORT_INVOICES_PER_PERIOD = 10;
 export const MAX_SUPPORT_INVOICE_PDF_BYTES = 5 * 1024 * 1024;
 
-export const SUPPORT_INVOICE_BILLING_STATUSES = ['to_invoice', 'invoiced'] as const;
+/** `partially_invoiced`: el período ya tiene facturas, pero suman menos que su total — queda saldo por facturar. */
+export const SUPPORT_INVOICE_BILLING_STATUSES = ['to_invoice', 'partially_invoiced', 'invoiced'] as const;
 export const supportInvoiceBillingStatusSchema = z.enum(SUPPORT_INVOICE_BILLING_STATUSES);
 export type SupportInvoiceBillingStatus = z.infer<typeof supportInvoiceBillingStatusSchema>;
 
 export const SUPPORT_INVOICE_BILLING_STATUS_LABELS: Readonly<Record<SupportInvoiceBillingStatus, string>> = {
   to_invoice: 'Por facturar',
+  partially_invoiced: 'Facturado parcial',
   invoiced: 'Facturado',
 };
 
@@ -56,6 +61,8 @@ export const supportInvoiceSchema = z.object({
   hoursBilled: z.number().nullable(),
   /** Orden dentro de las facturas del período (0 = la primera). */
   position: z.number().int(),
+  /** Total esperado del período mientras está "facturado parcial" — `null` si el período quedó cerrado. Igual en todas sus facturas. */
+  targetAmountUf: z.number().nullable(),
   folio: z.string(),
   invoicedAt: z.iso.date(),
   dueAt: z.iso.date().nullable(),
@@ -85,6 +92,14 @@ export const markSupportInvoiceIssuedSchema = z.object({
     .refine((invoices) => new Set(invoices.map((invoice) => invoice.folio.trim())).size === invoices.length, 'Hay folios repetidos.'),
   /** Solo `monthly`: el período a facturar (el vigente o uno ya cerrado que quedó sin factura). Sin él, se factura el vigente. */
   monthlyPeriodId: uuidSchema.optional(),
+  /** Agregar facturas a un período "facturado parcial" ('YYYY-MM') — sirve para cualquier tipo de contrato y cualquier mes. */
+  periodKey: z.string().regex(/^\d{4}-\d{2}$/, 'Formato de período inválido.').optional(),
+  /**
+   * Si lo registrado suma menos que el total del período: `false` (por
+   * defecto) deja el saldo por facturar — quedan facturas por emitir —;
+   * `true` cierra el mes por lo registrado y la diferencia no se cobra.
+   */
+  closePeriod: z.boolean().optional(),
 });
 export type MarkSupportInvoiceIssuedInput = z.infer<typeof markSupportInvoiceIssuedSchema>;
 
@@ -98,17 +113,39 @@ export const supportInvoiceRefSchema = z.object({
 });
 export type SupportInvoiceRef = z.infer<typeof supportInvoiceRefSchema>;
 
+/** "Cerrar mes por lo facturado" — un período "facturado parcial" deja de tener saldo por facturar. */
+export const closeSupportInvoicePeriodSchema = z.object({
+  periodKey: z.string().regex(/^\d{4}-\d{2}$/, 'Formato de período inválido.'),
+});
+export type CloseSupportInvoicePeriodInput = z.infer<typeof closeSupportInvoicePeriodSchema>;
+
+/** Un período con facturas que todavía no cubren su total — para registrar las que faltan o cerrarlo. */
+export const supportInvoicePendingPeriodSchema = z.object({
+  /** 'YYYY-MM'. */
+  periodKey: z.string(),
+  monthlyPeriodId: uuidSchema.nullable(),
+  /** Total esperado del período. */
+  totalAmountUf: z.number(),
+  /** Suma de las facturas ya registradas. */
+  invoicedAmountUf: z.number(),
+  /** Lo que falta por facturar (`totalAmountUf - invoicedAmountUf`). */
+  pendingAmountUf: z.number(),
+  invoices: z.array(supportInvoiceRefSchema),
+});
+export type SupportInvoicePendingPeriod = z.infer<typeof supportInvoicePendingPeriodSchema>;
+
 export const markSupportInvoicePaidSchema = z.object({
   paidAt: z.iso.date(),
 });
 export type MarkSupportInvoicePaidInput = z.infer<typeof markSupportInvoicePaidSchema>;
 
 /**
- * `invoiced`: ya tiene factura. `to_invoice`: el período vigente o uno ya
+ * `invoiced`: ya tiene factura. `partially_invoiced`: tiene facturas que no
+ * cubren su total — queda saldo por facturar. `to_invoice`: el período vigente o uno ya
  * cerrado sin factura — se puede registrar ahora. `upcoming`: un mes futuro
  * del contrato; se habilita cuando empieza (`startDate`).
  */
-export const SUPPORT_MONTHLY_BILLING_PERIOD_STATUSES = ['invoiced', 'to_invoice', 'upcoming'] as const;
+export const SUPPORT_MONTHLY_BILLING_PERIOD_STATUSES = ['invoiced', 'partially_invoiced', 'to_invoice', 'upcoming'] as const;
 export const supportMonthlyBillingPeriodStatusSchema = z.enum(SUPPORT_MONTHLY_BILLING_PERIOD_STATUSES);
 export type SupportMonthlyBillingPeriodStatus = z.infer<typeof supportMonthlyBillingPeriodStatusSchema>;
 
@@ -123,8 +160,10 @@ export const supportMonthlyBillingPeriodSchema = z.object({
   endDate: z.iso.date(),
   isCurrent: z.boolean(),
   status: supportMonthlyBillingPeriodStatusSchema,
-  /** Facturado: el monto congelado (la suma de sus facturas). Si no: la cuota (HH del período × valor hora, más el excedente si corresponde) — en los meses futuros es una estimación. */
+  /** Facturado: el monto congelado (la suma de sus facturas). Facturado parcial: el total esperado. Si no: la cuota (HH del período × valor hora, más el excedente si corresponde) — en los meses futuros es una estimación. */
   amountUf: z.number(),
+  /** Lo que falta por facturar — solo > 0 en `partially_invoiced`. */
+  pendingAmountUf: z.number(),
   /** Las facturas del mes, en orden — vacío si todavía no se factura. */
   invoices: z.array(supportInvoiceRefSchema),
 });
@@ -135,6 +174,8 @@ export const supportPlanWithInvoicesSchema = supportPlanDetailSchema.extend({
   invoices: z.array(supportInvoiceSchema),
   /** Solo `monthly` (vacío en bolsa/a demanda): todos los meses del contrato, del primero al último. */
   billingPeriods: z.array(supportMonthlyBillingPeriodSchema),
+  /** Períodos "facturado parcial" (cualquier tipo de contrato), del más antiguo al más nuevo. */
+  pendingPeriods: z.array(supportInvoicePendingPeriodSchema),
 });
 export type SupportPlanWithInvoices = z.infer<typeof supportPlanWithInvoicesSchema>;
 
@@ -146,15 +187,17 @@ export const supportBillingRowSchema = z.object({
   clientName: z.string(),
   scope: supportPlanScopeSchema,
   planType: supportPlanTypeSchema,
-  /** `null` = sin movimiento en este período (ni factura registrada ni monto en vivo — solo posible en períodos pasados). */
+  /** `null` = sin movimiento en este período (ni factura registrada ni monto en vivo — solo posible en períodos pasados). Facturado parcial: el total esperado. */
   amountUf: z.number().nullable(),
+  /** Saldo por facturar de un período "facturado parcial"; 0 en el resto. */
+  pendingAmountUf: z.number(),
   currency: supportPlanCurrencySchema,
   billingStatus: supportInvoiceBillingStatusSchema.nullable(),
   /** Con varias facturas en el período: atrasado si alguna lo está; pagado solo si están todas pagadas. */
   paymentStatus: supportInvoicePaymentStatusSchema.nullable(),
   /** Facturas del período de la fila, en orden — para "Marcar como pagado" desde el panel. */
   invoices: z.array(supportInvoiceRefSchema),
-  /** Solo en el período en curso, por facturar y con monto > 0 — mismas condiciones que exige `MarkSupportInvoiceIssuedUseCase`. */
+  /** Por facturar en el período en curso con monto > 0, o "facturado parcial" en cualquier período — mismas condiciones que exige `MarkSupportInvoiceIssuedUseCase`. */
   canInvoice: z.boolean(),
   hasAlert: z.boolean(),
   /** Qué alertas tiene — para el tooltip del ícono. Vacío ⇔ `hasAlert` falso. */
@@ -171,6 +214,7 @@ export type SupportBillingRow = z.infer<typeof supportBillingRowSchema>;
  */
 export const supportBillingKpiGroupSchema = z.object({
   currency: supportPlanCurrencySchema,
+  /** Incluye el saldo de los períodos "facturado parcial". */
   toInvoiceAmount: z.number(),
   toInvoiceCount: z.number().int(),
   invoicedAmount: z.number(),
@@ -241,7 +285,7 @@ export const BILLING_LEDGER_LINE_LABELS: Readonly<Record<BillingLedgerLine, stri
 };
 
 /**
- * `pendiente`: Soporte — ciclo vigente sin factura; Proyecto — el hito del tramo aún no se cumple.
+ * `pendiente`: Soporte — ciclo vigente sin factura, o el saldo de un período "facturado parcial"; Proyecto — el hito del tramo aún no se cumple.
  * `por_facturar`: solo Proyecto — el hito se cumplió y falta emitir la factura.
  */
 export const BILLING_LEDGER_STATUSES = ['pendiente', 'por_facturar', 'facturado', 'atrasado', 'pagado'] as const;

@@ -393,7 +393,8 @@ export function EditDevelopmentProjectDialog({
             <TextField label="Fecha de fin" type="date" disabled={estimationDisabled}
               {...register('endDate', { setValueAs: (v: string) => v || null })} />
             <TextField label={tipo === 'prospecto' || tipo === 'cotizacion' ? 'HH estimadas' : 'HH vendidas'}
-              type="number" min={0} disabled={estimationDisabled}
+              type="number" min={0} disabled={estimationDisabled || !isManagement}
+              helperText={isManagement ? undefined : 'Solo Gerencia/PMO puede modificarlas.'}
               errorText={errors.soldHours?.message} {...register('soldHours')} />
           </div>
           {soldHoursChanged && <div className={styles.field}>

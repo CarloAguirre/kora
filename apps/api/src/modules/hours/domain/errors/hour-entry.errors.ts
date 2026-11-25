@@ -1,4 +1,5 @@
 import { ConflictError, DomainError, NotFoundError, ValidationError } from '@kora/core';
+import { OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE } from '@kora/contracts';
 
 export class HourEntryNotFoundError extends NotFoundError {
   constructor(identifier: string) {
@@ -110,6 +111,13 @@ export class HourEntrySegmentRequiredError extends ValidationError {
   }
 }
 
+/** «Otro» (fase sin tarea vinculada) exige describir lo realizado. */
+export class OtherWorkDescriptionRequiredError extends ValidationError {
+  constructor() {
+    super(OTHER_WORK_DESCRIPTION_REQUIRED_MESSAGE, 'HOUR_ENTRY_OTHER_DESCRIPTION_REQUIRED');
+  }
+}
+
 export class SegmentNotInModuleError extends DomainError {
   constructor() {
     super('HOUR_ENTRY_SEGMENT_NOT_IN_MODULE', 'El tiempo de ejecución elegido no pertenece a esta fase.');
@@ -130,6 +138,22 @@ export class ProjectClosedError extends ConflictError {
 }
 
 /** El proyecto no tiene autorizadas horas extra — el líder del proyecto/equipo debe habilitarlo primero. */
+/**
+ * La asignación no calza con la etapa comercial del proyecto: "Prospecto" es
+ * solo para proyectos en prospecto o cotización y "Proyecto" para aprobados o
+ * de soporte (ver `expectedAssignmentForProject`).
+ */
+export class AssignmentMismatchesProjectStageError extends ValidationError {
+  constructor(expected: 'Proyecto' | 'Prospecto') {
+    super(
+      expected === 'Proyecto'
+        ? 'Este proyecto ya está aprobado: registra las horas con la asignación "Proyecto".'
+        : 'Este proyecto está en prospecto o cotización: registra las horas con la asignación "Prospecto".',
+      'HOUR_ENTRY_ASSIGNMENT_MISMATCHES_PROJECT_STAGE',
+    );
+  }
+}
+
 export class ProjectOvertimeNotAllowedError extends ConflictError {
   constructor() {
     super('Este proyecto no tiene autorizadas horas extra.', 'HOUR_ENTRY_PROJECT_OVERTIME_NOT_ALLOWED');

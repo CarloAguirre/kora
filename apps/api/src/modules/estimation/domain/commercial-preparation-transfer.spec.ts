@@ -51,6 +51,33 @@ describe('Fase 1 no calendarizada: presupuestos preexistentes al traspasar', () 
     expect(plan.teamAllocations.find((item) => item.teamId === 'ux')).toBeUndefined();
   });
 
+  it('reemplaza las HH estimadas por equipo y limpia las de equipos no cotizados', () => {
+    const plan = planCommercialPreparationTransfer({
+      previousSoldHours: 0,
+      approvedQuotationHours: 100,
+      replaceEstimatedTeamHours: true,
+      existingTeams: [
+        { teamId: 'desarrollo', assignedHours: '400' },
+        { teamId: 'ux', assignedHours: '220' },
+        { teamId: 'pmo', assignedHours: null },
+      ],
+      quotationTeams: [
+        { teamId: 'desarrollo', quotedHours: 70 },
+        { teamId: 'qa', quotedHours: 30 },
+      ],
+    });
+    expect(plan.projectSoldHours).toBe(100);
+    expect(plan.phase1AssignedHours).toBe(0);
+    expect(plan.teamAllocations).toEqual([
+      { teamId: 'desarrollo', phase1Hours: 0, quotationHours: 70,
+        combinedHours: 70, existedBefore: true },
+      { teamId: 'qa', phase1Hours: 0, quotationHours: 30,
+        combinedHours: 30, existedBefore: false },
+    ]);
+    // "pmo" no tenía presupuesto declarado: no hay nada que limpiar.
+    expect(plan.clearedEstimatedTeamIds).toEqual(['ux']);
+  });
+
   it('permite un proyecto ya iniciado con muchas HH consumidas fuera del nuevo presupuesto', () => {
     // Las 180 HH aprobadas previamente NO son parte de este cálculo.
     const usedHours = 180;

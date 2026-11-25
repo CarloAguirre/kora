@@ -4,7 +4,7 @@ import { ListSupportProjectUsageUseCase } from './list-support-project-usage.use
 import type { SupportPlanRecord, SupportPlanRepository } from '../../domain/repositories/support-plan.repository';
 import type { TicketProjectReader } from '../ports/ticket-project-reader.port';
 import type { SupportPlanSummaryBuilder } from '../services/support-plan-summary-builder';
-import type { HourEntryRepository } from '../../../hours/domain/repositories/hour-entry.repository';
+import type { SupportConsumptionReader } from '../ports/support-consumption-reader.port';
 import { FixedClock } from '../../../../test/fakes';
 
 const NOW = new Date('2026-11-18T12:00:00.000Z');
@@ -30,7 +30,7 @@ function setup(
       } as SupportPlanRecord;
     }),
   };
-  const hourEntries = { sumApprovedHoursForProjects: vi.fn().mockResolvedValue(monthHours) };
+  const hourEntries = { listDailyHours: vi.fn().mockResolvedValue(monthHours > 0 ? [{ date: '2026-11-15', hours: monthHours }] : []) };
   const projects = { isParticipant: vi.fn(async (projectId: string) => participants.has(projectId)) };
   const builder = {
     resolveLinkedProjectIds: vi.fn().mockResolvedValue(['linked']),
@@ -40,7 +40,7 @@ function setup(
     plans as unknown as SupportPlanRepository,
     projects as unknown as TicketProjectReader,
     builder as unknown as SupportPlanSummaryBuilder,
-    hourEntries as unknown as HourEntryRepository,
+    hourEntries as unknown as SupportConsumptionReader,
     new FixedClock(NOW),
   );
   return { useCase, projects, hourEntries };
@@ -89,7 +89,7 @@ describe('ListSupportProjectUsageUseCase', () => {
         contractUsedHours: 4,
       },
     ]);
-    expect(hourEntries.sumApprovedHoursForProjects).toHaveBeenCalledWith(
+    expect(hourEntries.listDailyHours).toHaveBeenCalledWith(
       ['linked'],
       new Date('2026-11-01T00:00:00.000Z'),
       new Date('2026-11-30T00:00:00.000Z'),
@@ -106,7 +106,7 @@ describe('ListSupportProjectUsageUseCase', () => {
 
     await useCase.execute({ projectIds: ['sol'], actorUserId: 'u', actorPermissions: ['projects:read'] });
 
-    expect(hourEntries.sumApprovedHoursForProjects).toHaveBeenCalledWith(
+    expect(hourEntries.listDailyHours).toHaveBeenCalledWith(
       ['linked'],
       new Date('2026-11-10T00:00:00.000Z'),
       new Date('2026-11-30T00:00:00.000Z'),

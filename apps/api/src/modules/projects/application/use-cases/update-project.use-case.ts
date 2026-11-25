@@ -12,6 +12,7 @@ import {
 import type { Permission, UpdateProjectInput } from '@kora/contracts';
 import {
   CannotChangeProjectInternalFlagError,
+  CannotChangeProjectSoldHoursError,
   CannotManageProjectError,
   CannotReassignProjectLeaderError,
   ProjectNameAlreadyInUseError,
@@ -89,6 +90,11 @@ export class UpdateProjectUseCase implements UseCase<UpdateProjectCommand, void,
 
     if (!hasFullManage && data.isInternal !== undefined && data.isInternal !== project.isInternal) {
       return err(new CannotChangeProjectInternalFlagError());
+    }
+
+    // Mismo criterio no-op que `leaderUserId`: el formulario reenvía el valor sin tocarlo.
+    if (!hasFullManage && data.soldHours !== undefined && data.soldHours !== project.toSnapshot().soldHours) {
+      return err(new CannotChangeProjectSoldHoursError());
     }
 
     // Al retroceder la etapa comercial desde un proyecto activo, primero se debe

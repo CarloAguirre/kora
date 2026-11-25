@@ -27,6 +27,7 @@ import { HourEntryFormDialog } from './HourEntryFormDialog';
 import { useApproveHourEntry, useDeleteHourEntry, useHourEntriesList, useRejectHourEntry } from '../api/hours.queries';
 import { useHourEntriesExport } from '../hooks/useHourEntriesExport';
 import { canDecideHourEntry, resolvedApprover } from '../lib/approver';
+import { hourEntryAssignmentLabel } from '../lib/assignment-label';
 import { isInCurrentMonth } from '../lib/edit-window';
 import { useProjectsList } from '@/modules/projects/api/projects.queries';
 import { getProjectOptionLabel } from '@/modules/projects/lib/project-option-label';
@@ -202,7 +203,7 @@ export function TeamHourHistoryPanel({ teamId, userId }: { teamId?: string; user
     { key: 'author', header: 'Autor', render: (e) => e.user.fullName },
     { key: 'team', header: 'Equipo', render: (e) => e.team?.name ?? <span className={styles.empty}>—</span> },
     { key: 'project', header: 'Proyecto', render: (e) => e.project?.name ?? <span className={styles.empty}>—</span> },
-    { key: 'assignment', header: 'Asignación', render: (e) => e.assignment ?? 'Desarrollo' },
+    { key: 'assignment', header: 'Asignación', render: (e) => hourEntryAssignmentLabel(e) },
     { key: 'category', header: 'Actividad', render: (e) => e.category || <span className={styles.empty}>—</span> },
     { key: 'hours', header: 'Horas', align: 'right', render: (e) => formatHours(e.hours) },
     {

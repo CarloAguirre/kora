@@ -78,6 +78,11 @@ export const envSchema = z.object({
   // sigue corrigiendo la ortografía con su diccionario local.
   LANGUAGETOOL_URL: z.url().optional(),
 
+  // API key del export completo (`GET /api/export/kora`), para integraciones
+  // máquina a máquina vía header `X-Api-Key`. Opcional: sin ella el endpoint
+  // queda cerrado (403), nunca abierto.
+  EXPORT_API_KEY: z.string().trim().min(32, 'EXPORT_API_KEY debe tener al menos 32 caracteres.').optional(),
+
   MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(1).max(50).default(5),
   ACCOUNT_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
 

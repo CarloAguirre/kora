@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { QuotationVersion } from '@kora/contracts';
 import { buildQuotationWorkbook, patchQuotationSlideXml, quotationClientBrief, quotationClientExclusions, quotationRepresentativeTeamActivities, quotationExportModel } from './quotation-export';
-import { patchStyledTableSheet } from './quotation-export-template';
+import { patchStyledTableSheet, quotationCostRecurrenceLabel, quotationPaymentTriggerLabel } from './quotation-export-template';
 
 const version = (patch: Record<string, unknown> = {}): QuotationVersion => ({
   id: 'v-a', quotationId: 'q-a', versionNumber: 1, name: 'Versión 1',
@@ -585,6 +585,31 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(workbook.SheetNames).toContain('Fuentes');
     expect(workbook.Sheets.Supuestos?.B3?.v).toBe('API externa disponible');
     expect(workbook.Sheets.Comercial?.C3?.v).toBe(12);
+    expect(workbook.Sheets.Comercial?.D3?.v).toBe('Único · UF');
+  });
+
+  it('traduce recurrencias y disparadores de pago, sin códigos internos', () => {
+    expect(quotationCostRecurrenceLabel('once')).toBe('Único');
+    expect(quotationCostRecurrenceLabel('monthly')).toBe('Mensual');
+    expect(quotationCostRecurrenceLabel('annual')).toBe('Anual');
+    expect(quotationPaymentTriggerLabel({ name: 'Inicio', percent: 50, trigger: 'approval' }))
+      .toBe('Aprobación del proyecto');
+    expect(quotationPaymentTriggerLabel({ name: 'Cierre', percent: 50, trigger: 'phase',
+      triggerPhase: 'Marcha blanca' })).toBe('Inicio de fase: Marcha blanca');
+    expect(quotationPaymentTriggerLabel({ name: 'Hito', percent: 10, trigger: 'date',
+      triggerDate: '2026-12-15' })).toBe('Fecha: 15-12-2026');
+  });
+
+  it('sin descripción ni análisis, el alcance resume las fases registradas', () => {
+    const v = version({ draft: {
+      ...version().draft, mode: 'phases',
+      phases: [
+        { name: 'Levantamiento', startWeek: 1, durationWeeks: 1, teamHours: [] },
+        { name: 'Desarrollo app', startWeek: 2, durationWeeks: 8, teamHours: [] },
+      ],
+    } });
+    const model = quotationExportModel(context(v));
+    expect(model.scope).toBe('Proyecto sin EDT · 2 fases: Levantamiento, Desarrollo app.');
   });
   it('adapta las barras editables del Gantt a las semanas reales de la cotización', () => {
     const v = version({ draft: {
@@ -648,6 +673,24 @@ describe('Exportación de cotizaciones · versión guardada', () => {
     expect(result.documentElement.textContent).toContain('Implementar UI');
     expect(result.documentElement.textContent).not.toContain('257');
     expect(result.getElementsByTagNameNS(ns, 'f')).toHaveLength(0);
+  });
+
+  it('permite reemplazar el estilo de fecha heredado de la fila de ejemplo', () => {
+    const ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    const xml = '<x:worksheet xmlns:x="' + ns + '"><x:sheetData>' +
+      '<x:row r="1"><x:c r="A1" s="4"/></x:row>' +
+      '<x:row r="2"><x:c r="A2" s="10"/></x:row>' +
+      '<x:row r="4"><x:c r="A4" s="16"/><x:c r="B4" s="16"/></x:row>' +
+      '<x:row r="5"><x:c r="A5" s="24"/><x:c r="B5" s="25"/></x:row>' +
+      '</x:sheetData></x:worksheet>';
+    const result = new DOMParser().parseFromString(patchStyledTableSheet(xml, {
+      title: 'T', subtitle: 'S', headers: ['Fase', 'Duración sem.'],
+      data: [['Levantamiento', 1]], styles: { 1: '24' },
+    }), 'application/xml');
+    const cell = Array.from(result.getElementsByTagNameNS(ns, 'c'))
+      .find((c) => c.getAttribute('r') === 'B5');
+    expect(cell?.getAttribute('s')).toBe('24');
+    expect(cell?.textContent).toBe('1');
   });
 
 

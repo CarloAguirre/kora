@@ -18,6 +18,7 @@ interface SupportInvoiceRow {
   currency: string;
   hoursBilled: string | null;
   position: number;
+  targetAmountUf: string | null;
   folio: string;
   invoicedAt: Date;
   dueAt: Date | null;
@@ -36,6 +37,7 @@ function toRecord(row: SupportInvoiceRow): SupportInvoiceRecord {
     currency: row.currency as SupportInvoiceRecord['currency'],
     hoursBilled: row.hoursBilled !== null ? Number(row.hoursBilled) : null,
     position: row.position,
+    targetAmountUf: row.targetAmountUf !== null ? Number(row.targetAmountUf) : null,
     folio: row.folio,
     invoicedAt: row.invoicedAt,
     dueAt: row.dueAt,
@@ -160,6 +162,7 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
         currency: input.currency,
         hoursBilled: input.hoursBilled !== null ? String(input.hoursBilled) : null,
         position: input.position,
+        targetAmountUf: input.targetAmountUf !== null ? String(input.targetAmountUf) : null,
         folio: input.folio,
         invoicedAt: input.invoicedAt,
         dueAt: input.dueAt,
@@ -188,6 +191,22 @@ export class DrizzleSupportInvoiceRepository implements SupportInvoiceRepository
   async markPaid(id: string, paidAt: Date, context?: TransactionContext): Promise<void> {
     const db = resolveDb(this.database, context);
     await db.update(supportInvoices).set({ paidAt, updatedAt: new Date() }).where(eq(supportInvoices.id, id));
+  }
+
+  async setPeriodTarget(planId: string, periodKey: string, targetAmountUf: number | null, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db
+      .update(supportInvoices)
+      .set({ targetAmountUf: targetAmountUf !== null ? String(targetAmountUf) : null, updatedAt: new Date() })
+      .where(and(eq(supportInvoices.planId, planId), eq(supportInvoices.periodKey, periodKey)));
+  }
+
+  async setHoursBilled(id: string, hoursBilled: number | null, context?: TransactionContext): Promise<void> {
+    const db = resolveDb(this.database, context);
+    await db
+      .update(supportInvoices)
+      .set({ hoursBilled: hoursBilled !== null ? String(hoursBilled) : null, updatedAt: new Date() })
+      .where(eq(supportInvoices.id, id));
   }
 
   async removeMany(ids: readonly string[], context?: TransactionContext): Promise<void> {

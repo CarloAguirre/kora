@@ -1,4 +1,5 @@
 import type { ProjectDetail, QuotationVersion } from '@kora/contracts';
+import { soldHoursAreCommercialEstimate } from '@kora/contracts';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
 import styles from './QuotationLifecycleDialogs.module.css';
@@ -90,6 +91,9 @@ type TransferProps = {
   project: ProjectDetail;
   version: QuotationVersion;
   open: boolean;
+  /** Nombres del catálogo de equipos: antes del primer traspaso los equipos
+   * cotizados todavía no están en `project.teams`. */
+  teamNames?: ReadonlyMap<string, string>;
   afterApproval: boolean;
   pending: boolean;
   error?: string;
@@ -100,11 +104,11 @@ type TransferProps = {
 /** Solo una vista previa comercial: el backend sigue validando el traspaso y
  * protegiendo registros operativos existentes antes de aplicar cualquier dato. */
 export function QuotationTransferDialog({
-  project, version, open, afterApproval, pending, error, onClose, onTransfer,
+  project, version, open, teamNames, afterApproval, pending, error, onClose, onTransfer,
 }: TransferProps) {
   const teams = version.draft.teams.map((team) => {
     const teamName = project.teams.find((t) => t.teamId === team.teamId)?.teamName ??
-      'Equipo Kora';
+      teamNames?.get(team.teamId) ?? 'Equipo sin nombre';
     const hours = version.draft.mode === 'phases'
       ? version.draft.phases.reduce((sum, phase) =>
           sum + (phase.teamHours.find((row) => row.teamId === team.teamId)?.hours ?? 0), 0)
@@ -114,11 +118,19 @@ export function QuotationTransferDialog({
   });
   const previousTeamHours = project.teams.reduce((sum, row) =>
     sum + (row.assignedHours ?? 0), 0);
-  const previousSoldHours = project.soldHours ?? 0;
+  // Mismo criterio que el backend: sin Roadmap ni contrato, las HH vendidas
+  // actuales son las «HH estimadas» de Prospecto/Cotización y se reemplazan.
+  const replacesEstimate = soldHoursAreCommercialEstimate({
+    moduleCount: project.modules?.length ?? 0,
+    paymentStatuses: (project.paymentMilestones ?? []).map((row) =>
+      row.invoiceNumber || row.issuedAt || row.paidAt ? 'invoiced' : row.status),
+  });
+  const currentSoldHours = project.soldHours ?? 0;
+  const previousSoldHours = replacesEstimate ? 0 : currentSoldHours;
   const historicalConsumed = project.usedHours ?? 0;
   const historicalBillable = version.draft.phaseZeroBillableHours ?? 0;
   const hasHistoricalPhase = project.teams.length > 0 ||
-    previousSoldHours > 0 || historicalConsumed > 0;
+    currentSoldHours > 0 || historicalConsumed > 0;
   const quotedTeamIds = new Set(teams.map((row) => row.id));
   const weeks = version.draft.phases.length
     ? Math.max(...version.draft.phases.map((phase) => phase.startWeek + phase.durationWeeks - 1))
@@ -127,10 +139,15 @@ export function QuotationTransferDialog({
     { key: 'approval', source: 'Aprobación', target: 'Tipo de proyecto: Proyecto aprobado' },
     ...(hasHistoricalPhase ? [
       { key: 'phase1', source: 'Presupuesto previo del proyecto',
-        target: formatted(previousTeamHours) + ' HH previamente asignadas que se mantienen. ' +
+        target: formatted(previousTeamHours) + (replacesEstimate
+          ? ' HH estimadas por equipo, reemplazadas por la cotización. '
+          : ' HH previamente asignadas que se mantienen. ') +
           formatted(historicalConsumed) + ' HH consumidas históricas conservadas (sin sumarlas otra vez).' },
-      { key: 'previous-sold', source: 'HH vendidas anteriores',
-        target: formatted(previousSoldHours) + ' HH; no se reemplazan.' },
+      replacesEstimate
+        ? { key: 'previous-sold', source: 'HH estimadas (Prospecto/Cotización)',
+            target: formatted(currentSoldHours) + ' HH; se reemplazan por la cotización aprobada.' }
+        : { key: 'previous-sold', source: 'HH vendidas anteriores',
+            target: formatted(previousSoldHours) + ' HH; no se reemplazan.' },
     ] : []),
     { key: 'hours', source: 'Nuevas fases · Cotización',
       target: formatted(version.totalHours) + ' HH nuevas' +
@@ -142,18 +159,24 @@ export function QuotationTransferDialog({
     }] : []),
     { key: 'total-project-hours', source: 'Total HH vendidas tras traspaso',
       target: formatted(previousSoldHours + version.totalHours + historicalBillable) +
-        (historicalBillable > 0
-          ? ' HH (anteriores + fases futuras + Fase 0)'
-          : ' HH (anteriores + cotización)') },
+        (replacesEstimate
+          ? (historicalBillable > 0 ? ' HH (fases futuras + Fase 0)' : ' HH (cotización)')
+          : historicalBillable > 0
+            ? ' HH (anteriores + fases futuras + Fase 0)'
+            : ' HH (anteriores + cotización)') },
     ...teams.map((team) => {
       const existing = project.teams.find((item) => item.teamId === team.id);
       const prior = existing?.assignedHours ?? 0;
+      const label = (/^equipo\b/i.test(team.name) ? team.name : 'Equipo ' + team.name) + ': ' +
+        (existing ? 'se conservan cupo, líder e integrantes · ' : '');
       return {
         key: 'team-' + team.id, source: team.name,
-        target: 'Equipo ' + team.name + ': ' +
-          (existing ? 'se conservan cupo, líder e integrantes · ' : '') +
-          formatted(prior) + ' HH previas + ' + formatted(team.hours) +
-          ' HH nuevas = ' + formatted(prior + team.hours) + ' HH asignadas',
+        target: label + (replacesEstimate
+          ? (existing?.assignedHours != null
+              ? formatted(prior) + ' HH estimadas se reemplazan por '
+              : '') + formatted(team.hours) + ' HH asignadas'
+          : formatted(prior) + ' HH previas + ' + formatted(team.hours) +
+            ' HH nuevas = ' + formatted(prior + team.hours) + ' HH asignadas'),
       };
     }),
     ...project.teams.filter((team) => !quotedTeamIds.has(team.teamId))
@@ -161,7 +184,9 @@ export function QuotationTransferDialog({
         key: 'historic-team-' + team.teamId, source: team.teamName,
         target: 'Equipo histórico conservado: ' +
           (team.assignedHours === null ? 'sin presupuesto declarado' :
-            formatted(team.assignedHours) + ' HH previas') +
+            replacesEstimate
+              ? formatted(team.assignedHours) + ' HH estimadas que quedan sin presupuesto (no está en la cotización)'
+              : formatted(team.assignedHours) + ' HH previas') +
           ' · cupo, líder e integrantes sin cambios',
       })),
     ...(version.draft.phases.length > 0
@@ -179,7 +204,10 @@ export function QuotationTransferDialog({
       : 'Valor neto nuevo: ' + formatted(version.netAmount) + ' ' + version.currency },
     { key: 'plan', source: 'Plan de pago',
       target: 'Tramos: ' + version.draft.paymentPlan.map((item) =>
-        item.name + ' ' + formatted(item.percent) + '%').join(' · ') },
+        item.name + ' ' + formatted(item.percent) + '%').join(' · ') +
+        (replacesEstimate && (project.contractAmount != null ||
+          (project.paymentMilestones ?? []).length > 0)
+          ? ' · reemplaza el monto de contrato y los tramos estimados' : '') },
     { key: 'version', source: 'Versión aprobada',
       target: 'Documentación → Cotización: v' + version.versionNumber },
     { key: 'commercial', source: 'Valor HH, impuesto, licencias',

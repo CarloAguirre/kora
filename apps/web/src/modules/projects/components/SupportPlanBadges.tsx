@@ -39,6 +39,7 @@ export function SupportPlanStatusBadge({ status }: { status: SupportPlanStatus }
 
 const BILLING_TONE: Readonly<Record<SupportInvoiceBillingStatus, BadgeTone>> = {
   to_invoice: 'warning',
+  partially_invoiced: 'brand',
   invoiced: 'info',
 };
 

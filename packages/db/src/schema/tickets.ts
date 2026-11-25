@@ -272,8 +272,10 @@ export const supportPlanProjects = pgTable(
  * se guarda de antemano.
  *
  * El total de un período se puede dividir en varias facturas: una fila por
- * factura, numeradas con `position` (0, 1, …), registradas todas juntas. Su
- * suma es lo facturado del período, aunque difiera del monto calculado. El índice único
+ * factura, numeradas con `position` (0, 1, …). Se pueden registrar juntas o
+ * en distintos momentos: mientras falten, `target_amount_uf` guarda el total
+ * esperado y el saldo sigue "por facturar". Una vez cerrado, la suma es lo
+ * facturado del período, aunque difiera del monto calculado. El índice único
  * `(plan_id, period_key, position)` impide que dos registros simultáneos del
  * mismo período queden ambos guardados (los dos intentan la `position` 0).
  *
@@ -302,6 +304,14 @@ export const supportInvoices = pgTable(
     hoursBilled: numeric('hours_billed', { precision: 10, scale: 2 }),
     /** Orden de la factura dentro del período (0 = la primera) — ver el comentario de la tabla. */
     position: smallint('position').notNull().default(0),
+    /**
+     * Total que se espera facturar en el período cuando sus facturas se emiten
+     * en distintos momentos ("facturado parcial"): mientras la suma de las
+     * facturas sea menor, el saldo sigue por facturar. Se repite igual en todas
+     * las filas del período. `null` = el período quedó cerrado por la suma de
+     * sus facturas (el caso normal, y el de todas las facturas previas a esto).
+     */
+    targetAmountUf: numeric('target_amount_uf', { precision: 12, scale: 2 }),
 
     folio: varchar('folio', { length: 50 }).notNull(),
     invoicedAt: date('invoiced_at', { mode: 'date' }).notNull(),

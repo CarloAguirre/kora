@@ -44,6 +44,7 @@ vi.mock('../api/quotation.queries', () => ({
       transferredVersionId: mocks.transferredVersionId }, isLoading:false, error:null };
   },
   useAppliedQuotationPlanning: () => ({ data:null }),
+  useQuotationActiveTeams: () => ({ data: [] }),
   useDeleteQuotationVersion: () => ({
     mutateAsync:mocks.remove,isPending:false,
   }),

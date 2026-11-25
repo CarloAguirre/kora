@@ -44,6 +44,9 @@ export type ApprovedQuotationTeam = {
 
 /** Traspaso aditivo de presupuesto de equipos: los equipos existentes
  * conservan sus HH y los equipos ausentes de la cotización quedan intactos.
+ * Excepción: con `replaceEstimatedTeamHours` las HH de equipo eran estimadas;
+ * los equipos cotizados quedan solo con sus HH cotizadas y los no cotizados
+ * pierden el presupuesto estimado (conservan cupo, líder e integrantes).
  * No calendariza horas previas ni afecta los módulos existentes.
  * SoldHours y UsedHours son distintos: nunca recalcula consumo histórico.
  */
@@ -54,9 +57,14 @@ export function planCommercialPreparationTransfer(input: {
   phaseZeroBillableHours?: number;
   existingTeams: readonly ExistingProspectTeam[];
   quotationTeams: readonly ApprovedQuotationTeam[];
+  /** HH estimadas de Prospecto/Cotización: la cotización reemplaza el
+   * presupuesto de cada equipo en vez de sumarse (ver soldHoursAreCommercialEstimate). */
+  replaceEstimatedTeamHours?: boolean;
 }): {
   projectSoldHours: number;
   phase1AssignedHours: number;
+  /** Equipos fuera de la cotización cuyo presupuesto estimado queda sin declarar. */
+  clearedEstimatedTeamIds: string[];
   teamAllocations: Array<{
     teamId: string; phase1Hours: number; quotationHours: number;
     combinedHours: number; existedBefore: boolean;
@@ -82,7 +90,7 @@ export function planCommercialPreparationTransfer(input: {
     seen.add(row.teamId);
     const quotation = cents(row.quotedHours);
     sumQuotation += quotation;
-    const previous = existing.get(row.teamId) ?? 0;
+    const previous = input.replaceEstimatedTeamHours ? 0 : existing.get(row.teamId) ?? 0;
     return {
       teamId: row.teamId, phase1Hours: previous / 100,
       quotationHours: quotation / 100,
@@ -96,8 +104,12 @@ export function planCommercialPreparationTransfer(input: {
   return {
     projectSoldHours: (cents(input.previousSoldHours) +
       cents(input.approvedQuotationHours) + cents(input.phaseZeroBillableHours ?? 0)) / 100,
-    phase1AssignedHours: [...existing.values()].reduce((sum, value) =>
-      sum + value, 0) / 100,
+    phase1AssignedHours: input.replaceEstimatedTeamHours ? 0 :
+      [...existing.values()].reduce((sum, value) => sum + value, 0) / 100,
+    clearedEstimatedTeamIds: input.replaceEstimatedTeamHours
+      ? input.existingTeams.filter((row) => !seen.has(row.teamId) &&
+          row.assignedHours !== null).map((row) => row.teamId)
+      : [],
     teamAllocations,
   };
 }

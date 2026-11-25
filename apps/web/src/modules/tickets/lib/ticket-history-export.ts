@@ -1,8 +1,22 @@
 import * as XLSX from 'xlsx';
-import { TICKET_STATUS_LABELS, TICKET_PRIORITY_LABELS, type TicketDailyHours, type TicketSummary } from '@kora/contracts';
+import {
+  TICKET_STATUS_LABELS,
+  TICKET_PRIORITY_LABELS,
+  type TicketContractConsumption,
+  type TicketContractConsumptionResponse,
+  type TicketContractHourEntry,
+  type TicketDailyHours,
+  type TicketSummary,
+} from '@kora/contracts';
 import { ticketExcelSerial, ticketReportDay } from './ticket-history-dates';
 
-const roundHours = (value: number) => Math.round(value * 100) / 100;
+/** Rango de fecha trabajada del filtro ('YYYY-MM-DD' inclusivos); vacío = sin filtro. */
+export interface TicketHistoryWorkedRange {
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+}
+
+const roundHours =(value: number) => Math.round(value * 100) / 100;
 const EXCEL_DATE_FORMAT = 'dd/mm/yyyy';
 type CellValue = string | number;
 
@@ -15,11 +29,32 @@ interface DailyRow {
   readonly dateObservation: string;
 }
 
+/** Fila de la hoja de detalle: de un ticket, o un registro de horas que el contrato consume sin ticket. */
+interface DetailRow {
+  readonly cells: CellValue[];
+  readonly hours: number;
+  readonly kind: 'ticket' | TicketContractHourEntry['source'];
+  /** Proyecto del ticket (vacío en registros sin ticket). */
+  readonly projectId: string;
+  /** Contrato en cuyo total cuenta la fila; `null` = no cuenta en ninguno. */
+  readonly contractId: string | null;
+  readonly countsLabel: string;
+}
+
 interface Reconciliation {
   readonly detailedHours: number;
   readonly undetailedHours: number;
   readonly status: string;
 }
+
+const ENTRY_SOURCE_LABELS: Record<TicketContractHourEntry['source'], string> = {
+  without_ticket: 'Registro sin ticket',
+  linked_project: 'Proyecto vinculado al contrato',
+  deleted_ticket: 'Registro de ticket eliminado',
+};
+
+const OUTSIDE_VALIDITY = 'No: posterior al término del contrato';
+const BEFORE_START = 'Sí: anterior al inicio (se suma al primer mes)';
 
 /** El resumen conserva las columnas históricas en su orden original. */
 const COLUMNS: ReadonlyArray<{ label: string; getValue: (ticket: TicketSummary) => CellValue }> = [
@@ -89,6 +124,7 @@ function reconcile(ticket: TicketSummary, days: readonly TicketDailyHours[]): Re
 function buildDailyRows(
   tickets: readonly TicketSummary[],
   byTicket: ReadonlyMap<string, readonly TicketDailyHours[]>,
+  withWorkedRange: boolean,
 ): DailyRow[] {
   return tickets.flatMap((ticket) => {
     const days = byTicket.get(ticket.id) ?? [];
@@ -105,8 +141,9 @@ function buildDailyRows(
           ? 'Trabajo anterior al reporte (revisar)'
           : '',
     }));
+    // Con rango de fecha trabajada, el desglose solo trae esos días: el resto del total no es "sin detalle", es de otro período.
     const { undetailedHours } = reconcile(ticket, days);
-    if (undetailedHours > 0) {
+    if (!withWorkedRange && undetailedHours > 0) {
       rows.push({
         ticket, day: '', userFullName: '', hours: undetailedHours,
         source: 'Sin detalle diario', dateObservation: '',
@@ -122,6 +159,82 @@ function buildDailyRows(
   });
 }
 
+/**
+ * Contrato en cuyo total cuenta una fila de ticket: el del proyecto del
+ * ticket, salvo que la fecha sea posterior a su término. Las anteriores al
+ * inicio también cuentan (Kora las suma al primer mes). Las HH sin desglose
+ * diario se imputan a la fecha de reporte, igual que en Kora.
+ */
+function ticketDetailRow(row: DailyRow, contracts: readonly TicketContractConsumption[]): DetailRow {
+  const projectId = row.ticket.project?.id ?? '';
+  const base = { cells: DETAIL_COLUMNS.map((column) => column.getValue(row)), hours: row.hours, kind: 'ticket' as const, projectId };
+  if (row.hours <= 0) return { ...base, contractId: null, countsLabel: '' };
+  const contract = contracts.find((item) => item.projectIds.includes(projectId));
+  if (!contract) return { ...base, contractId: null, countsLabel: 'No: sin contrato de soporte' };
+  const day = row.day || ticketReportDay(row.ticket.createdAt);
+  if (contract.endDate !== null && day > contract.endDate) return { ...base, contractId: null, countsLabel: OUTSIDE_VALIDITY };
+  return { ...base, contractId: contract.planId, countsLabel: day < contract.startDate ? BEFORE_START : 'Sí' };
+}
+
+function entryDetailRow(entry: TicketContractHourEntry, contract: TicketContractConsumption | undefined, clientName: string): DetailRow {
+  const title = [entry.category, entry.description].filter(Boolean).join(' — ');
+  return {
+    // Mismo orden que DETAIL_COLUMNS; "Proyecto Desarrollo" lleva el proyecto al que se cargaron las horas.
+    cells: [
+      '', title, entry.userFullName, clientName, contract?.name ?? '', '', entry.projectName, '', '', '',
+      ticketExcelSerial(entry.date), entry.userFullName, entry.hours, ENTRY_SOURCE_LABELS[entry.source], '',
+    ],
+    hours: entry.hours,
+    kind: entry.source,
+    projectId: '',
+    contractId: entry.planId,
+    countsLabel: 'Sí',
+  };
+}
+
+/**
+ * Por contrato: lo que suma este Excel (filas con "Cuenta en total contrato"
+ * = Sí) contra el total que muestra Kora en la ficha del contrato.
+ */
+function buildContractTotalsSheet(
+  contracts: readonly TicketContractConsumption[],
+  rows: readonly DetailRow[],
+  withWorkedRange: boolean,
+): XLSX.WorkSheet {
+  // Con rango de fecha trabajada el Excel suma solo ese período: compararlo con el total de todo el contrato no cuadraría nunca.
+  const headers = [
+    'Contrato',
+    'HH tickets',
+    'HH registros sin ticket',
+    'HH proyectos vinculados',
+    'HH registros de tickets eliminados',
+    withWorkedRange ? 'Total período' : 'Total Excel',
+    ...(withWorkedRange ? [] : ['Total contrato en Kora', 'Diferencia']),
+    'De las HH tickets: anteriores al inicio (en el primer mes)',
+    'HH de tickets posteriores al término (no cuentan)',
+  ];
+  const body = contracts.map((contract) => {
+    const sum = (predicate: (row: DetailRow) => boolean) =>
+      roundHours(rows.filter(predicate).reduce((total, row) => total + row.hours, 0));
+    const ofKind = (kind: DetailRow['kind']) => sum((row) => row.contractId === contract.planId && row.kind === kind);
+    const tickets = ofKind('ticket');
+    const withoutTicket = ofKind('without_ticket');
+    const linked = ofKind('linked_project');
+    const deleted = ofKind('deleted_ticket');
+    const total = roundHours(tickets + withoutTicket + linked + deleted);
+    const beforeStart = sum((row) => row.contractId === contract.planId && row.countsLabel === BEFORE_START);
+    const outside = sum((row) => row.countsLabel === OUTSIDE_VALIDITY && contract.projectIds.includes(row.projectId));
+    return [
+      contract.name, tickets, withoutTicket, linked, deleted, total,
+      ...(withWorkedRange ? [] : [contract.usedHours, roundHours(total - contract.usedHours)]),
+      beforeStart, outside,
+    ];
+  });
+  const sheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
+  sheet['!cols'] = headers.map((label, index) => ({ wch: index === 0 ? 34 : Math.max(14, Math.min(30, label.length + 2)) }));
+  return sheet;
+}
+
 function prepareSheet(sheet: XLSX.WorkSheet, headers: readonly string[], dateColumns: readonly number[], rowCount: number) {
   // Fechas como celdas numéricas de Excel, no texto: filtros y orden cronológico reales.
   for (const col of dateColumns) {
@@ -134,35 +247,52 @@ function prepareSheet(sheet: XLSX.WorkSheet, headers: readonly string[], dateCol
   sheet['!cols'] = headers.map((label) => ({
     wch: ['Título', 'Incidente', 'Solución', 'Observación fecha'].includes(label)
       ? 38
-      : ['Responsable', 'Registrado por', 'Contrato', 'Proyecto Desarrollo'].includes(label)
+      : ['Responsable', 'Registrado por', 'Contrato', 'Proyecto Desarrollo', 'Cuenta en total contrato'].includes(label)
         ? 26
         : Math.max(14, Math.min(28, label.length + 3)),
   }));
 }
 
 /**
- * Dos hojas del mismo conjunto de tickets: el detalle muestra HH aprobadas
- * por día y los saldos sin desglose; el resumen informa ambos por separado.
- * Las fechas de reporte usan America/Santiago y las de trabajo son DATE puras.
+ * Hojas del mismo conjunto de tickets: el detalle muestra HH aprobadas por
+ * día y los saldos sin desglose; el resumen informa ambos por separado. Con
+ * contratos de soporte, el detalle suma además las horas que el contrato
+ * consume sin ticket y la hoja "Total contrato" cuadra el total del Excel con
+ * el de Kora. Las fechas de reporte usan America/Santiago y las de trabajo
+ * son DATE puras.
  */
 export function buildTicketHistoryWorkbook(
   tickets: readonly TicketSummary[],
   dailyHours: readonly TicketDailyHours[],
+  consumption: TicketContractConsumptionResponse = { contracts: [], entries: [] },
+  workedRange: TicketHistoryWorkedRange = {},
 ): XLSX.WorkBook {
+  const { contracts, entries } = consumption;
+  const withContracts = contracts.length > 0;
+  const withWorkedRange = Boolean(workedRange.from || workedRange.to);
   const byTicket = groupDailyHours(dailyHours);
-  const detailRows = buildDailyRows(tickets, byTicket);
-  const detailHeaders = DETAIL_COLUMNS.map((column) => column.label);
+
+  const clientOf = (contract: TicketContractConsumption | undefined) =>
+    tickets.find((ticket) => ticket.project && contract?.projectIds.includes(ticket.project.id))?.client?.companyName ?? '';
+  const detailRows: DetailRow[] = [
+    ...buildDailyRows(tickets, byTicket, withWorkedRange).map((row) => ticketDetailRow(row, contracts)),
+    ...entries.map((entry) => {
+      const contract = contracts.find((item) => item.planId === entry.planId);
+      return entryDetailRow(entry, contract, clientOf(contract));
+    }),
+  ];
+
+  const detailHeaders = [...DETAIL_COLUMNS.map((column) => column.label), ...(withContracts ? ['Cuenta en total contrato'] : [])];
   const detailSheet = XLSX.utils.aoa_to_sheet([
     detailHeaders,
-    ...detailRows.map((row) => DETAIL_COLUMNS.map((column) => column.getValue(row))),
+    ...detailRows.map((row) => (withContracts ? [...row.cells, row.countsLabel] : row.cells)),
   ]);
   prepareSheet(detailSheet, detailHeaders, [9, 10], detailRows.length);
 
+  // Con rango de fecha trabajada, "HH Utilizadas" sigue siendo el total del ticket y se agregan las HH del período (no se concilia: el resto es de otros días).
   const summaryHeaders = [
     ...COLUMNS.map((column) => column.label),
-    'HH con detalle diario',
-    'HH sin detalle diario',
-    'Estado conciliación',
+    ...(withWorkedRange ? ['HH en el período'] : ['HH con detalle diario', 'HH sin detalle diario', 'Estado conciliación']),
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet([
     summaryHeaders,
@@ -170,9 +300,9 @@ export function buildTicketHistoryWorkbook(
       const reconciliation = reconcile(ticket, byTicket.get(ticket.id) ?? []);
       return [
         ...COLUMNS.map((column) => column.getValue(ticket)),
-        reconciliation.detailedHours,
-        reconciliation.undetailedHours,
-        reconciliation.status,
+        ...(withWorkedRange
+          ? [reconciliation.detailedHours]
+          : [reconciliation.detailedHours, reconciliation.undetailedHours, reconciliation.status]),
       ];
     }),
   ]);
@@ -181,6 +311,9 @@ export function buildTicketHistoryWorkbook(
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, detailSheet, 'Detalle por día');
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen por ticket');
+  if (withContracts) {
+    XLSX.utils.book_append_sheet(workbook, buildContractTotalsSheet(contracts, detailRows, withWorkedRange), 'Total contrato');
+  }
   return workbook;
 }
 
@@ -191,8 +324,16 @@ export function assertTicketHistoryExportComplete(tickets: readonly TicketSummar
   }
 }
 
-export function exportTicketHistory(tickets: readonly TicketSummary[], dailyHours: readonly TicketDailyHours[]) {
-  const workbook = buildTicketHistoryWorkbook(tickets, dailyHours);
+export function exportTicketHistory(
+  tickets: readonly TicketSummary[],
+  dailyHours: readonly TicketDailyHours[],
+  consumption?: TicketContractConsumptionResponse,
+  workedRange: TicketHistoryWorkedRange = {},
+) {
+  const workbook = buildTicketHistoryWorkbook(tickets, dailyHours, consumption, workedRange);
   const today = ticketReportDay(new Date().toISOString());
-  XLSX.writeFile(workbook, `historial-tickets-${today}.xlsx`, { compression: true });
+  const suffix = workedRange.from || workedRange.to
+    ? `trabajado-${workedRange.from ?? 'inicio'}_${workedRange.to ?? 'hoy'}`
+    : today;
+  XLSX.writeFile(workbook, `historial-tickets-${suffix}.xlsx`, { compression: true });
 }

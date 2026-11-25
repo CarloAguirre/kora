@@ -381,9 +381,12 @@ export class GetDashboardSummaryUseCase implements UseCase<GetDashboardSummaryCo
       optimal: allScored.filter((entry) => entry.status === 'optimal').length,
     };
 
-    /** Monitor de Salud: solo proyectos en riesgo por HH (consumidas > vendidas), primero los de mayor exceso. */
+    /**
+     * Monitor de Salud: solo proyectos externos (sin internos como Kabeli interno/PMO) en riesgo por HH
+     * (consumidas > vendidas), primero los de mayor exceso.
+     */
     const scored = allScored
-      .filter((entry) => entry.p.usedHours > entry.p.soldHours)
+      .filter((entry) => !entry.p.isInternal && entry.p.usedHours > entry.p.soldHours)
       .sort((a, b) => {
         const overrunDiff = b.p.usedHours - b.p.soldHours - (a.p.usedHours - a.p.soldHours);
         if (overrunDiff !== 0) return overrunDiff;
